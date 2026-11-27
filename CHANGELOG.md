@@ -78,6 +78,12 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `pc`, `fci`, `cdnod`, `fci_jci`, `rsmax2`, and the other methods that run the PC family's skeleton
+  search with `fisherz`, `student_t`, or `normal_scores` on complete data build the queries of the
+  conditioning-size-1 pass from arrays, and the scans of conditioning sets of two or more variables
+  list the sets of a small neighborhood at once, so they run faster on many variables, with the
+  same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
+  ([#1287])
 
 ### Fixed
 
@@ -3036,3 +3042,4 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
