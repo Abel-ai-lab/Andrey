@@ -241,3 +241,15 @@ def test_copy_adjacency_follows_columns(copy: str) -> None:
         relabeled[np.ix_(perm, perm)] = B_perm
         np.testing.assert_array_equal(relabeled != 0, B != 0, err_msg=str(perm))
         np.testing.assert_allclose(relabeled, B, atol=1e-9, err_msg=str(perm))
+
+
+def test_multi_group_order_does_not_depend_on_the_memory_layout() -> None:
+    """Near copies tie down to the last bits the search reads, so the layout of the input, which
+    changes how a sum of a column rounds, would decide which of them comes first."""
+    groups = [_chain_with_copy("near"), _chain_with_copy("near")[::-1].copy()]
+    groups[1][:, 3] = groups[1][:, 3] + 0.1 * np.sin(np.arange(300))
+    want = _shared(groups)
+    for relayout in (np.asfortranarray, lambda X: X[:, list(range(X.shape[1]))]):
+        assert _shared([relayout(X) for X in groups]) == want
+    near = _chain_with_copy("near")
+    assert pwling.find_causal_order(np.asfortranarray(near)) == pwling.find_causal_order(near)

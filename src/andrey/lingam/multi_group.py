@@ -87,7 +87,7 @@ def _find_shared_causal_order(
     # Copy + float64 so the in-place residual write-back never truncates.
     residualized = [np.array(X, dtype=np.float64) for X in groups]
     for X in residualized:  # centered once, as in :func:`pwling.find_causal_order`
-        X -= X.mean(axis=0)
+        pwling.center_columns(X)
     ranks = tie_ranks(np.vstack(residualized))  # centered: no group's offset moves its rows' ranks
     hint: dict[int, float] = {}
 

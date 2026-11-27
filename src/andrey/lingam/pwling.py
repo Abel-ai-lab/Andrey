@@ -417,7 +417,7 @@ def find_causal_order(
     # covariance, and residual is taken between values of the columns' spread, so an offset costs
     # them none of its rounding. One pass is enough: each step's standardization subtracts the small
     # mean the pass leaves.
-    residualized -= residualized.mean(axis=0)
+    center_columns(residualized)
     hint: dict[int, float] = {}
     while remaining:
         if precedence is None:
@@ -446,6 +446,16 @@ def find_causal_order(
         residualize(residualized, remaining, m)
         order += placed
     return order
+
+
+def center_columns(X: np.ndarray) -> None:
+    """Subtract each column's mean from ``X``, in place.
+
+    Each mean sums one column, so it has the bits of a contiguous column whatever the memory layout
+    of ``X``; ``X.mean(axis=0)`` adds the rows of a C-ordered array one after the other, which
+    rounds otherwise and would let the layout of the input reach the order.
+    """
+    X -= np.array([column.mean() for column in X.T])
 
 
 def residualize(X: np.ndarray, remaining: list[int], m: int) -> None:
