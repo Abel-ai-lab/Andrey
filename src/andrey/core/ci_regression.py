@@ -72,7 +72,8 @@ def _constant(value: float) -> Predictor:
 def _early_stopped(curve: np.ndarray) -> np.ndarray:
     """``curve`` with every round after the stop set to infinity.
 
-    The rounds stop once ``_BOOST_PATIENCE`` rounds in a row have not lowered the best error.
+    The rounds stop once ``_BOOST_PATIENCE`` rounds in a row have not lowered the best error. This
+    is the rule that :func:`_fold_curve` applies as a fold's model grows.
     """
     best = 0
     for i in range(1, curve.size):
@@ -99,24 +100,52 @@ def _boosting(
     )
 
 
+def _fold_curve(
+    features: np.ndarray, target: np.ndarray, held: np.ndarray, depth: int
+) -> np.ndarray:
+    """The held-out error after each round of boosted trees of ``depth`` fit on the other rows,
+    with every round after the stop set to infinity, as :func:`_early_stopped` gives.
+
+    The model grows only through the stop round: a callback adds each new tree's prediction of the
+    held-out rows, as staged prediction does, records the error, and stops the fit.
+    """
+    # The trees read their features as float32, which staged prediction converts them to.
+    held_features = np.ascontiguousarray(features[held], dtype=np.float32)
+    held_target = target[held]
+    curve = np.full(_BOOST_ROUNDS, np.inf)
+    prediction = np.empty(0)
+    best = 0
+
+    def stop_at_patience(i: int, model: GradientBoostingRegressor, _: dict) -> bool:
+        nonlocal prediction, best
+        if i == 0:
+            prediction = model.init_.predict(held_features).astype(np.float64)
+        # A round adds its tree's prediction times the rate, as staged prediction does.
+        tree = model.estimators_[i, 0]
+        prediction = prediction + _BOOST_RATE * tree.predict(held_features, check_input=False)
+        curve[i] = np.sqrt(np.mean((held_target - prediction) ** 2))
+        if curve[i] < curve[best]:
+            best = i
+        return i - best >= _BOOST_PATIENCE
+
+    _boosting(depth, _BOOST_ROUNDS).fit(features[~held], target[~held], monitor=stop_at_patience)
+    return curve
+
+
 def _fit_boosting(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -> Predictor:
     """Boosted trees whose depth and number of rounds minimize the cross-validated error."""
+    if not (np.isfinite(features).all() and np.isfinite(target).all()):
+        raise ValueError("boosting needs finite features and a finite target")
     n_folds = int(folds.max()) + 1
     error = np.zeros((_BOOST_ROUNDS, len(_BOOST_DEPTHS)))
-    for j, depth in enumerate(_BOOST_DEPTHS):
-        for fold in range(n_folds):
-            held = folds == fold
-            model = _boosting(depth, _BOOST_ROUNDS).fit(features[~held], target[~held])
-            curve = np.array(
-                [
-                    np.sqrt(np.mean((target[held] - p) ** 2))
-                    for p in model.staged_predict(features[held])
-                ]
-            )
-            error[:, j] += _early_stopped(curve)
-    # The first minimum over the depths in turn, each over its rounds.
-    j, rounds = divmod(int(np.argmin(error.T)), _BOOST_ROUNDS)
-    return _boosting(_BOOST_DEPTHS[j], rounds + 1).fit(features, target).predict
+    # The inputs are checked once above, not at each of the many small fits.
+    with sklearn.config_context(assume_finite=True, skip_parameter_validation=True):
+        for j, depth in enumerate(_BOOST_DEPTHS):
+            for fold in range(n_folds):
+                error[:, j] += _fold_curve(features, target, folds == fold, depth)
+        # The first minimum over the depths in turn, each over its rounds.
+        j, rounds = divmod(int(np.argmin(error.T)), _BOOST_ROUNDS)
+        return _boosting(_BOOST_DEPTHS[j], rounds + 1).fit(features, target).predict
 
 
 def _mean_cv_error(

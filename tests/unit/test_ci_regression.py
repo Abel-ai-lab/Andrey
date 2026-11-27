@@ -275,6 +275,118 @@ def test_mean_cv_error_equals_the_staged_curves(monkeypatch):
         assert cr._mean_cv_error(z, target, folds, rate, depth) == (mean[best], best + 1)
 
 
+def _boosting_case(kind: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The features, target, and folds of one ``_fit_boosting`` call, as ``_fit`` builds them."""
+    rng = np.random.default_rng(1)
+    if kind == "smooth":  # depth 1 keeps improving to the last round, deeper trees stop early
+        z = rng.standard_normal((80, 1))
+        y = np.sin(2 * z[:, 0]) + 0.3 * rng.standard_normal(80)
+    elif kind == "tied codes":  # three-level columns: every split threshold is shared by many rows
+        z = rng.integers(0, 3, size=(80, 2)).astype(float)
+        y = (z[:, 0] == 1) + rng.integers(0, 3, size=80)
+    elif kind == "constant fold":  # fold 3 holds both rows of the rare value, so its model sees 0
+        z = rng.standard_normal((60, 2))
+        y = np.zeros(60)
+        y[[3, 13]] = 1.0
+    else:  # the fewest rows a test is fitted on, and a dozen
+        rows = {"four rows": 4, "twelve rows": 12}[kind]
+        z = rng.standard_normal((rows, 2))
+        y = np.sin(2 * z[:, 0]) + 0.3 * rng.standard_normal(rows)
+    block = cr._canonical_columns(np.column_stack([y, z]))
+    m = len(y)
+    folds = np.arange(m) % min(cr._BOOST_FOLDS, m)
+    return block[:, 1:], block[:, 0], folds if kind == "constant fold" else rng.permutation(folds)
+
+
+def _staged_boosting(features, target, folds):
+    """The earlier ``_fit_boosting``: every fold grown to the last round, its held-out curve from
+    staged prediction cut by ``_early_stopped``. Returns each fold's curve and the predictor."""
+    curves = {}
+    error = np.zeros((cr._BOOST_ROUNDS, len(cr._BOOST_DEPTHS)))
+    for j, depth in enumerate(cr._BOOST_DEPTHS):
+        for fold in range(int(folds.max()) + 1):
+            held = folds == fold
+            model = cr._boosting(depth, cr._BOOST_ROUNDS).fit(features[~held], target[~held])
+            curve = np.array(
+                [
+                    np.sqrt(np.mean((target[held] - p) ** 2))
+                    for p in model.staged_predict(features[held])
+                ]
+            )
+            curves[depth, fold] = cr._early_stopped(curve)
+            error[:, j] += curves[depth, fold]
+    j, rounds = divmod(int(np.argmin(error.T)), cr._BOOST_ROUNDS)
+    return curves, cr._boosting(cr._BOOST_DEPTHS[j], rounds + 1).fit(features, target).predict
+
+
+@pytest.mark.parametrize(
+    "kind", ["smooth", "tied codes", "constant fold", "four rows", "twelve rows"]
+)
+def test_boosting_equals_the_staged_loop_bit_for_bit(kind, monkeypatch):
+    """Each fold's curve, and the predictor fitted from them, equal the earlier loop's."""
+    features, target, folds = _boosting_case(kind)
+    curves, predict = _staged_boosting(features, target, folds)
+    seen = {}
+    fold_curve = cr._fold_curve
+
+    def record(features, target, held, depth):
+        seen[depth, int(folds[held][0])] = curve = fold_curve(features, target, held, depth)
+        return curve
+
+    monkeypatch.setattr(cr, "_fold_curve", record)
+    fitted = cr._fit_boosting(features, target, folds)
+    assert seen.keys() == curves.keys()
+    assert all(seen[key].tobytes() == curves[key].tobytes() for key in curves)
+    assert fitted(features).tobytes() == predict(features).tobytes()
+    # The cases reach the regimes of the stop: cut early, run to the last round, and ties.
+    early = [np.isinf(c).any() for c in curves.values()]
+    full = [np.isfinite(c).all() for c in curves.values()]
+    if kind in ("smooth", "tied codes"):
+        assert any(early) and any(full)
+    if kind == "tied codes":
+        assert np.unique(features[:, 0]).size == 3
+    if kind == "constant fold":  # a fold with no variation to learn repeats one error, then stops
+        finite = curves[1, 3][np.isfinite(curves[1, 3])]
+        assert finite.size == cr._BOOST_PATIENCE + 1 and np.ptp(finite) == 0
+
+
+def test_a_fold_grows_only_through_its_stop(monkeypatch):
+    features, target, folds = _boosting_case("smooth")
+    grown = []
+    boosting = cr._boosting
+
+    def record(*args, **kwargs):
+        grown.append(boosting(*args, **kwargs))
+        return grown[-1]
+
+    monkeypatch.setattr(cr, "_boosting", record)
+    curve = cr._fold_curve(features, target, folds == 0, cr._BOOST_DEPTHS[-1])
+    stop = int(np.isfinite(curve).sum())
+    assert 0 < stop < cr._BOOST_ROUNDS
+    assert grown[0].estimators_.shape[0] == stop
+
+
+def test_gcm_boosting_p_value_equals_the_staged_loop(monkeypatch):
+    data = _chain(80)
+    p_values = [cr.GCM(data, seed=0)(0, 2, [1]), cr.GCM(data, seed=0)(0, 3, [1, 2])]
+
+    def staged(features, target, folds):
+        return _staged_boosting(features, target, folds)[1]
+
+    monkeypatch.setattr(cr._RegressionTest, "_fit_boosting", staticmethod(staged))
+    expected = [cr.GCM(data, seed=0)(0, 2, [1]), cr.GCM(data, seed=0)(0, 3, [1, 2])]
+    assert [float(p).hex() for p in p_values] == [float(p).hex() for p in expected]
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+@pytest.mark.parametrize("where", ["features", "target"])
+def test_boosting_rejects_a_non_finite_input(where, bad):
+    features, target, folds = _boosting_case("twelve rows")
+    (features if where == "features" else target)[3] = bad
+    with pytest.raises(ValueError, match="finite"):
+        cr._fit_boosting(features, target, folds)
+
+
 def _linear_null(n: int, seed: int) -> np.ndarray:
     """The wGCM paper's one-dimensional null at its linear grid point: ``x`` and ``y`` are
     ``0.3 z`` plus independent noise of scale 0.3."""
