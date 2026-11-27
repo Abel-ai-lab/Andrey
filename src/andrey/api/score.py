@@ -714,20 +714,25 @@ def fges(
         mixed-data scores, see Notes. Directed marks
         (``->``) are oriented edges, undirected (``--``) the ones the equivalence class leaves open.
         Under a mixed-data setting, ``metadata["categorical"]`` lists the categorical columns it
-        read, by name or 0-based position.
+        read, by name or 0-based position. ``metadata["tie_break"]`` is the tie-break rule the fit
+        ran under, ``andrey.config.tie_break``, and ``metadata`` also records the penalties its
+        score used, under their parameter names.
 
     Raises
     ------
     TypeError
-        If ``categorical`` is not a list of column names and positions, or ``knowledge`` is neither
-        ``None`` nor a :class:`~andrey.Knowledge`.
+        If an argument has the wrong type, such as a string for a number; the message names the
+        method, the argument, what it accepts, and the value. Also if ``categorical`` is not a list
+        of column names and positions, or ``knowledge`` is neither ``None`` nor a
+        :class:`~andrey.Knowledge`.
     ValueError
-        If an argument has the wrong type, lies outside its range, or is not one of its choices; the
-        message names the method, the argument, what it accepts, and the value. Also if a given
-        ``max_parents`` is below the parents some graph of the required edges of ``knowledge`` gives
-        a node; with a categorical score, if ``data`` holds a number that is not whole; or, with a
-        mixed-data score, if ``categorical`` names a column ``data`` lacks, or if a categorical
-        column holds a number that is not whole or a missing value. Also if a continuous score meets
+        If an argument lies outside its range or is not one of its choices; the message names the
+        method, the argument, what it accepts, and the value. Also if ``data`` is not a 2-D numeric
+        matrix with at least two rows and no ``NaN`` or ``inf``, or if a column is constant; if a
+        given ``max_parents`` is below the parents some graph of the required edges of
+        ``knowledge`` gives a node; with a categorical score, if ``data`` holds a number that is not
+        whole; or, with a mixed-data score, if ``categorical`` names a column ``data`` lacks, or if
+        a categorical column holds a number that is not whole. Also if a continuous score meets
         a column declared categorical, by ``categorical`` or by its type. With the BIC score, also
         if a column repeats another up to scale and shift given more than two rows or, with more
         rows than columns, is a linear function of other columns. One message names every group of
@@ -741,8 +746,8 @@ def fges(
         linear-Gaussian form, or when a setting reads columns that look like category codes as
         numbers. Each message warns once per process.
     ExperimentalWarning
-        On the first call in a process, because the method is experimental: it has no published
-        benchmark, and its API may change without deprecation.
+        On the first call in a process: the method is not supported (see Limitations), and its
+        API may change without deprecation.
 
     See Also
     --------
@@ -751,7 +756,7 @@ def fges(
 
     Notes
     -----
-    **When to use it.** FGES suits data with no unmeasured common causes, as GES does, and takes
+    **When to use.** FGES suits data with no unmeasured common causes, as GES does, and takes
     its scores, penalties, ``max_parents``, and background knowledge (see :func:`~andrey.ges` for
     the scores and how to choose ``penalty_discount``). It is for runs where the number of
     variables makes GES's first forward passes the cost, and for readers who want the algorithm of
@@ -779,6 +784,12 @@ def fges(
     parallel and cached scoring scheme, which GES here shares, and fixes the BIC penalty at 4 times
     the standard one for continuous data; ``penalty_discount`` keeps the default of ``1.0`` that
     every method shares.
+
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``. The score sums one term per
+    variable over every row; terms over different rows do not sum to one dataset's score, so the
+    search cannot delete rows per test as conditional-independence searches do. Drop the incomplete
+    rows yourself, which suits values missing completely at random, or use :func:`~andrey.pc` or
+    :func:`~andrey.fci`, whose tests delete rows per test.
 
     **Limitations.** Not benchmarked yet.
 
