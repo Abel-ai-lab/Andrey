@@ -180,6 +180,9 @@ names its pull request.
   target with one search, so a run that several targets share is made once, and each result counts
   the rows of the runs its target reads, as a call for that target alone counts them. These lists
   run faster, with the same output bit for bit. ([#1317])
+- `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` build the conditioning sets of their
+  collider test as int arrays and hand them as they are to a test that answers a set of queries at
+  once, so they run faster, with the same output bit for bit and the same queries. ([#1327])
 
 ### Fixed
 
@@ -3159,3 +3162,4 @@ First alpha release.
 [#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
 [#1317]: https://github.com/Abel-ai-lab/Andrey/pull/1317
+[#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
