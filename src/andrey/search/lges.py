@@ -20,11 +20,11 @@ from typing import cast
 
 import numpy as np
 
-from andrey.core import GraphStructure, backend
+from andrey.core import GraphStructure, _bitset, backend
 from andrey.core.orient import pdag2dag, to_structure
 from andrey.core.score import BICScore, LocalScore, make_score
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
-from andrey.core.ties import EPS_IMPROVE, tie_mask, tie_ranks
+from andrey.core.ties import EPS_IMPROVE, stable_key, tie_mask, tie_ranks
 from andrey.search import operators as ops
 from andrey.search._parallel_ges import backward_chunk_best, move_key, neighborhood_state
 from andrey.search.ges import recompute_objective
@@ -51,7 +51,12 @@ def extension(adj: np.ndarray, ranks: Sequence[int]) -> np.ndarray:
 
 
 def insert_moves(
-    adj: np.ndarray, score: LocalScore, n: int, ranks: Sequence[int], conservative: bool
+    adj: np.ndarray,
+    score: LocalScore,
+    n: int,
+    ranks: Sequence[int],
+    conservative: bool,
+    verdicts: dict[tuple[int, tuple[int, ...]], frozenset[int]] | None = None,
 ) -> Iterator[tuple[float, int, int, tuple[int, ...]]]:
     """Yield every valid ``Insert(x, y, T)`` the less greedy rule keeps, as ``(delta, x, y, T)``.
 
@@ -61,28 +66,57 @@ def insert_moves(
     ``x`` with ``NA_yx + T`` a clique that blocks every semi-directed path from ``y`` to ``x``;
     with ``conservative``, a pair with a valid Insert that worsens the score is left out whole
     (ConservativeInsert). ``delta`` is the change in score; lower is better.
+
+    ``verdicts``, when given, keeps the SafeInsert verdict of each target by ``(y, Pa_G(y))``: the
+    nodes ``x`` for which ``G`` does not score better without ``x -> y``. A verdict depends on the
+    score alone, so one dict serves every state of a search with the same score.
     """
     dag = extension(adj, ranks)
     adj_sets, par_of, nbr = neighborhood_state(adj)
-    succ = ops.tail_successor_lists(adj)
+    succ = _bitset.row_masks(adj == ops.TAIL)
+    dag_parents = [np.flatnonzero(row).tolist() for row in (dag == ops.ARROW)]
     for y in range(n):
-        dag_pa = set(ops.parents(dag, y).tolist())
-        dag_base = score.score(y, sorted(dag_pa))
+        dag_pa_list = dag_parents[y]
+        key = (y, tuple(dag_pa_list))
+        safe = None if verdicts is None else verdicts.get(key)
+        if safe is None:
+            dag_pa = set(dag_pa_list)
+            dag_base = score.score(y, dag_pa_list)
+            safe = frozenset(
+                x
+                for x in range(n)
+                if x != y
+                and x not in dag_pa
+                and not score.score(y, sorted(dag_pa | {x})) > dag_base
+            )
+            if verdicts is not None:
+                verdicts[key] = safe
         pa = {int(p) for p in par_of[y]}
-        for x in range(n):
-            if x == y or x in adj_sets[y]:
-                continue
-            if score.score(y, sorted(dag_pa | {x})) > dag_base:
-                continue  # SafeInsert: G scores better without x -> y
-            na = nbr[y] & adj_sets[x]
-            t0 = sorted(nbr[y] - adj_sets[x])
+        nbr_y = nbr[y]
+        extensions: dict[frozenset[int], list[tuple[tuple[int, ...], int, list[int]]]] = {}
+        reach: dict[int, int] = {}
+        base_score: dict[tuple[int, ...], float] = {}
+        for x in sorted(safe - adj_sets[y]):
+            na = frozenset(nbr_y & adj_sets[x])
+            ext = extensions.get(na)
+            if ext is None:
+                ext = []
+                for _index, T in ops.clique_extensions(adj, na, sorted(nbr_y - na)):
+                    clique = na.union(T)
+                    ext.append((T, _bitset.bitmask(clique), sorted(clique | pa)))
+                extensions[na] = ext
             moves: list[tuple[float, int, int, tuple[int, ...]]] = []
-            for _index, T in ops.clique_extensions(adj, na, t0):
-                clique = na | set(T)
-                if not ops.blocks_semi_directed_paths(succ, y, x, clique):
+            for T, clique_mask, kept in ext:
+                seen = reach.get(clique_mask)
+                if seen is None:
+                    seen = reach[clique_mask] = _bitset.semidirected_reach_set(succ, y, clique_mask)
+                if (seen >> x) & 1:
                     continue
-                kept = clique | pa
-                delta = score.score(y, sorted(kept | {x})) - score.score(y, sorted(kept))
+                base = tuple(kept)
+                s_kept = base_score.get(base)
+                if s_kept is None:
+                    s_kept = base_score[base] = score.score(y, kept)
+                delta = score.score(y, sorted([*kept, x])) - s_kept
                 if conservative and delta > 0:
                     moves = []
                     break  # ConservativeInsert: some Insert(x, y, T) worsens the score
@@ -91,12 +125,28 @@ def insert_moves(
 
 
 def insert_best(
-    adj: np.ndarray, score: LocalScore, n: int, ranks: Sequence[int], conservative: bool
+    adj: np.ndarray,
+    score: LocalScore,
+    n: int,
+    ranks: Sequence[int],
+    conservative: bool,
+    verdicts: dict[tuple[int, tuple[int, ...]], frozenset[int]] | None = None,
 ) -> tuple[float, int, int, tuple[int, ...]] | None:
     """The best of :func:`insert_moves` by :func:`~andrey.search._parallel_ges.move_key`, or None
-    when none lowers the score by more than :data:`~andrey.core.ties.EPS_IMPROVE`."""
-    improving = (m for m in insert_moves(adj, score, n, ranks, conservative) if m[0] < -EPS_IMPROVE)
-    return min(improving, key=lambda m: move_key(m[0], n, m[1], m[2], m[3], ranks), default=None)
+    when none lowers the score by more than :data:`~andrey.core.ties.EPS_IMPROVE`; ``verdicts``
+    is that function's."""
+    best: tuple[float, int, int, tuple[int, ...]] | None = None
+    best_key: tuple | None = None
+    for move in insert_moves(adj, score, n, ranks, conservative, verdicts):
+        delta = move[0]
+        if not delta < -EPS_IMPROVE:
+            continue
+        if best_key is not None and stable_key(delta, n) > best_key[0]:
+            continue
+        key = move_key(delta, n, move[1], move[2], move[3], ranks)
+        if best_key is None or key < best_key:
+            best, best_key = move, key
+    return best
 
 
 def lges(
@@ -163,6 +213,7 @@ def lges(
         # The turning scan reads only the score's local scores, not its batched additions.
         family = cast(FamilyScore, score)
         kept: dict[tuple[int, tuple[int, ...], int], float] = {}
+        verdicts: dict[tuple[int, tuple[int, ...]], frozenset[int]] = {}
 
         def deletes(adj: np.ndarray) -> np.ndarray:
             while (
@@ -184,13 +235,13 @@ def lges(
         if schedule == "lges":
             while True:
                 adj, turned = turns(deletes(adj))
-                if (move := insert_best(adj, score, n, ranks, conservative)) is not None:
+                if (move := insert_best(adj, score, n, ranks, conservative, verdicts)) is not None:
                     _, x, y, T = move
                     adj = ops.insert_cpdag(adj, x, y, T)
                 elif not turned:
                     break  # no Delete, turning move, or Insert improves
         else:
-            while (move := insert_best(adj, score, n, ranks, conservative)) is not None:
+            while (move := insert_best(adj, score, n, ranks, conservative, verdicts)) is not None:
                 _, x, y, T = move
                 adj = ops.insert_cpdag(adj, x, y, T)
             adj, _ = turns(deletes(adj))

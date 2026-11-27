@@ -513,8 +513,7 @@ class BICScore:
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
+        return self._score_key(int(node), tuple(sorted(map(int, parents))))
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the negative local BIC scores for many parent sets, in request order.
@@ -581,7 +580,7 @@ class _CountScore:
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = (int(node), tuple(sorted(int(p) for p in parents)))
+        key = (int(node), tuple(sorted(map(int, parents))))
         value = self._memo.get(key)
         if value is None:
             (counts,) = categorical.table_counts(self._codes, self._cardinalities, key[0], [key[1]])
@@ -947,8 +946,7 @@ class DGScore:
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
+        return self._score_key(int(node), tuple(sorted(map(int, parents))))
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the negative local DG scores for many parent sets, in request order."""
