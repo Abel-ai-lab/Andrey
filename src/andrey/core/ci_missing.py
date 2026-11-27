@@ -47,6 +47,7 @@ import numpy as np
 import numpy.typing as npt
 
 from . import backend
+from .categorical import _compact, configurations
 from .ci import (
     BOUND_MARGIN,
     FALLBACK_STACK_ENTRIES,
@@ -61,6 +62,7 @@ from .ci import (
     SingularCorrelationError,
     StudentT,
     _canonical,
+    _nonempty_rule,
     p_value_statistics,
     per_query,
 )
@@ -1328,6 +1330,139 @@ class BoundedDeletion(TestwiseDeletion):
         )
 
 
+class ChiSquareDeletion(TestwiseDeletion):
+    """:class:`TestwiseDeletion` of :class:`~andrey.core.ci.ChiSquare` that answers the candidates
+    of one conditioning set together (:meth:`pvalues_given`).
+
+    A scan codes each column once over its observed rows and numbers the configurations of the set
+    once over the rows that observe it and the target. Each candidate's block takes the codes of its
+    own rows, renumbered over the categories and configurations that occur there, as the test
+    numbers them on a block it is built over, and the test's statistic and p-value run unchanged
+    on them. So every entry of a scan, the rows it counts, and the error it raises are those of the
+    query asked alone. ``degrees_of_freedom`` is checked when the test is built, since a scan builds
+    no test over values.
+
+    Parameters
+    ----------
+    settings : mapping
+        The keyword settings of the block's :class:`~andrey.core.ci.ChiSquare`: ``g_square`` and
+        ``degrees_of_freedom``.
+    """
+
+    def __init__(self, *args: Any, settings: Mapping[str, Any], **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        _nonempty_rule(settings.get("degrees_of_freedom", "mean"))
+        self._settings = dict(settings)
+        self._infinite = np.isinf(self._data).any(axis=0)
+        self._coded: tuple[np.ndarray, np.ndarray] | None = None
+
+    def _column_codes(self) -> tuple[np.ndarray, np.ndarray]:
+        """Each column's category codes over its observed rows, one contiguous row per column and
+        ``-1`` where the value is missing, and the number of categories of each column."""
+        if self._coded is None:
+            n, d = self._data.shape
+            codes = np.full((d, n), -1, dtype=np.int32 if n < 2**31 else np.int64)
+            cardinalities = np.zeros(d, dtype=np.int64)
+            for j in range(d):
+                seen = self._observed[:, j]
+                if seen.any():
+                    inverse = np.unique(self._data[seen, j], return_inverse=True)[1].reshape(-1)
+                    codes[j, seen] = inverse
+                    cardinalities[j] = int(inverse.max()) + 1
+            self._coded = (codes, cardinalities)
+        return self._coded
+
+    def pvalues_given(
+        self, target: int, xs: Iterable[int], condition_set: Iterable[int] = ()
+    ) -> np.ndarray:
+        """The p-values of ``target`` and each of ``xs`` given one ``condition_set``.
+
+        Entry ``i`` equals ``self(target, xs[i], condition_set)`` bit for bit, and the running
+        :func:`rows_tested` counter takes the rows, the pairs, and the queries not tested of those
+        calls, in their order, as one call. A scan of fewer than two candidates, a scan over an
+        environment column, a candidate whose block the test holds, and a scan over a column that
+        holds an infinity, which a block over its rows raises on, are answered as the separate
+        calls answer them. A query that raises does so after the queries before it are counted, as
+        separate calls do.
+        """
+        target = int(target)
+        candidates = [int(x) for x in xs]
+        cond = sorted(set(map(int, condition_set)))
+        out = np.empty(len(candidates), dtype=np.float64)
+        apart = self._environments | self._infinite  # the columns the separate query answers
+        if len(candidates) < 2 or apart[[target, *cond]].any():
+            for i, x in enumerate(candidates):
+                out[i] = self(target, x, cond)
+            return out
+        codes, cardinalities = self._column_codes()
+        base = (codes[[target, *cond]] >= 0).all(axis=0)
+        # Each row's configuration of the set among those the base rows hold, -1 off them. The
+        # configurations are ordered by their codes, which a renumbering of the categories keeps,
+        # so the rows of a candidate number theirs in this order too.
+        held = np.flatnonzero(base)
+        layer = np.full(codes.shape[1], -1, dtype=np.int64)
+        layer[held], configurations_held = configurations(
+            codes[cond][:, held].T, cardinalities[cond], range(len(cond))
+        )
+        least = self.least_rows(len(cond))
+        counter = _ROWS.get()
+        rows_of: list[int] = []
+        answered: list[float] = []
+        pairs: list[tuple[int, int]] = []
+
+        def count_asked() -> None:
+            if counter is not None and rows_of:
+                self._count(counter, rows_of, answered, np.array(pairs), [cond] * len(rows_of))
+            rows_of.clear()
+            answered.clear()
+            pairs.clear()
+
+        try:
+            for i, x in enumerate(candidates):
+                a, b, _ = _canonical(target, x, cond)
+                if apart[x] or tuple(sorted((a, b, *cond))) in self._cache:
+                    count_asked()
+                    out[i] = self(target, x, cond)
+                    continue
+                rows = np.flatnonzero(base & (codes[x] >= 0))
+                p = NOT_TESTED
+                if len(rows) >= least:
+                    coded, cards = [], []
+                    for column in (a, b):
+                        recoded, k = _compact(
+                            codes[column][rows], int(cardinalities[column]), len(rows)
+                        )
+                        coded.append(recoded)
+                        cards.append(k)
+                    if cond:
+                        recoded, k = _compact(layer[rows], configurations_held, len(rows))
+                        coded.append(recoded)
+                        cards.append(k)
+                    p = self._block_pvalue(np.stack(coded, axis=1), np.array(cards), bool(cond))
+                out[i] = p
+                if counter is not None:
+                    rows_of.append(len(rows))
+                    answered.append(p)
+                    pairs.append((a, b))
+        finally:
+            count_asked()
+        return out
+
+    def _block_pvalue(self, coded: np.ndarray, cardinalities: np.ndarray, given: bool) -> float:
+        """The p-value of the first two columns of the encoded block ``coded``, given its third
+        column when ``given``; the answer of :meth:`_query` on a block it builds, ``NaN`` for zero
+        degrees of freedom, and the same error."""
+        test = ChiSquare._from_codes(coded, cardinalities, **self._settings)
+        test.zero_dof_pvalue = NOT_TESTED
+        try:
+            p = float(test(0, 1, [2] if given else []))
+        except (ValueError, ArithmeticError) as error:
+            raise self._failed(len(coded), f": {error}") from error
+        if np.isinf(p):
+            raise self._failed(len(coded), " gives no p-value")
+        return p
+
+
 def testwise_deletion(
     name: str,
     factory: Callable[..., CITest],
@@ -1372,6 +1507,10 @@ def testwise_deletion(
         kind = BoundedDeletion
     else:
         kind = TestwiseDeletion
+    extra: dict[str, Any] = {}
+    if test_class is ChiSquare:
+        kind = ChiSquareDeletion
+        extra["settings"] = {**getattr(factory, "keywords", {}), **options}
     floor, floor_options = _row_floor(factory, test_class, options)
     return kind(
         arr,
@@ -1381,6 +1520,7 @@ def testwise_deletion(
         continuous=continuous,
         check_copies=check_copies,
         least=None if floor is None else lambda size: int(floor(size, **floor_options)),
+        **extra,
     )
 
 

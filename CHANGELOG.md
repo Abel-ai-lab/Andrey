@@ -155,6 +155,11 @@ names its pull request.
   ([#1303])
 - `camuv` keeps each residual its sink tests fit, so it fits each variable on each set of
   regressors once, with the same output bit for bit. ([#1306])
+- `iamb` and `inter_iamb` on data with missing values and `chisq` or `gsq` code each column once and
+  answer each grow scan against one conditioning set together, reading its p-values as one array,
+  so these searches run faster on tens of variables, with the same output bit for bit.
+  `make_indep_test` with `chisq` or `gsq` on data with missing values raises for an unknown
+  `degrees_of_freedom` when it builds the test, not at its first query. ([#1307])
 - `pcmci` and `pcmciplus` on data with missing values stop the scan that picks each candidate's
   conditions once it has the ones the PC1 rounds keep, so they run faster on tens of variables,
   with the same output bit for bit. ([#1315])
@@ -3132,4 +3137,5 @@ First alpha release.
 [#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
+[#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
