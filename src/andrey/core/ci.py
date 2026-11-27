@@ -928,6 +928,18 @@ class NormalScores(FisherZ):
 #: The degrees-of-freedom rules of :class:`ChiSquare`: ``"mean"``, the null mean of the statistic,
 #: and ``"nonempty"``, each configuration's table with its empty rows and columns struck.
 DEGREES_OF_FREEDOM: tuple[str, ...] = ("mean", "nonempty")
+
+
+def _nonempty_rule(degrees_of_freedom: str) -> bool:
+    """Whether ``degrees_of_freedom`` is the ``"nonempty"`` rule; ``ValueError`` when it is not one
+    of :data:`DEGREES_OF_FREEDOM`."""
+    if degrees_of_freedom not in DEGREES_OF_FREEDOM:
+        raise ValueError(
+            f"degrees_of_freedom must be one of {DEGREES_OF_FREEDOM}, got {degrees_of_freedom!r}"
+        )
+    return degrees_of_freedom == "nonempty"
+
+
 # A joint table of at most this many cells is counted densely; a larger one counts only the cells
 # that occur, so memory stays proportional to the rows whatever the cardinalities.
 _DENSE_CELLS = 1 << 20
@@ -1072,20 +1084,62 @@ class ChiSquare:
     def __init__(
         self, data: np.ndarray, *, g_square: bool = False, degrees_of_freedom: str = "mean"
     ) -> None:
-        if degrees_of_freedom not in DEGREES_OF_FREEDOM:
-            raise ValueError(
-                f"degrees_of_freedom must be one of {DEGREES_OF_FREEDOM}, "
-                f"got {degrees_of_freedom!r}"
-            )
+        nonempty = _nonempty_rule(degrees_of_freedom)
         arr = stats.checked_matrix(data, "run a chi-square test", dtype=None)
-        self._n: int = arr.shape[0]
-        self._codes, self._cardinalities = categorical.encode(arr)
+        codes, cardinalities = categorical.encode(arr)
+        self._set_codes(codes, cardinalities, g_square, nonempty)
+
+    @classmethod
+    def _from_codes(
+        cls,
+        codes: np.ndarray,
+        cardinalities: np.ndarray,
+        *,
+        g_square: bool = False,
+        degrees_of_freedom: str = "mean",
+    ) -> Self:
+        """The test over data that is already encoded, as :func:`~andrey.core.categorical.encode`
+        encodes it.
+
+        Parameters
+        ----------
+        codes : ndarray of int64, shape (n_samples, n_features)
+            Column ``j`` holds each row's category, ``0..k_j-1``, every one of them present.
+        cardinalities : ndarray of int64, shape (n_features,)
+            ``k_j``, the number of categories of column ``j``.
+        g_square : bool, default=False
+            Use the G-square (likelihood-ratio) statistic instead of Pearson's chi-square.
+        degrees_of_freedom : {"mean", "nonempty"}, default="mean"
+            The degrees of freedom the p-value uses, as in the constructor.
+
+        Returns
+        -------
+        ChiSquare
+            The test the constructor builds over the data that ``codes`` encodes: every query
+            answers as that test answers it.
+
+        Raises
+        ------
+        ValueError
+            If ``degrees_of_freedom`` is not one of :data:`DEGREES_OF_FREEDOM`.
+        """
+        nonempty = _nonempty_rule(degrees_of_freedom)
+        test = cls.__new__(cls)
+        test._set_codes(codes, cardinalities, g_square, nonempty)
+        return test
+
+    def _set_codes(
+        self, codes: np.ndarray, cardinalities: np.ndarray, g_square: bool, nonempty: bool
+    ) -> None:
+        """Set the test over the encoded data, for the constructor and :meth:`_from_codes`."""
+        self._n: int = codes.shape[0]
+        self._codes, self._cardinalities = codes, cardinalities
         # Each column's codes as one contiguous row, for the batched counts and for numbering
         # configurations, which read a column at a time; int32 halves the memory those counts
         # stream through.
         self._rows = self._codes.T.astype(np.int32 if self._n < 2**31 else np.int64, order="C")
         self._g_square = bool(g_square)
-        self._nonempty = degrees_of_freedom == "nonempty"
+        self._nonempty = nonempty
         # The marginal queries' statistics and p-values, by pair, and which pairs are known.
         self._marginals: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
 
