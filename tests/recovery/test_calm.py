@@ -163,6 +163,15 @@ def test_calm_thresholds_keep_a_subset_of_the_edges(weak) -> None:
     assert _directed(andrey.calm(X, gate_threshold=1.0, knowledge=knowledge)) == {(1, 2)}
 
 
+def test_calm_keeps_every_edge_its_gate_keeps_by_default(weak) -> None:
+    """The default ``w_threshold`` is 0, as in the paper: a gate above ``gate_threshold`` keeps its
+    edge whatever its weight."""
+    X, default = weak
+    explicit = andrey.calm(X, w_threshold=0.0)
+    assert _directed(explicit) == _directed(default)
+    assert np.array_equal(explicit.weighted_adjacency, default.weighted_adjacency)
+
+
 def test_calm_a_larger_lambda1_gives_fewer_weights(weak) -> None:
     X, default = weak
     sparser = andrey.calm(X, lambda1=0.2)

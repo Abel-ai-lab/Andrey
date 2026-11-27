@@ -1312,14 +1312,14 @@ def xges(
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
-        value and the fewest rows two columns share; two columns that share no observed row raise
-        ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -1417,7 +1417,7 @@ def xges(
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score sums one term per variable over every row; terms over different rows do not sum to one
     dataset's score, so the search cannot delete rows per test as conditional-independence searches
-    do. ``missing="em"``, experimental, runs structural EM [5]_ [6]_ with the linear-Gaussian BIC,
+    do. ``missing="em"`` runs structural EM [5]_ [6]_ with the linear-Gaussian BIC,
     which reads the data only through their covariance: under a linear-Gaussian model of the current
     graph, each row's missing values are Gaussian given its observed ones, and their conditional
     means and covariances give the expected covariance of the data (the E-step); the search runs on
@@ -1454,6 +1454,14 @@ def xges(
     that fits its child exactly. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
     every setting.
+    With ``missing="em"`` it made fewer errors than mean imputation, and than dropping the
+    incomplete rows wherever enough rows remain to fit, and no more than the same search inside the
+    structural EM of Gao et al. [6]_, in every setting measured. With few rows and about half of
+    the values missing it was no better than the empty graph on denser graphs, as that EM was, and
+    test-wise deletion in :func:`~andrey.pc` made fewer errors in some settings on sparse graphs.
+    The
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data>`__ has
+    the settings.
 
     References
     ----------
@@ -2569,14 +2577,14 @@ def exact_search(
         or by its type. See *Data types* in the
         :doc:`getting-started guide </docs/guides/getting-started>`.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
-        value and the fewest rows two columns share; two columns that share no observed row raise
-        ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2681,7 +2689,7 @@ def exact_search(
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``. The
     score sums one term per variable over every row; terms over different rows do not sum to one
     dataset's score, so the search cannot delete rows per test as conditional-independence searches
-    do. ``missing="em"``, experimental, runs structural EM [8]_ [9]_ with the linear-Gaussian BIC,
+    do. ``missing="em"`` runs structural EM [8]_ [9]_ with the linear-Gaussian BIC,
     which reads the data only through their covariance: under a linear-Gaussian model of the current
     graph, each row's missing values are Gaussian given its observed ones, and their conditional
     means and covariances give the expected covariance of the data (the E-step); the search runs on
@@ -2717,6 +2725,14 @@ def exact_search(
     selects a parent set that fits its child exactly. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
     every setting.
+    With ``missing="em"`` it made fewer errors than mean imputation, and than dropping the
+    incomplete rows wherever enough rows remain to fit, and no more than the same search inside the
+    structural EM of Gao et al. [9]_, in every setting measured. With few rows and about half of
+    the values missing it was no better than the empty graph on denser graphs, as that EM was, and
+    test-wise deletion in :func:`~andrey.pc` made fewer errors in some settings on sparse graphs.
+    The
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data>`__ has
+    the settings.
 
     References
     ----------
@@ -2817,7 +2833,7 @@ def calm(
     screen_alpha: float = 0.01,
     use_moral_graph: bool = True,
     standardize: bool = False,
-    w_threshold: float = 0.3,
+    w_threshold: float = 0.0,
     gate_threshold: float = 0.5,
     max_iter: int = 25,
     subproblem_iter: int = 3000,
@@ -2858,8 +2874,9 @@ def calm(
     standardize : bool, default=False
         Scale each column to unit variance first, so the fit does not read the columns' units;
         the weights are then those of the scaled columns.
-    w_threshold : float, default=0.3
-        An edge is kept when its weight magnitude reaches this value, at least ``0``.
+    w_threshold : float, default=0.0
+        An edge is kept when its weight magnitude reaches this value, at least ``0``. The default
+        keeps every edge whose gate reaches ``gate_threshold``, as the paper does [1]_.
     gate_threshold : float, default=0.5
         An edge is kept when its gate probability reaches this value, in ``[0, 1]``.
     max_iter : int, default=25
@@ -2889,14 +2906,14 @@ def calm(
         :doc:`column-order guide </docs/guides/column-order>`). ``metadata["seed"]`` records the
         seed used.
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
-        value and the fewest rows two columns share; two columns that share no observed row raise
-        ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -2989,15 +3006,14 @@ def calm(
     If the edges that ``gate_threshold`` and ``w_threshold`` keep still form a cycle, edges are
     removed in order of increasing weight magnitude until none does.
 
-    The defaults are a shorter schedule than the paper's [1]_, which starts ``rho`` at ``1e-5``,
-    runs 40,000 steps per round at learning rate ``0.001``, and keeps every edge whose gate
-    reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
-    larger ``max_iter`` runs that schedule.
+    The defaults are a shorter schedule than the paper's [1]_, which starts ``rho`` at ``1e-5`` and
+    runs 40,000 steps per round at learning rate ``0.001``. ``rho_init=1e-5, subproblem_iter=40000,
+    lr=0.001`` with a larger ``max_iter`` runs that schedule.
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
     requires complete rows for every variable. The loss reads the data only through their
     covariance, and so does the screen, whose Fisher-Z tests read the expected correlations over
-    every row, so ``missing="em"``, experimental, runs structural EM [7]_ [8]_, which Gao et al.
+    every row, so ``missing="em"`` runs structural EM [7]_ [8]_, which Gao et al.
     [8]_ run with NOTEARS: under a linear-Gaussian model of the current graph, each row's missing
     values are Gaussian given its observed ones, and their conditional means and covariances give
     the expected covariance of the data (the E-step); the fit runs on it, with all of its settings,
@@ -3038,6 +3054,12 @@ def calm(
     ``standardize=True``. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
     every setting.
+    With ``missing="em"``, which has no reference to compare with, it made fewer errors than the
+    empty graph in every setting measured, by a thin margin with about half of the values missing.
+    It made fewer errors than mean imputation with few values missing and as many with more, and
+    more than test-wise deletion in :func:`~andrey.pc` with many missing. The
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data>`__ has
+    the settings.
 
     References
     ----------

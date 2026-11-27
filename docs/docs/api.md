@@ -143,24 +143,26 @@ last round changed it logs a warning. A row that observes no value is dropped fi
 `metadata["em"]` records how many (`rows_dropped`) and the fewest rows that observe both columns of
 a pair (`min_shared_rows`); two columns that share no observed row raise a `ValueError`. It takes
 `score_func="bic"` only and no `env`, and it assumes values missing completely at random or at
-random given observed values. `missing="mvpc"` is supported, and so is `missing="em"` in `ges`,
-`hc`, `tabu`, `boss`, `grasp`, and `notears`: in the [missing-data
-comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md),
-none was less accurate than its reference implementation in a setting that repeated on fresh
-datasets. For `ges`, `boss`, and `grasp` the reference estimates one covariance by EM before its
-search, a simpler method than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50
-variables, at two settings of the sample size the reference's score counts. In the benchmark the
-last round still changed the graph in 2 to 6% of the fits, and in 20% of `grasp`'s, most often with
-50 variables and 100 rows. In `xges`, `exact_search`, `dagma`, and `calm` it is experimental, as no
-reference implementation exists to compare them with; the benchmark reports their results beside the
-baselines. An unlisted value raises a `ValueError` naming the accepted values. A column with no
-observed value, or a constant one over its observed values, raises a `ValueError` before the fit. A
-test needs, where its variables are observed, `|S| + 4` rows for `"fisherz"` and `"normal_scores"`,
-`|S| + 3` for `"student_t"` and `"cond_gauss"`, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`,
-17 for `"wgcm"`'s default `variant="est"`, 12 for `"pcm"`, and 2 for most other tests; a test with
-fewer is not tested. `cdnod` and `fci_jci` need a complete `env`. Every other method raises a
-`ValueError` that names it and says what to do instead, as the
-[Missing values](guides/missing-values.md) guide describes; each method's Notes say why.
+random given observed values.
+`missing="mvpc"` is supported, and so is `missing="em"` in every method that takes it: in the
+[missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md),
+none was less accurate than its reference in a setting that repeated on fresh datasets. For `ges`,
+`boss`, and `grasp` the reference estimates one covariance by EM before its search, a simpler method
+than structural EM, and the comparison is at `ebic_gamma=0.0`, up to 50 variables, at two settings
+of the sample size the reference's score counts. The reference of `xges`, `exact_search`, and
+`dagma` is the same search as the M-step of MissDAG's EM (Gao et al., 2022). `calm` has no
+reference, as its search is too slow to run inside another structural EM loop; it was judged
+against the empty graph and its fit on the complete data. In the benchmark of `ges`, `hc`, `tabu`,
+`boss`, `grasp`, and `notears` the last round still changed the graph in 2 to 6% of the fits, and
+in 20% of `grasp`'s, most often with 50 variables and 100 rows. An unlisted value raises a
+`ValueError` naming the accepted values. A column with no observed value, or a constant one over its
+observed values, raises a `ValueError` before the fit. A test needs, where its variables are
+observed, `|S| + 4` rows for `"fisherz"` and `"normal_scores"`, `|S| + 3` for `"student_t"` and
+`"cond_gauss"`, 4 for `"gcm"` and for `"wgcm"` with `variant="fix"`, 17 for `"wgcm"`'s default
+`variant="est"`, 12 for `"pcm"`, and 2 for most other tests; a test with fewer is not tested.
+`cdnod` and `fci_jci` need a complete `env`. Every other method raises a `ValueError` that names it
+and says what to do instead, as the [Missing values](guides/missing-values.md) guide describes; each
+method's Notes say why.
 
 % concept: n_em_iterations
 `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` take

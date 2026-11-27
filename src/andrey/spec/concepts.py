@@ -637,6 +637,15 @@ _CONCEPTS = (
         fragment="weight magnitude",
         suitable=(*CONTINUOUS, "calm", "dynotears"),
         others_exempt="No weighted continuous fit to threshold.",
+        deviations=(
+            Deviation(
+                method="calm",
+                name="w_threshold",
+                default=0.0,
+                reason="The paper and the authors' code keep an edge where its gate reaches the "
+                "gate threshold, with no weight threshold.",
+            ),
+        ),
     ),
     Concept(
         key="standardize",

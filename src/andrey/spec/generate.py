@@ -617,9 +617,9 @@ def render_skill() -> str:
         "the graph logs a warning, and data in which two columns share no observed row are "
         "refused. `em` is supported in "
         + ", ".join(f"`{name}`" for name in EM_SUPPORTED)
-        + ", where it measured no less accurate than a reference implementation, and "
-        "experimental in the others, which have none to compare with. Every other method refuses "
-        "a missing value with a data error that says what to do instead."
+        + ", where it measured no less accurate than its reference, or, for `calm`, which has "
+        "none, better than the empty graph. Every other method refuses a missing value with a "
+        "data error that says what to do instead."
     )
     a("")
     a("## Background knowledge")

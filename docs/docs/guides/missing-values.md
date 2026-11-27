@@ -83,7 +83,7 @@ Choosing an option, by what each favors and what it gives up:
 | `missing="testwise"` | Every row each test can read, with no model of why values are missing; in PC, accuracy on large graphs where an indicator has many weak parents or parents with missing values | Its guarantee outside values missing completely at random | With PC at 20 variables and 1,000 rows, 10 to 30% missing completely at random, median errors of 6.5 to 7.5 where dropping the incomplete rows made 8.5 and 20.0 on 124 and 10 complete rows and had no complete row at 30% (complete data: 4.0; [0.11.0 release card](../benchmarks/0.11.0.md#missing-values)); fewer errors than `"mvpc"` in the 12 settings where `"mvpc"` was behind again on fresh seeds (50 or 100 variables, 20 or 30% missing) |
 | A test without enough rows, under `"testwise"` | No pair separated or kept on rows that cannot test it | The test: it never separates a pair, and a pair that no test with rows could decide is undecided and left out of the graph | Not measured against another rule |
 | `missing="mvpc"` | Values missing for a reason that other variables carry | Every test but `fisherz` and `student_t`; accuracy on large graphs where an indicator has many weak parents or parents with missing values | On Erdos-Renyi graphs of 10 to 100 variables (mean degree 2 or 4; 500 to 10,000 rows; 10 to 30% missing) with one observed parent per indicator, fewer errors than `"testwise"` in 14 of 72 settings at `alpha=0.01` and 28 at the default 0.05, and more in none. Over both levels together (144 settings): tied in 136 with values missing completely at random; behind in 12 of the 141 judged with many weak parents per indicator (3 again on fresh seeds); with a parent that has missing values, ahead in 12 and behind in 24 (9 again); the repeated ones all had 50 or 100 variables and 20 or 30% missing ({py:func}`~andrey.pc`, [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data)) |
-| `missing="em"` | The partly observed rows, under a linear model with Gaussian noise | Time: each of the 10 rounds runs the search again | In GES, BOSS, GRaSP, and NOTEARS (10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing), fewer errors than dropping the incomplete rows in 186 of the 225 settings judged, as many in 39, and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC and Tabu not compared with it. With 10 rounds, a setting's median fit in the six supported searches took 2 to 72 times as long as the same search on the complete data ([0.17.0 missing-data records][em-records]); not measured in the experimental searches |
+| `missing="em"` | The partly observed rows, under a linear model with Gaussian noise | Time: each of the 10 rounds runs the search again | In GES, BOSS, GRaSP, and NOTEARS (10 to 50 variables, 100 to 2,000 rows, 10 to 50% missing), fewer errors than dropping the incomplete rows in 186 of the 225 settings judged, as many in 39, and more in none, and in 204 more dropping the rows left too few to fit most datasets; HC and Tabu not compared with it. In XGES, exact search, and DAGMA, as accurate as the same search inside the EM of Gao et al. in every setting measured and more accurate than mean imputation; CALM, which has no such reference, better than the empty graph ([0.20.0 release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data)). With 10 rounds, a setting's median fit in GES, HC, Tabu, BOSS, GRaSP, and NOTEARS took 2 to 72 times as long as the same search on the complete data ([0.17.0 missing-data records][em-records]) |
 | `possibly_separable="orient"` | Arrowheads, and accuracy in PC and FCI, where it was measured | Protection from false colliders | The runs of `"ambiguous"` |
 | `possibly_separable="ambiguous"` | No false collider | The true arrowheads beside them | Fewer false colliders on merged cohorts that no row bridges ([Test-wise deletion](#test-wise-deletion) has the numbers); on bridged cohorts and complete data, the same graphs as `"orient"` |
 
@@ -271,17 +271,20 @@ records the rows dropped (`rows_dropped`) and the fewest rows that observe both 
 (`min_shared_rows`).
 
 `missing="em"` is supported in {{ em_supported_names }}, where no measured setting was less accurate
-than a reference implementation on both initial and fresh datasets. We measured `ges`, `boss`, and
-`grasp` at `ebic_gamma=0.0`, up to 50 variables, against a reference that estimates one covariance
-by EM before its search, a simpler method than structural EM, at two settings of the sample size its
-score counts. `boss` and `grasp` were better than the empty graph in 102 and 103 of 108 settings. In
-{{ em_experimental_names }} it is experimental: no reference implementation exists to compare them
-with, so the [0.16.0 release card](../benchmarks/0.16.0.md#what-we-measured-on-missing-data) reports
-them beside test-wise deletion, dropping rows, and mean imputation. What to expect from a fit:
+than its reference on both initial and fresh datasets; `calm`, which has no reference, was judged
+against the empty graph and its fit on the complete data. We measured `ges`, `boss`, and `grasp` at
+`ebic_gamma=0.0`, up to 50 variables, against a reference that estimates one covariance by EM before
+its search, a simpler method than structural EM, at two settings of the sample size its score
+counts. `boss` and `grasp` were better than the empty graph in 102 and 103 of 108 settings. We
+measured `xges`, `exact_search`, and `dagma` against the same search as the M-step of MissDAG's EM
+(Gao et al., 2022). `calm` has no such reference: its search is too slow to run inside another
+structural EM loop. The [0.20.0 release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data) reports these four beside test-wise deletion,
+dropping rows, and mean imputation. What to expect from a fit:
 
-- EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times. In the six
-  searches where it is supported, from 10 to 50 variables and 100 to 2,000 rows, a setting's median
-  fit took 2 to 72 times as long as the same search on the complete data.
+- EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times. In `ges`,
+  `hc`, `tabu`, `boss`, `grasp`, and `notears`, from 10 to 50 variables and 100 to 2,000 rows, a
+  setting's median fit took 2 to 72 times as long as the same search on the complete data; the
+  release card has the ratios for the other four.
 - EM does not always settle within its 10 rounds. The last round still changed the graph in 2 to 6%
   of the fits we measured, and in 20% of `grasp`'s, most often with 50 variables and 100 rows. Such
   a fit logs a warning, and more rows help. A larger `n_em_iterations` runs more rounds, which lets
@@ -291,6 +294,9 @@ them beside test-wise deletion, dropping rows, and mean imputation. What to expe
   complete data alike. From 500 rows on they were better in every setting.
 - On denser graphs (mean degree 4) `ges` at `ebic_gamma=0.0` was rarely better than the empty
   graph, with EM and on complete data alike.
+- With few rows and about half of the values missing, `xges` and `exact_search` on graphs with many
+  edges are often no better than the empty graph, as is the same search inside MissDAG's EM, and
+  `calm`'s margin over the empty graph is thin.
 
 The [0.17.0 release card](../benchmarks/0.17.0.md#missing-data) summarizes the numbers; the
 [missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)

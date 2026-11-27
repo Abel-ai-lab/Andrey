@@ -195,10 +195,9 @@ removed is listed in `metadata["possibly_separable"]`. The [release cards](bench
 against dropping incomplete samples. Searches that read the data only through their covariance,
 {{ em_methods }}, take `missing="em"`: structural EM over the expected covariance of the data, which
 suits linear-Gaussian data whose missing values depend at most on columns that have none; this is
-measured, not proved. It is supported in GES, hill climbing, Tabu search, BOSS, GRaSP, and NOTEARS,
-where it runs Friedman's alternating scheme: 10 searches unless you pass `n_em_iterations`, with 5
-parameter-only EM steps before each after the first. It is experimental in the others, which have no
-reference implementation to compare with; the
+measured, not proved. It is supported in each of them, where it runs Friedman's alternating scheme:
+10 searches unless you pass `n_em_iterations`, with 5 parameter-only EM steps before each after the
+first; the
 [missing-data comparison](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/missing-data.md)
 reports the measurements. The other methods refuse missing values with an error that says what to do
 instead, and the [Missing values](guides/missing-values.md) guide explains each handling.

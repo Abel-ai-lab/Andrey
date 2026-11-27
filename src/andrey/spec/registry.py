@@ -1162,6 +1162,7 @@ _add(
             concept_param("standardize"),
             concept_param(
                 "w_threshold",
+                default=0.0,
                 doc="An edge is kept when its weight magnitude reaches this value, at least 0.",
             ),
             ParamSpec(
