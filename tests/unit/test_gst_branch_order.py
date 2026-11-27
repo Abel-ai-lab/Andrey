@@ -147,7 +147,7 @@ def _search_state_bytes(d: int) -> int:
 def test_a_new_search_takes_memory_linear_in_the_variables() -> None:
     small, large = _search_state_bytes(500), _search_state_bytes(1000)
 
-    # Trees that each held a tuple of the other variables made these about 6.1e6 and 32.2e6 bytes.
+    # Trees that each hold a tuple of the other variables make these about 6.1e6 and 32.2e6 bytes.
     assert large < 3 * small
     assert large < 2_000 * 1000
 
