@@ -165,6 +165,9 @@ names its pull request.
   penalties of the solution path. The consistent DAG extension of a PDAG, the objective that `ges`,
   `gies`, `lges`, `xges`, and `ages` report, and the neighborhoods the `ges`, `gies`, `lges`, and
   `ages` scans read take each row's nodes of a graph from one `np.nonzero`. ([#1311])
+- `pcmci` and `pcmciplus` on data with missing values stop the scan that picks each candidate's
+  conditions once it has the ones the PC1 rounds keep, so they run faster on tens of variables,
+  with the same output bit for bit. ([#1315])
 - A process that imports Andrey starts a fit sooner, with the same output bit for bit: `scipy.stats`
   and the basis cache of the functional causal models are imported where they are used, a table is
   read as a DataFrame only once pandas is imported, so a fit on an array never imports it, and the
@@ -3150,3 +3153,4 @@ First alpha release.
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
 [#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
+[#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
