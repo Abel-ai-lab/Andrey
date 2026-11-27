@@ -12,6 +12,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import types
 
 import numpy as np
 import pytest
@@ -56,6 +57,13 @@ def test_a_data_frame_is_read_once_pandas_is_imported():
     assert _missing_cells(values[0]) is None  # one row of numbers is not a table
     nullable = pd.DataFrame({"a": pd.array([1, pd.NA, 3], dtype="Int64")})
     assert _missing_cells(nullable).tolist() == [[False], [True], [False]]
+
+
+def test_a_pandas_still_being_imported_has_no_data_frame_to_read(monkeypatch):
+    # Another thread's import puts the module in `sys.modules` before it defines `DataFrame`.
+    monkeypatch.setitem(sys.modules, "pandas", types.ModuleType("pandas"))
+    values = np.array([[1.0, np.nan], [3.0, 4.0]])
+    assert np.array_equal(_missing_cells(values), np.isnan(values))
 
 
 def test_a_data_frame_is_read_when_pandas_is_imported_after_andrey():

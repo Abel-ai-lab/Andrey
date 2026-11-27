@@ -694,8 +694,10 @@ def _missing_cells(data: object) -> np.ndarray | None:
 
     ``None`` for data that is neither a DataFrame nor one table of numbers.
     """
-    pandas = sys.modules.get("pandas")  # no DataFrame exists before pandas is imported
-    if pandas is not None and isinstance(data, pandas.DataFrame):  # of any column types
+    # No DataFrame exists before pandas has defined it, so a pandas another thread is still
+    # importing has none to read yet.
+    frame = getattr(sys.modules.get("pandas"), "DataFrame", None)
+    if frame is not None and isinstance(data, frame):  # of any column types
         return np.asarray(data.isna(), dtype=bool)
     try:
         array = np.asarray(data)
