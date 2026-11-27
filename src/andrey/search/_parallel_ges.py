@@ -42,7 +42,7 @@ import numpy as np
 from andrey.core import _bitset, env
 from andrey.core.knowledge import Constraints, admits
 from andrey.core.orient import cpdag_of_pdag, orient_out_of
-from andrey.core.score import BICScore, LocalScore
+from andrey.core.score import BICScore, LocalScore, ebic_step
 from andrey.core.score_delta import DeltaBICScore, FullScoreDelta
 from andrey.core.ties import EPS_IMPROVE, KEY_DP, stable_key
 from andrey.search import _parallel as par
@@ -333,7 +333,10 @@ class _ForwardScan:
     :func:`move_key`; a move in ``excluded`` is never selected. With ``forbidden`` (``[i, j]``: no
     edge ``i -> j``), neither a source nor a member of ``T`` is forbidden into the target. Under
     ``cap``, an Insert whose family exceeds it is left out before scoring and one whose CPDAG,
-    rebuilt by ``insert``, breaks it is never selected.
+    rebuilt by ``insert``, breaks it is never selected. With ``screen`` (a bitmask per target of
+    the sources it admits, from :func:`one_edge_screen`), no other source is a candidate for the
+    target. With ``cover``, the candidates of a target are the sources :func:`cover_sources` gives
+    on the graph being scanned, and a target whose sources changed is enumerated again.
     """
 
     def __init__(
@@ -346,6 +349,8 @@ class _ForwardScan:
         forbidden: np.ndarray | None = None,
         cap: float | None = None,
         insert: Callable[..., np.ndarray] = ops.insert_cpdag,
+        screen: Sequence[int] | None = None,
+        cover: bool = False,
     ) -> None:
         self.targets = list(targets)
         self.delta_engine = delta_engine
@@ -356,6 +361,10 @@ class _ForwardScan:
         self.ranks = ranks
         self.everyone = (1 << n) - 1
         self.forbidden = forbidden
+        self.screen = screen
+        self.cover = cover
+        # Per target, the sources admitted on the graph the kept candidates were enumerated on.
+        self.sources: Sequence[int] | None = None
         # Per target, the nodes forbidden into it, as bitmasks; None without knowledge.
         self.into = None if forbidden is None else _bitset.row_masks(forbidden.T)
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
@@ -404,11 +413,26 @@ class _ForwardScan:
                 limit = min(-EPS_IMPROVE, self.n * (key[0] + 2 * 10.0**-KEY_DP))
         return best
 
+    def pending(self, adj: np.ndarray) -> tuple[Sequence[int] | None, np.ndarray]:
+        """The sources admitted on ``adj`` and a mask of the targets to enumerate again there.
+
+        Those are the targets :func:`_touched` marks and, under ``cover``, the targets whose
+        sources differ from those of the kept graph.
+        """
+        redo = _touched(self.adj, adj)
+        if not self.cover:
+            return self.screen, redo
+        sources = cover_sources(adj)
+        if self.sources is not None:
+            moved = [new != old for new, old in zip(sources, self.sources, strict=True)]
+            redo = redo | np.array(moved, dtype=bool)
+        return sources, redo
+
     def _refresh(self, adj: np.ndarray) -> None:
         """Enumerate again the targets whose candidates differ from the kept graph's."""
         succ = _bitset.row_masks(adj == ops.TAIL)
         self.reach = _kept_reach(self.reach, self.succ, succ)
-        touched = _touched(self.adj, adj)
+        self.sources, touched = self.pending(adj)
         redo = [y for y in self.targets if touched[y]]
         if redo:
             adjacent = _bitset.row_masks(adj != ops.NULL)
@@ -442,6 +466,10 @@ class _ForwardScan:
         pa_set = set(parents)
         nbrs = lines[y]
         nonadjacent = self.everyone & ~adjacent[y] & ~(1 << y)
+        if self.sources is not None:
+            nonadjacent &= self.sources[y]
+            if not nonadjacent:
+                return  # the screen admits no non-adjacent source for y.
         free = nbrs  # the undirected neighbors T may hold
         if self.into is not None:
             nonadjacent &= ~self.into[y]
@@ -581,6 +609,8 @@ def _forward_task(
     constraints: Constraints | None = None,
     excluded: Excluded = None,
     cap: float | None = None,
+    screen: Sequence[int] | None = None,
+    cover: bool = False,
 ) -> ForwardResult:
     """Worker side of one forward chunk: refresh the kept candidates, scan, return the best."""
     global _WORKER_SCAN
@@ -588,10 +618,18 @@ def _forward_task(
         raise RuntimeError("GES worker pool reused across runs (cov/token mismatch)")
     assert _WORKER_DELTA is not None  # _init_worker runs before any task
     n = _WORKER_N
-    if _WORKER_SCAN is None or _WORKER_SCAN.targets != list(targets):
+    if _WORKER_SCAN is None or _WORKER_SCAN.targets != list(targets) or _WORKER_SCAN.cover != cover:
         forbidden = None if constraints is None else constraints.forbidden
         _WORKER_SCAN = _ForwardScan(
-            targets, _WORKER_DELTA, n, max_parents, _WORKER_RANKS, forbidden, cap
+            targets,
+            _WORKER_DELTA,
+            n,
+            max_parents,
+            _WORKER_RANKS,
+            forbidden,
+            cap,
+            screen=screen,
+            cover=cover,
         )
     return _WORKER_SCAN.best(adj, excluded)
 
@@ -656,18 +694,26 @@ def _min_work() -> int:
 
 
 def forward_work_per_target(
-    n: int, state: NeighborState, max_parents: float | None, cap: float | None = None
+    n: int,
+    state: NeighborState,
+    max_parents: float | None,
+    cap: float | None = None,
+    screen: Sequence[int] | None = None,
 ) -> list[int]:
     """Estimated candidate evaluations for each forward target ``y`` (0 for a parent-capped target).
 
     ``n_nonadj(y) * 2^min(deg(y), CAP)``: ``n_nonadj(y)`` non-adjacent sources enumerate at most
     ``2^deg(y)`` subsets (``t0(x, y)`` sits in ``y``'s undirected neighbors). Drives both the gate
-    (its sum) and the degree-aware chunker (its per-target profile).
+    (its sum) and the degree-aware chunker (its per-target profile). Under a ``screen``, the
+    sources are the admitted ones.
     """
     adj_sets, par_of, nbr = state
     work = []
     for y in range(n):
-        n_nonadj = n - 1 - len(adj_sets[y])
+        if screen is None:
+            n_nonadj = n - 1 - len(adj_sets[y])
+        else:
+            n_nonadj = (screen[y] & ~_bitset.bitmask(adj_sets[y])).bit_count()
         capped = (max_parents is not None and len(par_of[y]) > max_parents) or _over_cap(
             cap, len(par_of[y]) + 1
         )
@@ -746,6 +792,47 @@ class _LazyWorkerSet:
             self._wset = None
 
 
+def one_edge_screen(engine: DeltaEngine, n: int) -> list[int]:
+    """Each target's admitted sources under one-edge faithfulness, as bitmasks.
+
+    A pair is admitted when the DAG of that one edge scores better than the empty graph under the
+    plain score, by the margin a forward move needs (``EPS_IMPROVE``). The plain score has the
+    likelihood and the ``penalty_discount`` penalty and leaves out the extended-BIC term: FGES
+    skips a pair whose single-edge bump over the empty graph is not positive (Ramsey et al. 2017),
+    and the reference implementation's bump is the plain BIC difference. The extended-BIC term of
+    a first parent, ``2 * ebic_gamma * log(n - 1)``, is a prior over parent sets for the search
+    and is not part of that bump. Equivalent one-edge DAGs score alike, so the relation is
+    symmetric for the BIC; a score that differs between the two directions admits the pair when
+    either improves.
+    """
+    gamma = getattr(engine.score_obj, "ebic_gamma", 0.0)
+    ebic_first = ebic_step(0, n, gamma) if gamma and n > 1 else 0.0
+    gain = np.zeros((n, n), dtype=bool)
+    for y in range(n):
+        sources = [x for x in range(n) if x != y]
+        deltas = engine.delta_many_with_base(y, (), [("add", x) for x in sources])
+        gain[sources, y] = np.asarray(deltas) - ebic_first < -EPS_IMPROVE
+    return _bitset.row_masks(gain | gain.T)
+
+
+def cover_sources(adj: np.ndarray) -> list[int]:
+    """Each target's candidate sources for covering the unshielded noncolliders of ``adj``.
+
+    Returns one bitmask per target. A source ``m`` of target ``y`` is non-adjacent to ``y`` and
+    adjacent to a neighbor ``n`` of ``y`` such that ``m -> n <- y`` does not hold: the pair ends a
+    path ``m *-* n *-* y`` that is not a collider (the marriage step of fGES, Ramsey et al. 2017).
+    """
+    adjacent = _bitset.row_masks(adj != ops.NULL)
+    parents = _bitset.row_masks(adj == ops.ARROW)
+    sources = []
+    for y, near in enumerate(adjacent):
+        reach = 0
+        for n in _bitset.nodes(near):
+            reach |= adjacent[n] & ~parents[n] if (parents[n] >> y) & 1 else adjacent[n]
+        sources.append(reach & ~near & ~(1 << y))
+    return sources
+
+
 def _admitted(
     after: np.ndarray,
     before: np.ndarray,
@@ -779,6 +866,7 @@ def run_ges(
     constraints: Constraints | None = None,
     cap: float | None = None,
     sources: tuple[int, ...] = (),
+    one_edge: bool = False,
 ) -> np.ndarray:
     """Both GES phases with per-pass parallelism: a pass fans out only above the fixed work gate.
 
@@ -805,6 +893,11 @@ def run_ges(
     the edges at ``sources`` out of them; ``constraints`` then admit a move when its class holds a
     DAG that satisfies them and gives no source a parent. The passes run in-process, whatever
     ``workers``.
+
+    ``one_edge`` limits the first forward phase to the pairs :func:`one_edge_screen` admits, which
+    the backward phase does not read: it can still remove an edge that a required edge or an
+    earlier move put on a screened pair. A second forward and backward pass then takes, per target,
+    the sources of :func:`cover_sources` on the graph at hand.
     """
     global largest_pass_work
     workers = 1 if sources else max(1, min(workers, n))
@@ -830,69 +923,107 @@ def run_ges(
             constraints = Constraints(into_sources, constraints.required, constraints.tier)
     forbidden = None if constraints is None else constraints.forbidden
     targets = [y for y in range(n) if y not in sources]
-    scan = _ForwardScan(targets, engine, n, max_parents, ranks, forbidden, cap, insert)
+    # Each phase is a forward then a backward pass. One-edge faithfulness follows its screen with
+    # the cover phase, which has no screen and takes the sources of ``cover_sources`` on the graph.
+    phases = [(one_edge_screen(engine, n), False), (None, True)] if one_edge else [(None, False)]
     kept: dict[tuple[int, tuple[int, ...], int], float] = {}  # the in-process backward deltas
     excluded: set[tuple[int, int, tuple[int, ...]]] = (
         set()
     )  # the moves rejected on the current graph
     try:
-        while True:  # forward phase
-            work = [0]
-            if workers > 1:
-                # The in-process scan enumerates again every target touched since the graph it
-                # kept, which after pooled passes is an older one (none before its first pass).
-                touched = _touched(scan.adj, adj)
-                per_target = forward_work_per_target(n, neighborhood_state(adj), max_parents, cap)
-                work = [w for w, redo in zip(per_target, touched, strict=True) if redo]
-            largest = max(largest, sum(work))
-            if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
-                calibrate.warn_default_cutoff("ges", w_min)
-                warn = False
-            # The full-score engine never fans out: pooled workers only run Schur on BIC.
-            if lazy is not None and workers > 1 and sum(work) > w_min:
-                # Each worker scans its own fixed target partition (stable assignment); reduce keys
-                # on the global order, so this is bit-identical to the whole-range serial scan.
-                wset = lazy.get()
-                best = reduce_best(
-                    wset.dispatch(
-                        _forward_task, adj, max_parents, lazy.token, constraints, excluded, cap
+        for screen, cover in phases:
+            scan = _ForwardScan(
+                targets,
+                engine,
+                n,
+                max_parents,
+                ranks,
+                forbidden,
+                cap,
+                insert,
+                screen=screen,
+                cover=cover,
+            )
+            excluded.clear()
+            while True:  # forward phase
+                work = [0]
+                if workers > 1:
+                    # The in-process scan enumerates again every target touched since the graph it
+                    # kept, which after pooled passes is an older one (none before its first pass).
+                    admitted, touched = scan.pending(adj)
+                    per_target = forward_work_per_target(
+                        n, neighborhood_state(adj), max_parents, cap, admitted
                     )
-                )
-            else:
-                best = scan.best(adj, excluded)
-            if best is None:
-                break
-            key, x, y, T = best
-            if constraints is None:
-                adj = insert(adj, x, y, T)
-            else:
-                moved = insert(adj.copy(), x, y, T)
-                adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
-        excluded.clear()  # forward and backward moves share the key shape
-        while True:  # backward phase
-            state = neighborhood_state(adj)
-            work = backward_work_per_target(n, state) if workers > 1 else [0]
-            largest = max(largest, sum(work))
-            if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
-                calibrate.warn_default_cutoff("ges", w_min)
-                warn = False
-            if lazy is not None and workers > 1 and sum(work) > w_min:  # full scores stay serial
-                wset = lazy.get()
-                best = reduce_best(
-                    wset.dispatch(_backward_task, adj, lazy.token, constraints, excluded, cap)
-                )
-            else:
-                best = backward_chunk_best(
-                    range(n), adj, engine, n, state, ranks, kept, constraints, excluded, cap, delete
-                )
-            if best is None:
-                break
-            key, x, y, H = best
-            if constraints is None:
-                adj = delete(adj, x, y, H)
-            else:
-                moved = delete(adj.copy(), x, y, H)
-                adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
+                    work = [w for w, redo in zip(per_target, touched, strict=True) if redo]
+                largest = max(largest, sum(work))
+                if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
+                    calibrate.warn_default_cutoff("ges", w_min)
+                    warn = False
+                # The full-score engine never fans out: pooled workers only run Schur on BIC.
+                if lazy is not None and workers > 1 and sum(work) > w_min:
+                    # Each worker scans its own fixed target partition (stable assignment); reduce
+                    # keys on the global order, so this is bit-identical to the whole-range scan.
+                    wset = lazy.get()
+                    best = reduce_best(
+                        wset.dispatch(
+                            _forward_task,
+                            adj,
+                            max_parents,
+                            lazy.token,
+                            constraints,
+                            excluded,
+                            cap,
+                            screen,
+                            cover,
+                        )
+                    )
+                else:
+                    best = scan.best(adj, excluded)
+                if best is None:
+                    break
+                key, x, y, T = best
+                if constraints is None:
+                    adj = insert(adj, x, y, T)
+                else:
+                    moved = insert(adj.copy(), x, y, T)
+                    adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
+            excluded.clear()  # forward and backward moves share the key shape
+            while True:  # backward phase
+                state = neighborhood_state(adj)
+                work = backward_work_per_target(n, state) if workers > 1 else [0]
+                largest = max(largest, sum(work))
+                if warn and sum(work) >= calibrate.WARN_FRACTION * w_min:
+                    calibrate.warn_default_cutoff("ges", w_min)
+                    warn = False
+                if (
+                    lazy is not None and workers > 1 and sum(work) > w_min
+                ):  # full scores stay serial
+                    wset = lazy.get()
+                    best = reduce_best(
+                        wset.dispatch(_backward_task, adj, lazy.token, constraints, excluded, cap)
+                    )
+                else:
+                    best = backward_chunk_best(
+                        range(n),
+                        adj,
+                        engine,
+                        n,
+                        state,
+                        ranks,
+                        kept,
+                        constraints,
+                        excluded,
+                        cap,
+                        delete,
+                    )
+                if best is None:
+                    break
+                key, x, y, H = best
+                if constraints is None:
+                    adj = delete(adj, x, y, H)
+                else:
+                    moved = delete(adj.copy(), x, y, H)
+                    adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
     finally:
         if lazy is not None:
             lazy.close()

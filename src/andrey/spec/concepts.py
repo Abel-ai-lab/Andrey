@@ -120,6 +120,7 @@ CI_SEARCHES = (
 PCMCI_FAMILY = ("pcmci", "pcmciplus", "lpcmci")
 SCORE_SEARCHES = (
     "ges",
+    "fges",
     "gies",
     "xges",
     "hc",
@@ -133,7 +134,7 @@ SCORE_SEARCHES = (
     "boss_fci",
     "grasp_fci",
 )
-PURE_SCORE = ("ges", "gies", "xges", "lges", "hc", "tabu", "exact_search", "boss", "grasp")
+PURE_SCORE = ("ges", "fges", "gies", "xges", "lges", "hc", "tabu", "exact_search", "boss", "grasp")
 CONTINUOUS = ("notears", "dagma")
 LINGAM = (
     "direct_lingam",
@@ -1226,6 +1227,7 @@ _CONCEPTS = (
         suitable=(
             *CI_SEARCHES,
             "ges",
+            "fges",
             "hc",
             "exact_search",
             "boss",

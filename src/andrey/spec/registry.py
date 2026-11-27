@@ -698,6 +698,28 @@ _add(
     )
 )
 _add(
+    REGISTRY["ges"].model_copy(
+        update={
+            "name": "fges",
+            "summary": "Fast greedy equivalence search: GES with one-edge faithfulness, which adds "
+            "an edge in the first forward phase only between variables whose one-edge graph "
+            "scores better than the empty graph, then covers the unshielded noncolliders in a "
+            "second pass. Takes the scores, penalties, max_parents, and knowledge of ges. Can "
+            "miss an edge between variables that are independent in the data and linked through "
+            "canceling paths. The score is in metadata['score'].",
+            "data": DataSpec(inputs=(_DATA_MATRIX,), layout=_MATRIX_LAYOUT),
+            "output": OutputSpec(
+                structure_type="graph",
+                graph_kind="cpdag",
+                doc="score in metadata['score']; metadata['categorical'] lists the categorical "
+                "columns a mixed-data setting read",
+            ),
+            "status": "experimental",
+            "references": ("Ramsey et al. 2017", "Chickering 2002"),
+        }
+    )
+)
+_add(
     MethodSpec(
         name="gies",
         family="score",
@@ -3573,6 +3595,7 @@ _KNOWLEDGE_HOW: dict[str, str] = {
     "grasp_fci": "The GRaSP phase searches as grasp does; the test phase starts from the "
     "adjacencies GRaSP found and never removes a required pair. " + _PAG_MARKS + _ENV_FREE,
     "ges": _MOVE_RULE + _CLASS_RULE + " " + _ENV_FREE,
+    "fges": _MOVE_RULE + _CLASS_RULE,
     "gies": _MOVE_RULE + _CLASS_RULE,
     "gnies": _MOVE_RULE + _CLASS_RULE,
     "xges": _MOVE_RULE + _CLASS_RULE,
@@ -3877,7 +3900,7 @@ _METADATA: dict[str, tuple[str, ...]] = {
     "iamb": ("target", "markov_blanket"),
     "inter_iamb": ("target", "markov_blanket"),
     "mmpc": ("target", "parents_and_children"),
-    **dict.fromkeys(("gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
+    **dict.fromkeys(("fges", "gies", "xges", "lges", "mmhc", "rsmax2"), ("score",)),
     **dict.fromkeys(
         ("ges", "hc", "tabu", "boss", "grasp"), ("score", "index_edges", "changing_variables")
     ),

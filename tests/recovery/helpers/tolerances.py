@@ -18,6 +18,7 @@ SPEC: dict[str, dict] = {
     },
     "PC": GRAPH_ONLY,
     "GES": GRAPH_SCORE,
+    "FGES": GRAPH_SCORE,
     "GIES": GRAPH_SCORE,
     "GnIES": {
         "structural": ["graph", "targets"],
