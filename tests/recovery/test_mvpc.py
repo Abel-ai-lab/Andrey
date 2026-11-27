@@ -42,15 +42,21 @@ def test_test_wise_deletion_finds_the_pair_of_figure_1b_dependent_and_keeps_its_
 
 
 @pytest.mark.parametrize("seed", range(4))
-def test_mvpc_finds_the_indicator_parent_removes_the_edge_and_orients_the_collider(seed):
-    out = andrey.pc(figure_1b(seed), missing="mvpc")
+@pytest.mark.parametrize("collider_rule", ["sepsets", "majority", "conservative"])
+def test_mvpc_finds_the_indicator_parent_removes_the_edge_and_orients_the_collider(
+    seed, collider_rule
+):
+    # The vote of the majority and conservative rules runs the corrected tests that removed the
+    # edge, so it finds the empty set separating the pair and leaves no triple ambiguous.
+    out = andrey.pc(figure_1b(seed), missing="mvpc", collider_rule=collider_rule)
     assert out.structure.oriented_edges() == [(0, 2, "directed"), (1, 2, "directed")]
     assert out.metadata["missingness_parents"] == {1: [2]}
     assert out.metadata["corrected_edges"]["removed"] == [[0, 1]]
+    assert out.metadata.get("ambiguous_triples", []) == []
 
 
 def test_a_seeded_fit_of_figure_1b_records_its_output():
-    out = andrey.pc(figure_1b(0), missing="mvpc", seed=0)
+    out = andrey.pc(figure_1b(0), missing="mvpc", seed=0, collider_rule="sepsets")
     assert dict(out.metadata) == {
         "algorithm": "pc",
         "conflicts": [],

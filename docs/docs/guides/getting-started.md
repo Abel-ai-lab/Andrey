@@ -247,12 +247,16 @@ def directed(graph):
 assert links(logged.structure) < links(out.structure) <= links(sachs.graph)
 assert len(links(out.structure) - links(logged.structure)) == 1
 assert directed(out.structure) == {("p38", "pkc"), ("jnk", "pkc")}
-assert directed(logged.structure) == {("plc", "pip3"), ("pip2", "pip3")}
+assert not directed(logged.structure)
+columns = list(sachs.data.columns)
+ambiguous = {tuple(columns[i] for i in t) for t in logged.metadata["ambiguous_triples"]}
+assert ambiguous == {("plc", "pip3", "pip2")}
 ```
 
-PC keeps 7 of the 8 links it found before and adds none. The directions changed: the collider at
-pkc is gone, and another appears at pip3. The skeleton is the more stable part of the answer.
-Treat directions learned from observational data as hypotheses to test.
+PC keeps 7 of the 8 links it found before and adds none. It directs none of them: the collider at
+pkc is gone, and the one at pip3 is ambiguous, so PC orients neither of its links and lists the
+triple in `metadata["ambiguous_triples"]`. The skeleton is the more stable part of the answer. Treat
+directions learned from observational data as hypotheses to test.
 
 ### A second method
 
@@ -280,13 +284,14 @@ pd.DataFrame(boot.table()[:8]).round(2)
 ```
 
 `table()` lists every link that appeared in some resample, with the direction it had there, most
-frequent first. The four undirected links appear in 91 to 100 of the 100 resamples. Directions are
-less stable: each arrow of the collider at pkc appears in 86 resamples, and `plc -> pip3` in 31.
+frequent first. Five undirected links appear in 93 to 100 of the 100 resamples, and each arrow of
+the collider at pkc in 95. The link between plc and pip3 is the least stable: it appears in 54
+resamples, undirected in 48 of them.
 
 `boot.structure` is the averaged graph. Each pair takes the state it has most often, with no edge
-counted as one of the states, and the result is then made a valid CPDAG. It holds seven of `out`'s
-eight links: plc and pip3 are adjacent in 54 of the 100 resamples, but no one edge between them is
-as frequent as no edge (`plc -> pip3` in 31, no edge in 46). A stricter threshold asks a link to be
+counted as one of the states, and the result is then made a valid CPDAG. It holds all eight of
+`out`'s links, plc and pip3's among them: the undirected edge between them, in 48 of the 100
+resamples, is a little more frequent than no edge, in 46. A stricter threshold asks a link to be
 adjacent in more of the resamples, without refitting:
 
 ```{code-cell} ipython3
@@ -298,14 +303,14 @@ print(boot.average(0.95))
 
 # The prose below holds only while these do.
 table = pd.DataFrame(boot.table())
-assert table.iloc[:4]["type"].eq("undirected").all()
-assert table.iloc[:4]["count"].between(75, 100).all()
+undirected = table[table["type"].eq("undirected")].head(5)
+assert len(undirected) == 5 and undirected["count"].between(93, 100).all()
 arrows = table[table["target"].eq("pkc") & table["type"].eq("directed")]
-assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(80, 90).all()
-assert 50 <= table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]["count"].sum() < 60
+assert set(arrows["source"]) == {"p38", "jnk"} and arrows["count"].between(90, 100).all()
 plc_pip3 = table[table[["source", "target"]].isin(["plc", "pip3"]).all(axis=1)]
-assert plc_pip3["count"].max() < 100 - plc_pip3["count"].sum()
-assert links(boot.structure) == links(out.structure) - {frozenset({"plc", "pip3"})}
+assert 50 <= plc_pip3["count"].sum() < 60
+assert plc_pip3["count"].max() > 100 - plc_pip3["count"].sum() and plc_pip3["count"].max() < 50
+assert links(boot.structure) == links(out.structure)
 assert links(out.structure) - links(boot.average(0.95)) == {
     frozenset({"plc", "pip3"}),
     frozenset({"erk", "pka"}),
@@ -315,10 +320,11 @@ columns = list(sachs.data.columns)
 assert 0.9 < adjacent[columns.index("erk"), columns.index("pka")] <= 0.95
 ```
 
-That drops the link between erk and pka, which is in 93 of the 100 resamples. Treat the counts as a
-ranking of the links, not as probabilities. `resampling="bootstrap"` draws all the cells with
-replacement instead; a resample then repeats some cells, so PC's tests see more evidence than it
-holds and keep weak links more often than they do on the data.
+That drops the link between plc and pip3, in 54 of the 100 resamples, and the one between erk and
+pka, in 93. Treat the counts as a ranking of the links, not as probabilities.
+`resampling="bootstrap"` draws all the cells with replacement instead; a resample then repeats some
+cells, so PC's tests see more evidence than it holds and keep weak links more often than they do on
+the data.
 
 ### Checking a result against the data
 
@@ -587,7 +593,7 @@ Each test and score reads the columns as one kind of data:
 
 | Data | `indep_test` | `score_func` |
 |---|---|---|
-| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` (experimental) | `bic` (the default when no column is categorical), `normal_scores` (experimental: monotone transformations of Gaussian columns) |
+| Continuous | `fisherz` (the default when no column is categorical), `student_t`, `normal_scores` (monotone effects, any marginals); for nonlinear effects, `kci`, `rcot`, `cmiknn`, `gpdc`, `gcm`, `wgcm`, and `pcm` (experimental) | `bic` (the default when no column is categorical), `normal_scores` (monotone transformations of Gaussian columns) |
 | Categorical | `chisq`, `gsq` (the default when every column is categorical) | `bdeu` (the default when every column is categorical), `discrete_bic` |
 | Mixed | `degen_gauss`, `cond_gauss` (the default when some columns are categorical) | `cond_gauss` (the default when some columns are categorical), `degen_gauss` |
 

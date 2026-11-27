@@ -337,15 +337,20 @@ the R package bnlearn. With a `target`, each returns that variable's set, whatev
 
 % concept: collider_rule
 `pc`, `cdnod`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` take `collider_rule`, which
-decides whether the middle node of an unshielded triple `x - z - y` is a collider. `"sepsets"`, the
-default, reads the separating set that removed the edge `x - y`. `"conservative"` (Ramsey, Zhang,
-and Spirtes 2006) and `"majority"` (Colombo and Maathuis 2014) test `x` and `y` again given every
-subset of either one's neighbors and, if at least one subset separates them, make `z` a collider
-when none, or fewer than half, of the separating subsets contain it. A triple the vote cannot decide
-is ambiguous: no rule orients through it, and `metadata["ambiguous_triples"]` lists it. Each
-method's Notes give every outcome. `pcmciplus` and `jpcmciplus` take the same three rules for their
-same-step colliders, with `"majority"` as their default, as in tigramite, since their orientations
-do not depend on the order of the variables.
+decides whether the middle node of an unshielded triple `x - z - y` is a collider. `"sepsets"` reads
+the separating set that removed the edge `x - y`; it orients the most edges, with the most false
+arrowheads. `"conservative"` (Ramsey, Zhang, and Spirtes 2006) and `"majority"` (Colombo and
+Maathuis 2014) test `x` and `y` again given every subset of either one's neighbors and, if at least
+one subset separates them, make `z` a collider when none, or fewer than half, of the separating
+subsets contain it. `"conservative"` gives the fewest false arrowheads and leaves more edges
+undirected; `"majority"` lies between the two, with far fewer false arrowheads than `"sepsets"`. A
+triple the vote cannot decide is ambiguous: no rule orients through it, and
+`metadata["ambiguous_triples"]` lists it. Each method's Notes give every outcome. The default is
+`"majority"` in `pc` and `fci`, where the rules were compared on simulated data, and `"sepsets"` in
+`cdnod`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci`, until the rules are compared in them.
+`pcmciplus` and `jpcmciplus` take the same three rules for their same-step colliders, with
+`"majority"` as their default, as in tigramite, since their orientations do not depend on the order
+of the variables.
 
 % concept: edge_removal
 `gfci`, `boss_fci`, and `grasp_fci` take `edge_removal`: which edges of the score search's CPDAG
@@ -836,7 +841,7 @@ A method becomes supported once it has:
 |---|---|---|
 | `"fisherz"` | Partial correlation with Fisher's z-transform: linear effects, Gaussian noise | Supported |
 | `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
-| `"normal_scores"` | Fisher's z-transform of the partial correlation of each column's normal scores: monotone effects, any marginals | Experimental |
+| `"normal_scores"` | Fisher's z-transform of the partial correlation of each column's normal scores: monotone effects, any marginals | Supported; experimental in `lpcmci` |
 | `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
 | `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
 | `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Supported |
@@ -846,6 +851,12 @@ A method becomes supported once it has:
 | `"gcm"` | Generalized covariance measure: the normalized covariance of the residuals of boosted-tree regressions | Experimental |
 | `"wgcm"` | Weighted generalized covariance measure: the GCM with weights on the conditioning set, for a covariance that changes sign | Experimental |
 | `"pcm"` | Projected covariance measure: whether one variable improves an additive-model prediction of the other | Experimental |
+
+`"student_t"` favors exact p-values when the rows barely exceed the conditioning set; otherwise it
+gives the graphs of `"fisherz"`. `"normal_scores"` favors columns that are monotone transformations
+of Gaussian variables and data with heavy-tailed noise; it gives up some adjacencies on Gaussian
+data with few rows. In `lpcmci` it is experimental: its graph did not always equal the graph of
+`"fisherz"` on the normal scores of the data.
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores
@@ -970,7 +981,8 @@ likewise rebuilt for each query.
 
 ### Rank-based score
 
-`score_func="normal_scores"` is experimental; {{ rank_score_names }} take it. It replaces each
+`score_func="normal_scores"` is supported; {{ rank_score_names }} take it, `lges` with its own
+status. It replaces each
 column by its normal scores, the transformation of `indep_test="normal_scores"`, and scores them
 with the linear-Gaussian BIC, `penalty_discount` and `ebic_gamma` included. Its model is the
 nonparanormal, or Gaussian copula, model of Liu, Lafferty, and Wasserman: each column is an unknown
@@ -981,7 +993,9 @@ transformation of any column leaves the score, and so the graph, unchanged; on d
 Gaussian already, it ranks graphs almost as `"bic"` does. Neither option sets the other:
 `indep_test="normal_scores"` alone keeps the default score, `"bic"`. In a method that takes both,
 pass both, and the test and the score read one model; then a strictly increasing transformation of
-any column leaves the graph unchanged.
+any column leaves the graph unchanged. The score favors such data, where `"bic"` does no better
+than the empty graph; it gives up accuracy on linear data with heavy-tailed noise, where it adds
+false edges, and on Gaussian data with few rows, where it misses some edges.
 
 We estimate the latent correlations by the correlations of the normal scores. Nandy, Hauser and
 Maathuis estimate them from Spearman's or Kendall's rank correlation, transformed, which estimates
@@ -989,7 +1003,8 @@ the same latent correlation under the model, and prove GES and its restricted hy
 consistent in high dimensions with that score; Harris and Drton prove the same for PC with a
 rank-based test. With `ges`, the score is a published variant, with our estimate in place of
 theirs. With the other searches and hybrids, it is the analogous construction, not a result those
-papers prove.
+papers prove. Its accuracy was measured against ground truth and against `"bic"` on the data before
+the transformation, not against another package.
 
 Ties lose information: a column with few distinct values has few distinct scores, and a column
 whose ranks repeat another's, such as `x` and `exp(x)`, is a copy and raises a `ValueError`, as

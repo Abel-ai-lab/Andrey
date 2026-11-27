@@ -16,8 +16,21 @@ names its pull request.
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
   `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
+- `pc` and `fci` default to `collider_rule="majority"`, where they defaulted to `"sepsets"`. In the
+  options study, the majority rule made fewer errors overall than the separating sets in most
+  settings measured, with far fewer false arrowheads. It runs extra tests per unshielded triple, and
+  it can leave a triple ambiguous, which `metadata["ambiguous_triples"]` then lists. For the former
+  behavior, pass `collider_rule="sepsets"`. `cdnod`, `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci`
+  keep `"sepsets"` until the rule is measured in them. ([#1266])
 
 ### Changed
+
+- `score_func="normal_scores"` is supported in `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`,
+  `grasp`, `mmhc`, `rsmax2`, `gfci`, `boss_fci`, and `grasp_fci`, and in `lges` with its own status,
+  and `indep_test="normal_scores"` in `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `iamb`,
+  `inter_iamb`, `mmpc`, `mmhc`, `rsmax2`, `pcmci`, and `pcmciplus`; in `lpcmci` the test stays
+  experimental. These options, `collider_rule`, `collider_order`, and `"student_t"` say what each
+  value favors and what it gives up. ([#1266])
 
 - Each method's Limitations paragraph says in a few sentences where it does better or worse and
   against which methods, without numbers, and links the release card that holds the measurements;
@@ -84,6 +97,11 @@ names its pull request.
   (`chisq`, `gsq`, `bdeu`, and `discrete_bic`) refused it as a code of "2**53 or more", and reading
   the columns as numbers (`categorical=[]`) kept it as a value and returned another graph.
   ([#1241])
+- `pc(missing="mvpc")` with `collider_rule="conservative"` or `"majority"` decides each unshielded
+  triple with the tests of the skeleton search, the corrected ones for a pair the correction
+  retests. The vote ran the test-wise deletion tests, which find a pair dependent through the
+  selection the correction removed, so no subset separated it and the collider of Figure 1b of the
+  MVPC paper stayed unoriented; it is now oriented, as under `collider_rule="sepsets"`. ([#1266])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3022,4 +3040,5 @@ First alpha release.
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
 [#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
 [#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
+[#1266]: https://github.com/Abel-ai-lab/Andrey/pull/1266
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
