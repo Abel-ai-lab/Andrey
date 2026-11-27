@@ -317,9 +317,9 @@ class PoolMatrix:
     """The matrix a pool's workers read, made once by the pool's owner.
 
     On Linux with the forkserver, :attr:`payload` is a :class:`SharedMatrix`: one file holds a copy
-    of the matrix, written through its descriptor, and each worker maps it. The owner does not map
-    the file, so the process tree holds the owner's matrix, the file, and each worker's mapping of
-    the pages it reads. Otherwise, for a matrix that is not C-contiguous, or when ``/dev/shm``
+    of the matrix, and each worker maps it. The owner writes the copy through the file's descriptor
+    and does not map it, so a page of the file shows in a process's resident memory only once a
+    worker has read it. Otherwise, for a matrix that is not C-contiguous, or when ``/dev/shm``
     cannot hold the copy, :attr:`payload` is the matrix itself, which each worker's start pickles.
     Either way the workers read the same bytes in the same layout.
 
