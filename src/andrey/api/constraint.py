@@ -1031,7 +1031,11 @@ def gfci(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors over the data variables and more true arrowheads than pooling the rows, also
+        when a hidden variable drives the environment; it gives up a few false arrowheads on small
+        graphs, and accuracy when one index holds many environments that together shift every
+        variable: read as numbers it adds false arrowheads, and read as categories it misses edges.
     score_func : str or None, default=None
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1099,7 +1103,11 @@ def gfci(
         for :func:`~andrey.fci`. If at least one does, ``"conservative"`` makes ``z`` a collider
         when none of them contains it and a non-collider when all do; ``"majority"`` when fewer
         than half contain it and when more than half do. Any other triple is ambiguous, and no
-        rule orients through it. Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
+        rule orients through it. Both run ``2**degree(x) + 2**degree(y)`` tests per pair. With
+        hidden variables the rules differ less than in :func:`~andrey.pc` and :func:`~andrey.fci`:
+        ``"conservative"`` favors fewer false arrowheads and gives up true ones, with about the
+        same overall error as ``"sepsets"``, and ``"majority"`` gives about the graph of
+        ``"sepsets"``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for the mixed-data score and test: column labels
         (strings) or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and
@@ -1130,8 +1138,14 @@ def gfci(
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as for
         :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
-        randomized experiment, so every edge the index keeps points out of it. Without ``env``, it
-        has no effect.
+        randomized experiment, so every edge the index keeps points out of it. ``False`` favors
+        finding which variables the environments act on directly, when they are assigned from
+        outside; it gives up correct marks at the index when a hidden variable drives both the
+        environment and a variable, where it reports the environment as a cause of that variable.
+        ``True`` favors correct marks at the index when a hidden variable may drive both; it gives
+        up the direct targets of randomized environments, whose edges it leaves partly undetermined.
+        The graph over the data variables is the same or nearly so. Without ``env``, it has no
+        effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1889,7 +1903,13 @@ def fci_jci(
         health deciding both the hospital and an outcome: FCI-JCI1 [1]_. ``False`` assumes the index
         is set from outside, as in a randomized experiment, so every edge the index keeps points out
         of it, which can orient more edges: FCI-JCI123, which with one context variable is
-        FCI-JCI12. See Notes.
+        FCI-JCI12. ``False`` favors finding which variables the environments act on directly, when
+        they are assigned from outside; it gives up correct marks at the index when a hidden
+        variable drives both the environment and a variable, where it reports the environment as a
+        cause of that variable. ``True`` favors correct marks at the index when a hidden variable
+        may drive both; it gives up the direct targets of randomized environments, whose edges it
+        leaves partly undetermined. The graph over the data variables is the same or nearly so. See
+        Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which

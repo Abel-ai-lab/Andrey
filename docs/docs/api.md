@@ -295,7 +295,12 @@ may cause both the environment index and a data variable; `gfci`, `boss_fci`, an
 it only with `env`. `True`, the default (Mooij, Magliacane, and Claassen 2020's FCI-JCI1), leaves
 the index end of an edge a circle until a rule orients it. `False` assumes the environment is set
 from outside, as in a randomized experiment (FCI-JCI123), so every edge the index keeps points out
-of it.
+of it. `False` favors finding which variables the environments act on directly, when they are
+assigned from outside; it gives up correct marks at the index when a hidden variable drives both the
+environment and a variable, where it reports the environment as a cause of that variable. `True`
+favors correct marks at the index when a hidden variable may drive both; it gives up the direct
+targets of randomized environments, whose edges it leaves partly undetermined. The graph over the
+data variables is the same or nearly so.
 
 % concept: fdr_method
 `pcmci`, `pcmciplus`, `jpcmciplus`, `rpcmci`, and `granger` take `fdr_method`, tigramite's name for
@@ -658,8 +663,11 @@ of targets and answers each in turn. On the command line, `'target=[a,b]'` names
 header or position, and the JSON result holds `multi: true` and `results`, one entry per target in
 the list's order, in place of `structure` and `metadata`. MMHC learns a skeleton with MMPC's
 conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs. RSMAX2
-generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or Inter-IAMB, or
-of PC's skeleton, and its maximize phase runs hill climbing or tabu search among them.
+generalizes it: its restrict phase keeps the pairs of the skeleton of IAMB, the default, MMPC, or
+Inter-IAMB, or of PC's skeleton, and its maximize phase runs tabu search, the default, or hill
+climbing among them. MMHC is the MMPC skeleton with hill climbing, which `rsmax2` ran by default
+before 0.20. On linear-Gaussian data, IAMB makes fewer errors than MMPC and takes longer on many
+variables, and tabu search makes fewer errors than hill climbing with every restrict phase.
 
 FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI use uncovered paths for their R5, R9, and R10 tail
 orientations: nodes two steps apart on each path must be non-adjacent. R5 considers every circle
@@ -708,8 +716,12 @@ IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observatio
 interventional settings whose intervention targets are all known, as GIES does, where a setting is
 the rows of one environment of `env`: it searches variable orders for the DAG with the fewest edges,
 then the fewest I-contradicting edges, the edges whose direction the settings' invariance tests
-contradict. Its default level for both tests, `alpha=None`, is one over the number of observational
-rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its authors swept, from `1e-4` to `0.05`,
+contradict. Its invariance test, `invariance_test=None`, is `"gaussian"` under `"fisherz"` and
+`"student_t"`, which finds an intervention that changes a variable's mechanism whether or not it
+moves the mean, and `"indicator"` under the other tests; `"indicator"` with `"fisherz"` or
+`"student_t"` raises a `ValueError`, as it sees only a shift of the mean. Its default level for both
+tests, `alpha=None`, is one over the number of observational rows, as for UT-IGSP, `0.001` at 1,000
+rows. Of the levels its authors swept, from `1e-4` to `0.05`,
 `1e-3` had the fewest errors on one set of datasets simulated as in its papers; on fresh datasets,
 against the authors' reference implementation at `1e-3`, it and one over the observational rows were
 each worse in none of 114 comparisons and had fewer errors in 17, with interval ends that are

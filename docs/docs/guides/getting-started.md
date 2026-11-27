@@ -391,6 +391,17 @@ more variable; a numeric label, such as a time step, stays a number. `ges`, `hc`
 `grasp`, `gfci`, `boss_fci`, and `grasp_fci` also fit without `env`, and `icp` also takes `target`,
 the variable whose parents it finds.
 
+With the environment index, `ges`, `hc`, `tabu`, `boss`, and `grasp` make fewer errors and orient
+more edges correctly than the same search on the pooled rows, when each environment shifts a few
+variables. `gfci`, `boss_fci`, and `grasp_fci` do so over the data variables, also when a hidden
+variable drives the environment, and add a few false arrowheads on small graphs. One index that
+holds many environments, which together shift every variable, can do worse than pooling. Read as
+numbers it adds edges, or false arrowheads in `gfci`, `boss_fci`, and `grasp_fci`, since a shift
+that does not follow the labels' order goes unnoticed. Read as categories (`score_func="cond_gauss"`
+with `categorical=[]`) it adds none: `ges`, `hc`, `tabu`, `boss`, and `grasp` then beat pooling
+given enough rows per environment, while `gfci`, `boss_fci`, and `grasp_fci` miss edges. The index
+then identifies no direction beyond the pooled graph's.
+
 `gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
 variables, by name or position, with `[]` for an observational environment; as the name of a column
 whose cells give each row's variables, from whose distinct values `env` follows when you leave it

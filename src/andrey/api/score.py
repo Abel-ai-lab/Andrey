@@ -92,17 +92,30 @@ def ges(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data.
         ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
         continuous data that are Gaussian only after an unknown increasing transformation of each
         column [13]_ [14]_. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial
-        BIC [7]_, for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate
-        Gaussian) [4]_ and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed
-        data, continuous and categorical columns. ``"degen_gauss"`` favors time and accuracy on
-        smaller graphs; ``"cond_gauss"`` favors accuracy on larger graphs and gives up time.
-        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        BIC [7]_, for categorical data coded by whole numbers. ``"bdeu"`` favors fewer errors than
+        ``"discrete_bic"`` with few rows, mostly by adding fewer false edges, and on a larger
+        benchmark network at every sample size measured; it gives up some true edges on random and
+        small networks with few or moderate rows, where it misses more edges and orients fewer.
+        ``"discrete_bic"`` favors fewer missed edges and more correctly oriented ones there; it
+        gives up more false edges, and on the larger network accuracy altogether. With many rows the
+        two give about the same graph on small networks. ``"degen_gauss"`` (degenerate Gaussian)
+        [4]_ and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data,
+        continuous and categorical columns. ``"degen_gauss"`` favors time and accuracy on smaller
+        graphs; ``"cond_gauss"`` favors accuracy on larger graphs and gives up time. ``None`` picks
+        from the declared column types: ``"bdeu"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. See Notes. ``metadata["score_func"]`` names the score the fit used: the one picked
@@ -1810,7 +1823,14 @@ def hc(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"``, the BDeu score, or ``"discrete_bic"``, the multinomial BIC, for categorical data
@@ -2174,7 +2194,14 @@ def tabu(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"`` or ``"discrete_bic"``, the BDeu score or the multinomial BIC for categorical data

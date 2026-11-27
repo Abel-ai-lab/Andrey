@@ -83,7 +83,14 @@ def boss(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
@@ -452,7 +459,14 @@ def grasp(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
@@ -1528,7 +1542,11 @@ def boss_fci(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors over the data variables and more true arrowheads than pooling the rows, also
+        when a hidden variable drives the environment; it gives up a few false arrowheads on small
+        graphs, and accuracy when one index holds many environments that together shift every
+        variable: read as numbers it adds false arrowheads, and read as categories it misses edges.
     score_func : str or None, default=None
         Local score driving the BOSS phase, as for :func:`~andrey.boss`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1607,10 +1625,16 @@ def boss_fci(
         the false edges in no triangle, which costs accuracy at the defaults on sparse graphs, and
         it saves no time. See Notes.
     confounded_index : bool, default=True
-        With ``env``, whether a hidden variable may cause both the index and a data variable, as
-        for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
-        in a randomized experiment, so every edge the index keeps points out of it. Without ``env``,
-        it has no effect.
+        With ``env``, whether a hidden variable may cause both the index and a data variable, as for
+        :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
+        randomized experiment, so every edge the index keeps points out of it. ``False`` favors
+        finding which variables the environments act on directly, when they are assigned from
+        outside; it gives up correct marks at the index when a hidden variable drives both the
+        environment and a variable, where it reports the environment as a cause of that variable.
+        ``True`` favors correct marks at the index when a hidden variable may drive both; it gives
+        up the direct targets of randomized environments, whose edges it leaves partly undetermined.
+        The graph over the data variables is the same or nearly so. Without ``env``, it has no
+        effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random order in which the BOSS phase
@@ -1854,7 +1878,11 @@ def grasp_fci(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors over the data variables and more true arrowheads than pooling the rows, also
+        when a hidden variable drives the environment; it gives up a few false arrowheads on small
+        graphs, and accuracy when one index holds many environments that together shift every
+        variable: read as numbers it adds false arrowheads, and read as categories it misses edges.
     score_func : str or None, default=None
         Local score driving the GRaSP phase, as for :func:`~andrey.grasp`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1937,10 +1965,16 @@ def grasp_fci(
         the false edges in no triangle, which costs accuracy at the defaults on sparse graphs, and
         it saves no time. See Notes.
     confounded_index : bool, default=True
-        With ``env``, whether a hidden variable may cause both the index and a data variable, as
-        for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
-        in a randomized experiment, so every edge the index keeps points out of it. Without ``env``,
-        it has no effect.
+        With ``env``, whether a hidden variable may cause both the index and a data variable, as for
+        :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
+        randomized experiment, so every edge the index keeps points out of it. ``False`` favors
+        finding which variables the environments act on directly, when they are assigned from
+        outside; it gives up correct marks at the index when a hidden variable drives both the
+        environment and a variable, where it reports the environment as a cause of that variable.
+        ``True`` favors correct marks at the index when a hidden variable may drive both; it gives
+        up the direct targets of randomized environments, whose edges it leaves partly undetermined.
+        The graph over the data variables is the same or nearly so. Without ``env``, it has no
+        effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random starting order and the order
