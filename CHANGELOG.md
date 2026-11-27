@@ -128,6 +128,9 @@ names its pull request.
   build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
   the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
   output bit for bit and the same counts of the queries not tested. ([#1296])
+- `nogam` runs faster: each fold of its cross-validated kernel regressions is assembled from slices
+  of the kernel, the kernels are built in place, and the repeated non-finite checks of the Cholesky
+  steps are skipped, with the same output bit for bit. ([#1298])
 - `iamb` and `inter_iamb` on data with missing values and `fisherz` or `student_t`, the default
   test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
   array, so these searches run faster on tens of variables, with the same output bit for bit.
@@ -3100,4 +3103,5 @@ First alpha release.
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
+[#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
