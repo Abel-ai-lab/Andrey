@@ -176,6 +176,10 @@ names its pull request.
   rules CUDA out from the build's version file, so a `direct_lingam` fit and a fit with
   `indep_test="kci"` or `indep_test="cmiknn"` that stay on NumPy no longer import torch. A torch
   already imported is asked, and so is a `cuda` pin. ([#1314])
+- `iamb`, `inter_iamb`, and `mmpc` with a list of `target` on data with missing values answer every
+  target with one search, so a run that several targets share is made once, and each result counts
+  the rows of the runs its target reads, as a call for that target alone counts them. These lists
+  run faster, with the same output bit for bit. ([#1317])
 - `jpcmciplus` runs faster as the number of system variables grows, with the same output bit for
   bit: its test over the stacked design keeps the node counts and the design columns each lagged
   node adds to a conditioning set, and forms each conditioning set once per query, instead of
@@ -3158,4 +3162,5 @@ First alpha release.
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
 [#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
+[#1317]: https://github.com/Abel-ai-lab/Andrey/pull/1317
 [#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
