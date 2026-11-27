@@ -705,6 +705,8 @@ def test_a_part_warns_exactly_where_it_is_experimental(data):
         for name in ("iamb", "inter_iamb"):
             getattr(andrey, name)(data, knowledge=required)
             getattr(andrey, name)(data, knowledge=forbidden)
+        for knowledge in (required, forbidden):
+            andrey.mmpc(data, knowledge=knowledge, structure="cpdag")
         for name in ("fci", "gfci", "boss_fci", "grasp_fci"):
             getattr(andrey, name)(data, knowledge=Knowledge(confounded=[("a", "f")]))
 

@@ -3787,11 +3787,11 @@ for _name in EM_METHODS:
 #: beyond the edge parts and does not list here is experimental: mmhc and rsmax2 made more errors
 #: than their reference given the required edges, on repeated seeds. tabu with required paths and
 #: iamb, inter_iamb, and mmpc with forbidden paths are supported with a gap their docstrings state:
-#: with the plain BIC, tabu ends on another graph than the reference's on a dataset whose ties
-#: break another way, and on a graph with no consistent extension the class the claims define moves
-#: further than the graph does. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were measured
-#: with the rule for a graph with no consistent extension, on which a claim acts on an edge and
-#: most claims are dropped.
+#: with the plain BIC, tabu can end on a lower-scoring graph on a dataset whose ties break another
+#: way, and on a graph with no consistent extension the class the claims define moves further than
+#: the graph does. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were measured with the rule
+#: for a graph with no consistent extension, on which a claim acts on an edge and most claims are
+#: dropped.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,

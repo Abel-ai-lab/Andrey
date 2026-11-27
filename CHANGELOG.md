@@ -186,11 +186,13 @@ names its pull request.
   variables stand for latent Gaussian variables, and `"cond_gauss"` is more accurate on conditional
   Gaussian data and where the categorical variables have only categorical parents, and more accurate
   than reading the category codes as numbers on every kind of mixed data measured. `"cond_gauss"`
-  has one gap, named in the `pc` and `fci` entries: a reference implementation of its test could not
-  be run on data like its paper's. `required_paths` is supported in `tabu`, and `forbidden_paths` in
+  has one gap, named in the `pc` and `fci` entries: no reference implementation of its test could be
+  run on data like its paper's. `required_paths` is supported in `tabu`, and `forbidden_paths` in
   `iamb`, `inter_iamb`, and `mmpc`, so a fit with them no longer warns `ExperimentalWarning`; each
-  entry states the difference a check found, a tie rule in `tabu` and, in the blanket methods, a
-  graph with no consistent extension, where a claim acts only on an edge. ([#1288])
+  entry states the difference a check found. With the plain BIC, `tabu` given the same required
+  edges as bnlearn's `tabu` can end at a lower-scoring graph, depending on how ties break; the
+  blanket methods return a graph with no consistent extension more often than `pc` on larger graphs,
+  where a claim acts only on an edge. ([#1288])
 
 ### Fixed
 

@@ -418,11 +418,10 @@ def pc(
     no consistent DAG extension, and a graph query such as ``markov_blanket`` raises ``ValueError``.
     The `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__
     has the numbers. On mixed data, ``"degen_gauss"`` and ``"cond_gauss"`` made fewer errors than
-    the empty graph in the settings measured, with one gap for ``"cond_gauss"``: the reference
-    implementation of its test stopped with an error on almost every dataset of its paper's setting,
-    so there it was compared with the empty graph and with ``"fisherz"`` on the category codes, not
-    with the reference. The `0.20.0 release card
-    <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ has the comparison.
+    the empty graph in the settings measured, with one gap for ``"cond_gauss"``: no reference
+    implementation of its test could be run on data like its paper's, so there it was compared with
+    the empty graph and with ``"fisherz"`` on the category codes, not with a reference. The `0.20.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ has the comparison.
 
     References
     ----------
@@ -879,10 +878,10 @@ def fci(
     can raise ``ValueError``. The `0.8.0 release card
     <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`__ has the numbers. On
     mixed data, ``"degen_gauss"`` and ``"cond_gauss"`` made fewer errors than the empty graph in the
-    settings measured, with one gap for ``"cond_gauss"``: the reference implementation of its test
-    stopped with an error on almost every dataset of its paper's setting, so there it was compared
-    with the empty graph and with ``"fisherz"`` on the category codes, not with the reference. The
-    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ has the comparison.
+    settings measured, with one gap for ``"cond_gauss"``: no reference implementation of its test
+    could be run on data like its paper's, so there it was compared with the empty graph and with
+    ``"fisherz"`` on the category codes, not with a reference. The `0.20.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ has the comparison.
 
     References
     ----------

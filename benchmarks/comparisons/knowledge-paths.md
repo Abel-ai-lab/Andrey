@@ -798,20 +798,19 @@ required edges the paths imply made fewer errors in rows that repeated.
 
 Supported with a difference, where a check failed and the trace found no defect:
 
-- `tabu` with `required_paths`: with the plain BIC, the same required edges as bnlearn's `tabu`
-  left `tabu` with more errors in one row on both sets of seeds (20 variables, 500 samples,
-  expected degree 2, 5 % of the pairs). The difference is the tie rule: with ties broken by column
-  position (`tie_break="position"`) `tabu` takes bnlearn's moves on 39 of the 40 datasets of that
-  row, and with the default order-free ties its errors against bnlearn's on 160 datasets not in
-  the lane were -0.08 [-1.12, +0.93] per graph. With the default score every check passed.
+- `tabu` with `required_paths`: with the plain BIC, the same required edges as bnlearn's `tabu` left
+  `tabu` with more errors in one row on both sets of seeds (the row above). The 0.20.0 options study
+  traced it and found no defect: the difference is the tie rule. With ties broken by column position
+  (`tie_break="position"`) `tabu` takes bnlearn's moves, and with the default order-free ties the gap
+  did not repeat on datasets outside the lane. With the default score every check passed.
 - `iamb`, `inter_iamb`, and `mmpc` with `forbidden_paths`: pooled over two sets of seeds, forbidden
   paths alone left the CPDAG 0.65 to 1.95 edges farther from the class the claims define at 50
   variables and expected degree 2, because on a graph with no consistent extension about 96 % of
-  them are dropped (`metadata["unmet_knowledge"]` lists them). The graph itself moved toward the
-  claims in every such row (the CPDAG's change against the class it was fitted to is below 0), and
-  the class the claims define moved farther, mostly in fits whose graph has no consistent
-  extension, which these searches return 4 to 6 times as often as `pc` on those cells, and `iamb`
-  and `inter_iamb` as often as bnlearn's.
+  them are dropped (`metadata["unmet_knowledge"]` lists them). The study found no defect in the
+  knowledge step: the graph itself moved toward the claims in every such row, and the class the
+  claims define moved farther, mostly in fits whose graph has no consistent extension, which these
+  searches return more often than `pc` on those cells, and `iamb` and `inter_iamb` as often as
+  bnlearn's.
 
 The limits the measurements show:
 

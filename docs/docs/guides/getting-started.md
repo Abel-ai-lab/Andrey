@@ -547,11 +547,11 @@ than the same fit without them and than a reference package given the same knowl
 method that honors them except two. Required paths are experimental in MMHC and RSMAX2, where a
 reference package given the edges those paths imply made fewer errors. Tabu search supports required
 paths, and IAMB, Inter-IAMB, and MMPC forbidden paths, each with a difference: with the plain BIC
-(`ebic_gamma=0`), Tabu search can end on another graph than a reference package's where ties between
-equally scoring moves break another way, and over many datasets the two are as accurate; the blanket
-methods return a graph with no consistent extension more often than PC on larger graphs, and a claim
-there acts only on an edge, so the class the claims define can move farther than the graph does,
-though the graph itself moves toward it. The [0.20.0 release
+(`ebic_gamma=0`), Tabu search can end at a lower-scoring graph with more errors where ties between
+equally scoring moves break another way, and over many datasets the default order-free ties are as
+accurate; the blanket methods return a graph with no consistent extension more often than PC on
+larger graphs, and a claim there acts only on an edge, so the class the claims define can move
+farther than the graph does, though the graph itself moves toward it. The [0.20.0 release
 card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons. A path claim says
 less than an edge and so directs less: a required path cannot restore an edge the search left out.
 When you know the edge itself, state it as `required`.

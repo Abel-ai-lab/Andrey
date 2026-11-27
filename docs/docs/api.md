@@ -235,15 +235,16 @@ method that honors them except two. `required_paths` is experimental in `mmhc` a
 reference package given the required edges those paths imply made fewer errors. An experimental part
 warns with {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation.
 `tabu` supports `required_paths`, and `iamb`, `inter_iamb`, and `mmpc` support `forbidden_paths`,
-each with a difference. With the plain BIC (`ebic_gamma=0`), `tabu` can end on another graph than a
-reference package's where ties between equally scoring moves break another way, and over many
-datasets the two are as accurate. The blanket methods return a graph with no consistent extension
-more often than `pc` on larger graphs: a claim there acts only on an edge, so the class the claims
-define can move farther than the graph does, though the graph itself moves toward it. The [0.20.0
-release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons. A CPDAG
-method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
-an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
-says less than an edge and so directs less: when you know the edge itself, state it as `required`.
+each with a difference. With the plain BIC (`ebic_gamma=0`), `tabu` can end at a lower-scoring graph
+with more errors where ties between equally scoring moves break another way, and over many datasets
+the default order-free ties are as accurate. The blanket methods return a graph with no consistent
+extension more often than `pc` on larger graphs: a claim there acts only on an edge, so the class
+the claims define can move farther than the graph does, though the graph itself moves toward it. The
+[0.20.0 release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons. A
+CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
+direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
+claim says less than an edge and so directs less: when you know the edge itself, state it as
+`required`.
 
 Knowledge that no graph meets, such as required paths that form a cycle with the required edges,
 raises `ValueError` before the search. A claim the rest of the knowledge allows can still be one the
@@ -869,11 +870,10 @@ data whose categorical variables have only categorical parents. `"cond_gauss"` f
 conditional Gaussian model and data whose categorical variables have only categorical parents, and
 on every kind of mixed data measured it is more accurate than reading the category codes as numbers
 with `"fisherz"`; it gives up some true edges and orientations to `"degen_gauss"` on data whose
-categorical variables stand for latent Gaussian variables. The one gap of `"cond_gauss"`: a
-reference implementation of its test could not be run on data like its paper's, where it stopped
-with an error on almost every dataset, so there it was compared with the empty graph and with
-`"fisherz"` on the category codes, not with the reference. The [0.20.0 release
-card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons.
+categorical variables stand for latent Gaussian variables. The one gap of `"cond_gauss"`: no
+reference implementation of its test could be run on data like its paper's, so there it was compared
+with the empty graph and with `"fisherz"` on the category codes, not with a reference. The [0.20.0
+release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons.
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores
