@@ -176,6 +176,14 @@ names its pull request.
   rules CUDA out from the build's version file, so a `direct_lingam` fit and a fit with
   `indep_test="kci"` or `indep_test="cmiknn"` that stay on NumPy no longer import torch. A torch
   already imported is asked, and so is a `cuda` pin. ([#1314])
+- Every fit reads its data with fewer passes and builds its result with NumPy, so a fit on many rows
+  starts its search sooner and a bootstrap on a few variables builds each resample's graph sooner,
+  with the same output bit for bit. The input check takes each column's maximum and minimum first
+  and runs the full finiteness pass only for data that holds `NaN` or `inf`, the constant-column
+  test reads the same extremes, and the check for whole-valued columns tests the first rows before
+  the rest. The graph's sparse store is built with `np.nonzero`, its partner marks are looked up
+  with one `searchsorted` in `validate` and in the check that halves a `dag` or `cpdag` store, and
+  a store loaded with its entries out of order or repeated takes the earlier code. ([#1325])
 
 ### Fixed
 
@@ -3154,3 +3162,4 @@ First alpha release.
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
 [#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
+[#1325]: https://github.com/Abel-ai-lab/Andrey/pull/1325
