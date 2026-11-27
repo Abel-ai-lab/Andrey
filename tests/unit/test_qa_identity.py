@@ -10,12 +10,14 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pytest
 
 import andrey
 from andrey import GraphStructure, StructureOutput
+from andrey.constraint import blanket
 from andrey.core import ci, ci_missing, score_delta
 from andrey.core.ci import make_indep_test
 from andrey.core.score import BICScore
@@ -437,6 +439,85 @@ def test_counting_records_one_query_per_pvalue_of_a_batched_call(
     assert counts.summary()["ci_queries"] == len(p_values) == 3
     assert counts.separated == {(0, 2), (1, 3), (0, 3)}
     assert counts.summary()["ci_sets"] == ({"1": 3} if np.size(conditions) else {"0": 1})
+
+
+@pytest.mark.parametrize("name", ["fisherz", "student_t", "normal_scores"])
+def test_counting_records_the_stacked_queries_up_to_the_first_that_separates(
+    x: np.ndarray, name: str
+) -> None:
+    """A stacked call that stops at its first separating query counts the p-values it returns, not
+    the queries it computed ahead and dropped: the queries of a scalar loop that stops there."""
+    test = make_indep_test(name, x)
+    rows = (np.array([1, 1, 1]), np.array([3, 0, 2]), np.array([[0, 2], [3, 2], [3, 0]]))
+    with identity.counting(alpha=0.05) as stacked:
+        found = test.pvalues_until_separated(*rows, 0.05)
+    with identity.counting(alpha=0.05) as alone:
+        for target, member, cond in zip(*rows):
+            if test(target, member, cond) > 0.05:
+                break
+    assert len(found) == 1  # column 3 is independent of column 1, so the first query separates
+    assert (
+        stacked.summary()
+        == alone.summary()
+        == {
+            "ci_queries": 1,
+            "ci_after_separation": 0,
+            "ci_sets": {"2": 1},
+        }
+    )
+    assert stacked.separated == alone.separated == {(1, 3)}
+
+
+def test_counting_records_the_queries_of_a_stack_that_falls_back_to_scalar_calls() -> None:
+    """A stack that raises on a singular row answers by scalar calls up to the first separating
+    one, and those are the queries counted, once each."""
+    X = np.random.default_rng(2).standard_normal((200, 5))
+    X[:, 4] = X[:, 1]
+    test = ci.FisherZ(X)  # make_indep_test refuses copies
+    rows = (np.array([0, 0, 0]), np.array([2, 2, 3]), np.array([[1, 3], [1, 4], [2, 1]]))
+    with identity.counting(alpha=0.05) as counts:
+        found = test.pvalues_until_separated(*rows, 0.05)
+    assert len(found) == 1 and counts.summary()["ci_queries"] == 1
+    with pytest.raises(ValueError, match="singular"), identity.counting(alpha=1.0) as raised:
+        test.pvalues_until_separated(*rows, 1.0)
+    assert raised.ci_queries == 0  # a call that raises records nothing
+
+
+def test_counting_a_stacked_shrink_gives_the_counts_of_the_loop_that_asks_one_member_at_a_time(
+    x: np.ndarray, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A shrink that asks every member in one call, drops one with members after it, and asks the
+    rest again counts the queries, the pairs separated, and the sets of a loop that asks one at a
+    time, though the stacks computed more queries than that."""
+
+    class Alone:
+        """A test that answers only one query at a time, so a shrink asks it one at a time."""
+
+        def __init__(self, test: ci.FisherZ) -> None:
+            self.test = test
+
+        def __call__(self, a: int, b: int, cond: object = ()) -> float:
+            return self.test(a, b, cond)  # type: ignore[arg-type]
+
+    asked: list[int] = []
+    stack = ci.PartialCorrelationTest.statistic_pvalues
+
+    def spied(test: Any, a: Any, b: Any, conditions: Any) -> Any:
+        asked.append(len(a))
+        return stack(test, a, b, conditions)
+
+    monkeypatch.setattr(ci.PartialCorrelationTest, "statistic_pvalues", spied)
+    members_stacked, members_alone = [3, 0, 2], [3, 0, 2]  # column 3 is independent of column 1
+    with identity.counting(alpha=0.05) as stacked:
+        blanket._shrink(ci.FisherZ(x), 1, 0.05, members_stacked)
+    stacked_rows = list(asked)
+    with identity.counting(alpha=0.05) as alone:
+        blanket._shrink(Alone(ci.FisherZ(x)), 1, 0.05, members_alone)  # type: ignore[arg-type]
+    assert members_stacked == members_alone == [0, 2]
+    assert stacked_rows == [3, 2]  # five queries computed
+    assert stacked.summary() == alone.summary()  # three of them are the loop's
+    assert stacked.ci_queries == 3
+    assert stacked.separated == alone.separated == {(1, 3)}
 
 
 @pytest.mark.parametrize(

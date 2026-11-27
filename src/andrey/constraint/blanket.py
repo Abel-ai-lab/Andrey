@@ -51,13 +51,14 @@ from andrey.constraint._skeleton import (
     MaskedMapping,
     _runs,
     adjacent_pairs,
+    canonical_capable,
     flagged_triples,
     kept_apart,
     scan_conditioning_sets,
     subset_rows,
 )
 from andrey.core import ARROW, NULL, TAIL, backend
-from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.core.ci import CITest, PartialCorrelationTest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
     RowCounts,
@@ -328,17 +329,40 @@ def _shrink(
 ) -> list[int]:
     """Drop, in place and in joining order, each member independent of ``target`` given the rest;
     the members in ``keep`` are not tested. With ``sepsets``, a dropped member's entry is set to the
-    rest. Returns the members dropped."""
+    rest. Returns the members dropped.
+
+    A test that answers stacked queries (:func:`~andrey.constraint._skeleton.canonical_capable`)
+    asks every member not yet visited in one call, which returns the p-values up to the first member
+    found independent (``pvalues_until_separated``). That member is dropped and the members after it
+    are asked again given the smaller blanket, so the tests used are those of one query at a time.
+    """
     dropped = []
-    for x in list(blanket):
-        if x in keep:
-            continue
+    pending = [x for x in blanket if x not in keep]
+    stack = test if isinstance(test, PartialCorrelationTest) and canonical_capable(test) else None
+    while pending:
+        if stack is not None and len(pending) > 1:
+            pvalues = stack.pvalues_until_separated(
+                np.full(len(pending), target, dtype=np.intp),
+                np.array(pending, dtype=np.intp),
+                np.array([[z for z in blanket if z != x] for x in pending], dtype=np.intp),
+                alpha,
+            )
+            if not pvalues[-1] > alpha:
+                break
+            first = len(pvalues) - 1
+        else:
+            rest = [z for z in blanket if z != pending[0]]
+            if not test(target, pending[0], rest) > alpha:
+                pending = pending[1:]
+                continue
+            first = 0
+        x = pending[first]
         rest = [z for z in blanket if z != x]
-        if test(target, x, rest) > alpha:
-            blanket.remove(x)
-            dropped.append(x)
-            if sepsets is not None:
-                sepsets[x] = tuple(sorted(rest))
+        blanket.remove(x)
+        dropped.append(x)
+        if sepsets is not None:
+            sepsets[x] = tuple(sorted(rest))
+        pending = pending[first + 1 :]
     return dropped
 
 

@@ -214,7 +214,8 @@ selection rules) and, for the greedy score-based searches, use the shared worker
 `src/andrey/search/_parallel.py`. Keep the recovery tests passing and the outputs equal across
 Andrey's execution paths, and measure the speedup with a benchmark campaign. `qa/identity.py`
 shows the change returns the same bits and makes no more queries: write its manifest on the base
-commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)).
+commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)). Tests a
+speed change computes ahead and discards do not count: the count is the algorithm's.
 
 ### Change a parameter or default
 
