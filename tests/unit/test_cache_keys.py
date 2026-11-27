@@ -107,7 +107,8 @@ def pools():
 def test_the_blas_limit_reaches_a_library_imported_after_the_first_fit(monkeypatch, pools):
     # A fit limits the BLAS and OpenMP pools it finds to one thread, so its result does not depend
     # on the machine's thread count. A library imported later brings pools the first search never
-    # saw, so they are found again once an import has happened.
+    # saw, so they are found again once the set of imported modules has changed, as when one
+    # module is removed and another imported, which leaves the count of modules as it was.
     import threadpoolctl
 
     found = []
@@ -128,6 +129,13 @@ def test_the_blas_limit_reaches_a_library_imported_after_the_first_fit(monkeypat
     with backend.one_blas_thread():
         pass
     assert len(found) == 2
+    count = len(sys.modules)
+    monkeypatch.delitem(sys.modules, "a_library_imported_later")
+    monkeypatch.setitem(sys.modules, "a_library_replacing_it", types.ModuleType("replacing"))
+    assert len(sys.modules) == count
+    with backend.one_blas_thread():
+        pass
+    assert len(found) == 3
 
 
 def test_a_conditioning_threshold_is_applied_to_an_inverse_cached_under_another():

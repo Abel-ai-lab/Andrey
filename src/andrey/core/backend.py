@@ -600,8 +600,8 @@ def worker_count(n_jobs: int | None = None) -> int:
 
 
 @lru_cache(maxsize=1)
-def _thread_pools(imported: int):
-    """The thread pools of the libraries loaded when ``imported`` modules were."""
+def _thread_pools(imported: frozenset[str]):
+    """The thread pools of the libraries loaded when the modules named in ``imported`` were."""
     from threadpoolctl import ThreadpoolController
 
     return ThreadpoolController()
@@ -610,10 +610,10 @@ def _thread_pools(imported: int):
 def one_blas_thread() -> contextlib.AbstractContextManager:
     """Limit the loaded BLAS and OpenMP thread pools to one thread inside a ``with`` block.
 
-    The libraries are found again after any import, so one loaded later, such as torch's, is
-    limited too.
+    The libraries are found again whenever the set of imported module names changes, so one loaded
+    later, such as torch's, is limited too, even when other modules were removed meanwhile.
     """
-    return _thread_pools(len(sys.modules)).limit(limits=1)
+    return _thread_pools(frozenset(sys.modules)).limit(limits=1)
 
 
 # ---- tensor transfer (torch backends) -----------------------------------------------------------
