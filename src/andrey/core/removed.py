@@ -19,8 +19,8 @@ class Removed(NamedTuple):
     """An argument name, or a value of one argument, that the ``methods`` no longer take.
 
     ``release`` is the release that renamed or dropped it. ``now`` is the current name, or the
-    current value when ``value`` is set; ``None`` when the argument was dropped, in which case
-    ``note`` says what to do instead.
+    current value when ``value`` is set; ``None`` when the argument or the value was dropped, in
+    which case ``note`` says what to do instead.
     """
 
     release: str
@@ -149,6 +149,14 @@ REMOVED: tuple[Removed, ...] = (
     ),
     Removed("0.14.0", ("cdnod",), "domain_index", "env"),
     Removed("0.14.0", ("gies",), "interventions", "targets"),
+    Removed(
+        "0.20.0",
+        ("exact_search",),
+        "search_method",
+        None,
+        "dp",
+        note="A* is the only search, and it returns the same DAG",
+    ),
 )
 
 

@@ -928,8 +928,7 @@ def ut_igsp_targets(x: np.ndarray) -> list[list[int]]:
     return [learned[k] for k in range(1, len(unknown_target_unstack(x)[2]) + 1)]
 
 
-#: Public defaults, except MMPC and RSMAX2: MMPC returns a skeleton by default, so the gate fits its
-#: CPDAG, and RSMAX2's default restrict phase is MMHC's, so the gate fits its IAMB restrict phase. A
+#: Public defaults, except MMPC: it returns a skeleton by default, so the gate fits its CPDAG. A
 #: fixed seed pins the search orders of BOSS, GRaSP, BOSS-FCI, and GRaSP-FCI, FastICA's start, and
 #: CALM's optimizer. CD-NOD and MultiGroupDirectLiNGAM run through their benchmark adapters, which
 #: call the public functions with the published settings: the domain index of four equal blocks of
@@ -953,7 +952,7 @@ SUPPORTED: dict[str, Method] = {
     "Tabu": Method(lambda x: andrey.tabu(x), "cpdag", CPDAG_DATA),
     "MMPC": Method(lambda x: andrey.mmpc(x, structure="cpdag"), "cpdag", CPDAG_DATA),
     "MMHC": Method(lambda x: andrey.mmhc(x), "cpdag", CPDAG_DATA),
-    "RSMAX2": Method(lambda x: andrey.rsmax2(x, restrict="iamb"), "cpdag", CPDAG_DATA),
+    "RSMAX2": Method(lambda x: andrey.rsmax2(x), "cpdag", CPDAG_DATA),
     "CAM": Method(lambda x: andrey.cam(x), "dag", ("anm_er_n1000_d20", "anm_er_n1000_d50")),
     "RESIT": Method(lambda x: andrey.resit(x), "dag", ("anm_er_n1000_d5", "anm_er_n1000_d10")),
     "ScoreMatching": Method(lambda x: andrey.score_matching(x), "dag", SCORE_DATA),

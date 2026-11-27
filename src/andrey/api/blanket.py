@@ -369,9 +369,12 @@ def iamb(
     as blankets grow: between variables with large blankets the skeleton step removes many true
     edges, and its tests grow exponentially with a blanket's size. Tests that contradict each other
     can leave a graph with no consistent extension, which stands for no DAG; a ``knowledge`` claim
-    then acts only on an edge. The
-    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#iamb>`__ has the
-    numbers.
+    then acts only on an edge, and the class the claims define can move further than the graph does.
+    Forbidden paths bring the CPDAG closer to the true graph; these searches return a graph with no
+    consistent extension more often than :func:`~andrey.pc` on larger graphs. The `0.13.0 release
+    card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#iamb>`__ has the numbers, and the
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ the comparison for
+    forbidden paths.
 
     References
     ----------
@@ -647,9 +650,12 @@ def inter_iamb(
     as blankets grow: between variables with large blankets the skeleton step removes many true
     edges, and its tests grow exponentially with a blanket's size. Tests that contradict each other
     can leave a graph with no consistent extension, which stands for no DAG; a ``knowledge`` claim
-    then acts only on an edge. The
-    `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#inter-iamb>`__ has the
-    numbers.
+    then acts only on an edge, and the class the claims define can move further than the graph does.
+    Forbidden paths bring the CPDAG closer to the true graph; these searches return a graph with no
+    consistent extension more often than :func:`~andrey.pc` on larger graphs. The `0.12.0 release
+    card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#inter-iamb>`__ has the numbers, and the
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ the comparison for
+    forbidden paths.
 
     References
     ----------
@@ -920,9 +926,12 @@ def mmpc(
     set, and ``structure="cpdag"`` adds tests over each triple's blankets, so on denser graphs with
     many rows most CPDAG fits did not finish in time. Tests that contradict each other can leave a
     graph with no consistent extension, which stands for no DAG; a ``knowledge`` claim then acts
-    only on an edge. The
-    `0.13.0 release card <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#mmpc>`__ has the
-    numbers.
+    only on an edge, and the class the claims define can move further than the graph does. Forbidden
+    paths bring the CPDAG closer to the true graph; these searches return a graph with no consistent
+    extension more often than :func:`~andrey.pc` on larger graphs. The `0.13.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.13.0.html#mmpc>`__ has the numbers, and the `0.20.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ the comparison for
+    forbidden paths.
 
     References
     ----------

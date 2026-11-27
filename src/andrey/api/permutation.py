@@ -83,7 +83,14 @@ def boss(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
@@ -452,7 +459,14 @@ def grasp(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the covariance-based linear-Gaussian BIC; ``"bdeu"`` and
         ``"discrete_bic"`` are the BDeu score and the multinomial BIC for categorical data coded by
@@ -890,8 +904,14 @@ def igsp(
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
         others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
         ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
-        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
-        the test the fit used. See Notes.
+        mixed-data ``indep_test`` it raises ``ValueError``. ``"gaussian"`` favors interventions that
+        change a variable's mechanism, such as a new noise variance or weaker causes, whether or not
+        they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where they
+        keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``: it
+        sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
+        interventions shift it, and gives up the edges and the exact class when they keep it, and in
+        ``ut_igsp`` some unknown targets of perfect interventions. ``metadata["invariance_test"]``
+        names the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -946,12 +966,12 @@ def igsp(
         malformed, or leaves an environment's targets unknown, as :func:`~andrey.gies` lists; if no
         environment is observational, or every one is, as with ``env`` and ``targets`` both
         ``None``; if an environment has fewer than 3 rows; if ``invariance_test="gaussian"`` comes
-        with a categorical or mixed-data ``indep_test``; if ``data`` holds a missing or infinite
-        value, a column constant on every row or on the observational rows, or does not suit the
-        test, as for :func:`~andrey.pc`. With a partial-correlation test, also if a column repeats
-        another up to scale and shift on the observational rows; one message names every group of
-        copies. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        with a categorical or mixed-data ``indep_test``, or ``"indicator"`` with ``"fisherz"`` or
+        ``"student_t"``; if ``data`` holds a missing or infinite value, a column constant on every
+        row or on the observational rows, or does not suit the test, as for :func:`~andrey.pc`. With
+        a partial-correlation test, also if a column repeats another up to scale and shift on the
+        observational rows; one message names every group of copies. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1017,7 +1037,7 @@ def igsp(
     ``"indicator"``, a variable is invariant when ``indep_test`` finds it independent of a 0/1
     indicator of the setting's rows given the others, on the rows of the setting and the
     observational ones [5]_; under ``"fisherz"`` and ``"student_t"`` this sees a change of the mean
-    alone, which is why ``"gaussian"`` is their default.
+    alone, which is why ``"gaussian"`` is their default and ``"indicator"`` is refused.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -1213,8 +1233,14 @@ def ut_igsp(
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
         others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
         ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
-        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
-        the test the fit used. See Notes.
+        mixed-data ``indep_test`` it raises ``ValueError``. ``"gaussian"`` favors interventions that
+        change a variable's mechanism, such as a new noise variance or weaker causes, whether or not
+        they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where they
+        keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``: it
+        sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
+        interventions shift it, and gives up the edges and the exact class when they keep it, and in
+        ``ut_igsp`` some unknown targets of perfect interventions. ``metadata["invariance_test"]``
+        names the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -1285,12 +1311,12 @@ def ut_igsp(
         :func:`~andrey.gies` lists; if no environment is observational, or every one is; if an
         environment has fewer than 3 rows; if, without ``env``, two environments' known targets join
         to one key, as when a column label holds a comma; if ``invariance_test="gaussian"`` comes
-        with a categorical or mixed-data ``indep_test``; if ``data`` holds a missing or infinite
-        value, a column constant on every row or on the observational rows, or does not suit the
-        test, as for :func:`~andrey.pc`. With a partial-correlation test, also if a column repeats
-        another up to scale and shift on the observational rows; one message names every group of
-        copies. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        with a categorical or mixed-data ``indep_test``, or ``"indicator"`` with ``"fisherz"`` or
+        ``"student_t"``; if ``data`` holds a missing or infinite value, a column constant on every
+        row or on the observational rows, or does not suit the test, as for :func:`~andrey.pc`. With
+        a partial-correlation test, also if a column repeats another up to scale and shift on the
+        observational rows; one message names every group of copies. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1354,7 +1380,7 @@ def ut_igsp(
     ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows given the others,
     on the rows of the setting and the observational ones [4]_; under ``"fisherz"`` and
     ``"student_t"`` this sees a change of the mean alone, which is why ``"gaussian"`` is their
-    default.
+    default and ``"indicator"`` is refused.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -1518,7 +1544,11 @@ def boss_fci(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors over the data variables and more true arrowheads than pooling the rows, also
+        when a hidden variable drives the environment; it gives up a few false arrowheads on small
+        graphs, and accuracy when one index holds many environments that together shift every
+        variable: read as numbers it adds false arrowheads, and read as categories it misses edges.
     score_func : str or None, default=None
         Local score driving the BOSS phase, as for :func:`~andrey.boss`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1597,10 +1627,16 @@ def boss_fci(
         the false edges in no triangle, which costs accuracy at the defaults on sparse graphs, and
         it saves no time. See Notes.
     confounded_index : bool, default=True
-        With ``env``, whether a hidden variable may cause both the index and a data variable, as
-        for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
-        in a randomized experiment, so every edge the index keeps points out of it. Without ``env``,
-        it has no effect.
+        With ``env``, whether a hidden variable may cause both the index and a data variable, as for
+        :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
+        randomized experiment, so every edge the index keeps points out of it. ``False`` favors
+        finding which variables the environments act on directly, when they are assigned from
+        outside; it gives up correct marks at the index when a hidden variable drives both the
+        environment and a variable, where it reports the environment as a cause of that variable.
+        ``True`` favors correct marks at the index when a hidden variable may drive both; it gives
+        up the direct targets of randomized environments, whose edges it leaves partly undetermined.
+        The graph over the data variables is the same or nearly so. Without ``env``, it has no
+        effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random order in which the BOSS phase
@@ -1844,7 +1880,11 @@ def grasp_fci(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors over the data variables and more true arrowheads than pooling the rows, also
+        when a hidden variable drives the environment; it gives up a few false arrowheads on small
+        graphs, and accuracy when one index holds many environments that together shift every
+        variable: read as numbers it adds false arrowheads, and read as categories it misses edges.
     score_func : str or None, default=None
         Local score driving the GRaSP phase, as for :func:`~andrey.grasp`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1927,10 +1967,16 @@ def grasp_fci(
         the false edges in no triangle, which costs accuracy at the defaults on sparse graphs, and
         it saves no time. See Notes.
     confounded_index : bool, default=True
-        With ``env``, whether a hidden variable may cause both the index and a data variable, as
-        for :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as
-        in a randomized experiment, so every edge the index keeps points out of it. Without ``env``,
-        it has no effect.
+        With ``env``, whether a hidden variable may cause both the index and a data variable, as for
+        :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
+        randomized experiment, so every edge the index keeps points out of it. ``False`` favors
+        finding which variables the environments act on directly, when they are assigned from
+        outside; it gives up correct marks at the index when a hidden variable drives both the
+        environment and a variable, where it reports the environment as a cause of that variable.
+        ``True`` favors correct marks at the index when a hidden variable may drive both; it gives
+        up the direct targets of randomized environments, whose edges it leaves partly undetermined.
+        The graph over the data variables is the same or nearly so. Without ``env``, it has no
+        effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random starting order and the order
@@ -2134,10 +2180,11 @@ def _chosen_tests(
 
     Returns the conditional-independence test, the invariance test (``None`` picks it to match),
     the checked data, and the categorical mask. Raises ``ValueError`` when ``"gaussian"`` comes
-    with a categorical or mixed-data test, which reads category codes.
+    with a categorical or mixed-data test, which reads category codes, and when ``"indicator"``
+    comes with a partial-correlation test, which sees only a shift of the mean.
     """
     from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
-    from andrey.core.invariance import default_invariance_test
+    from andrey.core.invariance import GAUSSIAN_INVARIANCE, default_invariance_test
 
     assert indep_test is not None  # method_spec picks it from the column types
     invariance_test = invariance_test or default_invariance_test(indep_test)
@@ -2146,6 +2193,11 @@ def _chosen_tests(
             f"{method}: invariance_test='gaussian' regresses on the columns' values and so cannot "
             f"read categorical columns, which indep_test={indep_test!r} reads; use 'indicator' "
             "or None"
+        )
+    if invariance_test == "indicator" and indep_test in GAUSSIAN_INVARIANCE:
+        raise ValueError(
+            f"{method}: invariance_test='indicator' with indep_test={indep_test!r} sees only a "
+            "shift of a variable's mean; use 'gaussian' or None, which picks it"
         )
     X, mask = checked_data(data, categorical, "indep_test", indep_test, method=method)
     return indep_test, invariance_test, X, mask

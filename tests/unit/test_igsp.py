@@ -143,6 +143,30 @@ def test_bad_arguments_raise(kwargs, message):
         andrey.igsp(frame, env, targets=targets, **kwargs)
 
 
+@pytest.mark.parametrize("method", ["igsp", "ut_igsp"])
+@pytest.mark.parametrize("indep_test", ["fisherz", "student_t"])
+def test_the_indicator_test_refuses_a_partial_correlation_test_and_names_gaussian(
+    method, indep_test
+):
+    frame, env, targets, _ = sample(method, n=50)
+    fit = getattr(andrey, method)
+    with pytest.raises(ValueError, match=r"invariance_test='indicator'.*use 'gaussian'"):
+        fit(frame, env, targets=targets, indep_test=indep_test, invariance_test="indicator")
+    chosen = fit(frame, env, targets=targets, indep_test=indep_test, invariance_test="gaussian")
+    assert chosen.metadata["invariance_test"] == "gaussian"
+    default = fit(frame, env, targets=targets, indep_test=indep_test)
+    assert default.metadata["invariance_test"] == "gaussian"
+
+
+@pytest.mark.parametrize("method", ["igsp", "ut_igsp"])
+def test_the_indicator_test_stays_for_a_nonlinear_test(method):
+    frame, env, targets, _ = sample(method, n=50)
+    out = getattr(andrey, method)(
+        frame, env, targets=targets, indep_test="rcot", invariance_test="indicator"
+    )
+    assert out.metadata["invariance_test"] == "indicator"
+
+
 def test_a_missing_value_or_a_column_constant_on_the_observational_rows_raises():
     frame, env, targets, _ = sample("igsp", n=100)
     gap = frame.copy()

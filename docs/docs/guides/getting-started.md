@@ -391,6 +391,17 @@ more variable; a numeric label, such as a time step, stays a number. `ges`, `hc`
 `grasp`, `gfci`, `boss_fci`, and `grasp_fci` also fit without `env`, and `icp` also takes `target`,
 the variable whose parents it finds.
 
+With the environment index, `ges`, `hc`, `tabu`, `boss`, and `grasp` make fewer errors and orient
+more edges correctly than the same search on the pooled rows, when each environment shifts a few
+variables. `gfci`, `boss_fci`, and `grasp_fci` do so over the data variables, also when a hidden
+variable drives the environment, and add a few false arrowheads on small graphs. One index that
+holds many environments, which together shift every variable, can do worse than pooling. Read as
+numbers it adds edges, or false arrowheads in `gfci`, `boss_fci`, and `grasp_fci`, since a shift
+that does not follow the labels' order goes unnoticed. Read as categories (`score_func="cond_gauss"`
+with `categorical=[]`) it adds none: `ges`, `hc`, `tabu`, `boss`, and `grasp` then beat pooling
+given enough rows per environment, while `gfci`, `boss_fci`, and `grasp_fci` miss edges. The index
+then identifies no direction beyond the pooled graph's.
+
 `gies`, `igsp`, and `ut_igsp` take `targets` as a mapping from each label of `env` to a list of its
 variables, by name or position, with `[]` for an observational environment; as the name of a column
 whose cells give each row's variables, from whose distinct values `env` follows when you leave it
@@ -533,14 +544,17 @@ narrow the causal order, as their paper describes (Shimizu et al., 2011). Every 
 supported wherever true claims [measured no
 worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge, which is every
-method that honors them except six. Required paths are experimental in Tabu search, MMHC, and
-RSMAX2, where a reference package given the edges those paths imply made fewer errors. Forbidden
-paths are experimental in IAMB, Inter-IAMB, and MMPC, where the graph found at 50 variables often
-has no consistent extension: a claim there acts only on an edge, the fits we measured dropped about
-96% of the forbidden paths on such a graph, and with forbidden paths alone the CPDAG was 0.65 to 1.95
-edges farther from the class the claims define. A path claim says less than an edge and so directs
-less: a required path cannot restore an edge the search left out. When you know the edge itself,
-state it as `required`.
+method that honors them except two. Required paths are experimental in MMHC and RSMAX2, where a
+reference package given the edges those paths imply made fewer errors. Tabu search supports required
+paths, and IAMB, Inter-IAMB, and MMPC forbidden paths, each with a difference: with the plain BIC
+(`ebic_gamma=0`), Tabu search can end at a lower-scoring graph with more errors where ties between
+equally scoring moves break another way, and over many datasets the default order-free ties are as
+accurate; the blanket methods return a graph with no consistent extension more often than PC on
+larger graphs, and a claim there acts only on an edge, so the class the claims define can move
+farther than the graph does, though the graph itself moves toward it. The [0.20.0 release
+card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons. A path claim says
+less than an edge and so directs less: a required path cannot restore an edge the search left out.
+When you know the edge itself, state it as `required`.
 
 Knowledge that no graph meets, such as `required_paths` that lead in a cycle, raises a `ValueError`
 before the search. A true claim can still be one the graph a fit finds does not meet: on finite
@@ -619,15 +633,18 @@ score the fit used, the one picked for `None` included.
 
 ### Mixed data
 
-With continuous and categorical columns, choose a mixed-data test or score, such as
-`andrey.pc(data, indep_test="cond_gauss")` or `andrey.ges(data, score_func="cond_gauss")`. The
-degenerate Gaussian (`degen_gauss`) turns each categorical column into indicator columns and treats
-every column as Gaussian, so it suits effects that are linear and add up across categories. The
-conditional Gaussian (`cond_gauss`) gives each combination of categories its own Gaussian, so a
-category can change a variable's spread as well as its mean; it needs several rows for each
-combination of categories it conditions on. Both are experimental. With either score, `hc` and
-`tabu`, and so the score phase of `mmhc` and `rsmax2`, give no categorical column a continuous
-parent.
+With continuous and categorical columns, choose a mixed-data test or score, such as `andrey.pc(data,
+indep_test="cond_gauss")` or `andrey.ges(data, score_func="cond_gauss")`. The degenerate Gaussian
+(`degen_gauss`) turns each categorical column into indicator columns and treats every column as
+Gaussian, so it suits effects that are linear and add up across categories. The conditional Gaussian
+(`cond_gauss`) gives each combination of categories its own Gaussian, so a category can change a
+variable's spread as well as its mean; it needs several rows for each combination of categories it
+conditions on. As tests in `pc` and `fci` both are supported: `degen_gauss` finds more of the true
+edges and orients more of them when the categorical variables stand for latent Gaussian variables,
+and `cond_gauss` is more accurate on conditional Gaussian data and when the categorical variables
+have only categorical parents; it is also more accurate than reading the category codes as numbers.
+Elsewhere, and as scores, both are experimental. With either score, `hc` and `tabu`, and so the
+score phase of `mmhc` and `rsmax2`, give no categorical column a continuous parent.
 
 ### Marking the categorical columns
 

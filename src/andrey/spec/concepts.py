@@ -480,8 +480,8 @@ _CONCEPTS = (
             None,
             "Invariance test: gaussian = Chow and variance F-tests of the linear regressions, "
             "not with a categorical or mixed-data indep_test; indicator = indep_test against an "
-            "environment indicator; null picks gaussian under the partial-correlation tests, else "
-            "indicator.",
+            "environment indicator, not with fisherz or student_t, which see only a shift of the "
+            "mean; null picks gaussian under the partial-correlation tests, else indicator.",
             choices=TWO_GROUP_INVARIANCE_TESTS,
             nullable=True,
         ),

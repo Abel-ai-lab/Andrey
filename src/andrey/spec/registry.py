@@ -1077,7 +1077,7 @@ _add(
     MethodSpec(
         name="exact_search",
         family="score",
-        summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
+        summary="Globally optimal score search over DAGs (A*). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns the CPDAG of "
         "the best-scoring equivalence class. BIC by default, BDeu when every column is "
         "categorical, conditional Gaussian when some are; score_func=bdeu or "
@@ -1099,8 +1099,8 @@ _add(
                 name="search_method",
                 type="str",
                 default="astar",
-                doc="Exact search strategy: A* or dynamic programming.",
-                choices=("astar", "dp"),
+                doc="Exact search strategy: A* search, the only one.",
+                choices=("astar",),
             ),
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -1487,7 +1487,7 @@ _add(
             ParamSpec(
                 name="restrict",
                 type="str",
-                default="mmpc",
+                default="iamb",
                 doc="The restrict phase: mmpc = each variable in the other's MMPC parents and "
                 "children; iamb and inter_iamb = each in the other's Markov blanket and not "
                 "separated by a subset of the smaller blanket (their skeleton); pc = PC's "
@@ -1497,7 +1497,7 @@ _add(
             ParamSpec(
                 name="maximize",
                 type="str",
-                default="hc",
+                default="tabu",
                 doc="The maximize phase: hc = hill climbing; tabu = tabu search.",
                 choices=MAXIMIZES,
             ),
@@ -3784,27 +3784,29 @@ for _name in EM_METHODS:
 #: The path and confounder parts a method honors as supported: the method ran in the lanes of
 #: benchmarks/knowledge_paths.py, and the part passed them, against the same fit without the claims
 #: and, where a reference package takes the same knowledge, against it. A part a method honors
-#: beyond the edge parts and does not list here is experimental: tabu, mmhc, and rsmax2 made more
-#: errors than their reference given the required edges, on repeated seeds, and iamb, inter_iamb,
-#: and mmpc with forbidden paths alone were farther from the class the claims leave at 50
-#: variables, over two seed groups pooled. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were
-#: measured with the rule for a graph with no consistent extension, on which a claim acts on an
-#: edge and most claims are dropped.
+#: beyond the edge parts and does not list here is experimental: mmhc and rsmax2 made more errors
+#: than their reference given the required edges, on repeated seeds. tabu with required paths and
+#: iamb, inter_iamb, and mmpc with forbidden paths are supported with a gap their docstrings state:
+#: with the plain BIC, tabu can end on a lower-scoring graph on a dataset whose ties break another
+#: way, and on a graph with no consistent extension the class the claims define moves further than
+#: the graph does. In pc, cdnod, iamb, inter_iamb, and mmpc the parts were measured with the rule
+#: for a graph with no consistent extension, on which a claim acts on an edge and most claims are
+#: dropped.
 _SUPPORTED_PARTS: dict[str, tuple[KnowledgePart, ...]] = {
     "pc": PATH_PARTS,
     "cdnod": PATH_PARTS,
     "ges": PATH_PARTS,
     "xges": PATH_PARTS,
     "hc": PATH_PARTS,
-    "tabu": ("forbidden_paths",),
+    "tabu": PATH_PARTS,
     "mmhc": ("forbidden_paths",),
     "rsmax2": ("forbidden_paths",),
     "boss": PATH_PARTS,
     "grasp": PATH_PARTS,
     "exact_search": PATH_PARTS,
-    "iamb": ("required_paths",),
-    "inter_iamb": ("required_paths",),
-    "mmpc": ("required_paths",),
+    "iamb": PATH_PARTS,
+    "inter_iamb": PATH_PARTS,
+    "mmpc": PATH_PARTS,
     "fci": _PAG_PARTS,
     "fci_jci": _PAG_PARTS,
     "gfci": _PAG_PARTS,

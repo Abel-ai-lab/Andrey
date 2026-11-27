@@ -85,18 +85,27 @@ def pc(
         not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
         whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
-        Gaussian) test mixed data, continuous and categorical columns, by a likelihood ratio. Seven
-        more tests detect nonlinear dependence in continuous data, at a far higher cost per test:
-        ``"kci"`` is the kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a
-        nearest-neighbor conditional mutual information test; ``"gpdc"`` Gaussian-process regression
-        with a distance correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized,
-        weighted generalized, and projected covariance measures, which test the covariance of
-        regression residuals. ``None`` picks from the declared column types: ``"gsq"`` when every
-        column is categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is
-        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
-        type, never by its values. See **Categorical data.** and **Mixed data.** in Notes. On mixed
-        data ``"cond_gauss"`` favors accuracy at about the time of ``"degen_gauss"``.
-        ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
+        Gaussian) test mixed data, continuous and categorical columns, by a likelihood ratio.
+        ``"degen_gauss"`` favors mixed data whose categorical variables stand for latent Gaussian
+        variables, where it finds more of the true edges and orients more of them than
+        ``"cond_gauss"``; it gives up more false edges and false arrowheads, and on conditional
+        Gaussian data, or data whose categorical variables have only categorical parents, it is less
+        accurate than ``"cond_gauss"``. ``"cond_gauss"`` favors mixed data from the conditional
+        Gaussian model and data whose categorical variables have only categorical parents, where it
+        is more accurate than ``"degen_gauss"``, and on every kind of mixed data measured it is more
+        accurate than reading the category codes as numbers; it gives up some true edges and
+        orientations to ``"degen_gauss"`` on data whose categorical variables stand for latent
+        Gaussian variables, where it adds fewer false edges. Seven more tests detect nonlinear
+        dependence in continuous data, at a far higher cost per test: ``"kci"`` is the kernel test;
+        ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor conditional
+        mutual information test; ``"gpdc"`` Gaussian-process regression with a distance correlation
+        test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized, weighted generalized, and
+        projected covariance measures, which test the covariance of regression residuals. ``None``
+        picks from the declared column types: ``"gsq"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. See **Categorical data.** and **Mixed data.** in Notes. ``metadata["indep_test"]``
+        names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -408,7 +417,11 @@ def pc(
     largest neighborhood. Test errors can produce colliders that fit no DAG: the ``cpdag`` then has
     no consistent DAG extension, and a graph query such as ``markov_blanket`` raises ``ValueError``.
     The `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__
-    has the numbers.
+    has the numbers. On mixed data, ``"degen_gauss"`` and ``"cond_gauss"`` made fewer errors than
+    the empty graph in the settings measured, with one gap for ``"cond_gauss"``: no reference
+    implementation of its test could be run on data like its paper's, so there it was compared with
+    the empty graph and with ``"fisherz"`` on the category codes, not with a reference. The `0.20.0
+    release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ has the comparison.
 
     References
     ----------
@@ -614,17 +627,26 @@ def fci(
         not change under a strictly increasing transformation of a column. ``"chisq"`` (Pearson's
         chi-square) and ``"gsq"`` (G-square, the likelihood ratio) test categorical data, coded by
         whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and ``"cond_gauss"`` (conditional
-        Gaussian) test mixed data, continuous and categorical columns. Seven more tests detect
-        nonlinear dependence in continuous data, at a far higher cost per test: ``"kci"`` is the
-        kernel test; ``"rcot"`` its random-feature approximation; ``"cmiknn"`` a nearest-neighbor
-        conditional mutual information test; ``"gpdc"`` Gaussian-process regression with a distance
-        correlation test; and ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized, weighted
-        generalized, and projected covariance measures, which test the covariance of regression
-        residuals. ``None`` picks from the declared column types: ``"gsq"`` when every column is
-        categorical, ``"cond_gauss"`` when some are, else ``"fisherz"``. A column is declared
-        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
-        never by its values. See Notes. ``metadata["indep_test"]`` names the test used, including
-        the choice for ``None``.
+        Gaussian) test mixed data, continuous and categorical columns. ``"degen_gauss"`` favors
+        mixed data whose categorical variables stand for latent Gaussian variables, where it finds
+        more of the true edges and orients more of them than ``"cond_gauss"``; it gives up more
+        false edges and false arrowheads, and on conditional Gaussian data, or data whose
+        categorical variables have only categorical parents, it is less accurate than
+        ``"cond_gauss"``. ``"cond_gauss"`` favors mixed data from the conditional Gaussian model and
+        data whose categorical variables have only categorical parents, where it is more accurate
+        than ``"degen_gauss"``, and on every kind of mixed data measured it is more accurate than
+        reading the category codes as numbers; it gives up some true edges and orientations to
+        ``"degen_gauss"`` on data whose categorical variables stand for latent Gaussian variables,
+        where it adds fewer false edges. Seven more tests detect nonlinear dependence in continuous
+        data, at a far higher cost per test: ``"kci"`` is the kernel test; ``"rcot"`` its
+        random-feature approximation; ``"cmiknn"`` a nearest-neighbor conditional mutual information
+        test; ``"gpdc"`` Gaussian-process regression with a distance correlation test; and
+        ``"gcm"``, ``"wgcm"``, and ``"pcm"`` the generalized, weighted generalized, and projected
+        covariance measures, which test the covariance of regression residuals. ``None`` picks from
+        the declared column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when
+        some are, else ``"fisherz"``. A column is declared categorical by ``categorical`` or by a
+        DataFrame's ``category``, ``bool``, or text type, never by its values. See Notes.
+        ``metadata["indep_test"]`` names the test used, including the choice for ``None``.
     degrees_of_freedom : {"mean", "nonempty"}, default="mean"
         Degrees of freedom of the categorical tests, ``"chisq"`` and ``"gsq"``. ``"mean"`` is the
         mean of the statistic when ``y`` is shuffled within each configuration of the conditioning
@@ -853,9 +875,13 @@ def fci(
     to hundreds of variables, but on the largest sparse graphs its errors passed the empty graph's,
     and :func:`~andrey.gfci` made fewer at nearly every size. Test errors can give results that no
     MAG fits: the ``pag`` is then not the PAG of any MAG, and a graph query such as ``m_separated``
-    can raise ``ValueError``. The
-    `0.8.0 release card <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`__
-    has the numbers.
+    can raise ``ValueError``. The `0.8.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.8.0.html#fci-s-feasible-sizes>`__ has the numbers. On
+    mixed data, ``"degen_gauss"`` and ``"cond_gauss"`` made fewer errors than the empty graph in the
+    settings measured, with one gap for ``"cond_gauss"``: no reference implementation of its test
+    could be run on data like its paper's, so there it was compared with the empty graph and with
+    ``"fisherz"`` on the category codes, not with a reference. The `0.20.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ has the comparison.
 
     References
     ----------
@@ -1031,7 +1057,11 @@ def gfci(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors over the data variables and more true arrowheads than pooling the rows, also
+        when a hidden variable drives the environment; it gives up a few false arrowheads on small
+        graphs, and accuracy when one index holds many environments that together shift every
+        variable: read as numbers it adds false arrowheads, and read as categories it misses edges.
     score_func : str or None, default=None
         Local score driving the GES skeleton phase, as for :func:`~andrey.ges`: ``"bic"``, the
         linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"`` for categorical data, coded by whole
@@ -1099,7 +1129,11 @@ def gfci(
         for :func:`~andrey.fci`. If at least one does, ``"conservative"`` makes ``z`` a collider
         when none of them contains it and a non-collider when all do; ``"majority"`` when fewer
         than half contain it and when more than half do. Any other triple is ambiguous, and no
-        rule orients through it. Both run ``2**degree(x) + 2**degree(y)`` tests per pair.
+        rule orients through it. Both run ``2**degree(x) + 2**degree(y)`` tests per pair. With
+        hidden variables the rules differ less than in :func:`~andrey.pc` and :func:`~andrey.fci`:
+        ``"conservative"`` favors fewer false arrowheads and gives up true ones, with about the
+        same overall error as ``"sepsets"``, and ``"majority"`` gives about the graph of
+        ``"sepsets"``.
     categorical : sequence of str or int, or None, default=None
         The categorical columns of ``data``, for the mixed-data score and test: column labels
         (strings) or 0-based positions. ``None`` takes a DataFrame's ``category``, ``bool``, and
@@ -1130,8 +1164,14 @@ def gfci(
     confounded_index : bool, default=True
         With ``env``, whether a hidden variable may cause both the index and a data variable, as for
         :func:`~andrey.fci_jci`: FCI-JCI1. ``False`` assumes the index is set from outside, as in a
-        randomized experiment, so every edge the index keeps points out of it. Without ``env``, it
-        has no effect.
+        randomized experiment, so every edge the index keeps points out of it. ``False`` favors
+        finding which variables the environments act on directly, when they are assigned from
+        outside; it gives up correct marks at the index when a hidden variable drives both the
+        environment and a variable, where it reports the environment as a cause of that variable.
+        ``True`` favors correct marks at the index when a hidden variable may drive both; it gives
+        up the direct targets of randomized environments, whose edges it leaves partly undetermined.
+        The graph over the data variables is the same or nearly so. Without ``env``, it has no
+        effect.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which
@@ -1889,7 +1929,13 @@ def fci_jci(
         health deciding both the hospital and an outcome: FCI-JCI1 [1]_. ``False`` assumes the index
         is set from outside, as in a randomized experiment, so every edge the index keeps points out
         of it, which can orient more edges: FCI-JCI123, which with one context variable is
-        FCI-JCI12. See Notes.
+        FCI-JCI12. ``False`` favors finding which variables the environments act on directly, when
+        they are assigned from outside; it gives up correct marks at the index when a hidden
+        variable drives both the environment and a variable, where it reports the environment as a
+        cause of that variable. ``True`` favors correct marks at the index when a hidden variable
+        may drive both; it gives up the direct targets of randomized environments, whose edges it
+        leaves partly undetermined. The graph over the data variables is the same or nearly so. See
+        Notes.
     seed : int or None, default=None
         ``None``, the default, is the configured seed, ``ANDREY_SEED`` or ``0`` when it is unset,
         not a fresh random one, so a fit repeats. Seed for the random draws of ``indep_test``, which

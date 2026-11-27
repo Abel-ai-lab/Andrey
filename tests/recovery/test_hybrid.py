@@ -113,9 +113,16 @@ PHASES = [(r, m) for r in ("mmpc", "iamb", "inter_iamb", "pc") for m in ("hc", "
 
 def test_mmhc_is_rsmax2_with_mmpc_and_hill_climbing():
     x = _er_sample(20, 1).data
-    mmhc, rsmax2 = andrey.mmhc(x), andrey.rsmax2(x)
+    mmhc, rsmax2 = andrey.mmhc(x), andrey.rsmax2(x, restrict="mmpc", maximize="hc")
     assert _edges(mmhc) == _edges(rsmax2)
     assert mmhc.metadata["score"] == rsmax2.metadata["score"]
+
+
+def test_rsmax2_defaults_to_the_iamb_restrict_and_tabu_search():
+    x = _er_sample(20, 1).data
+    default, named = andrey.rsmax2(x), andrey.rsmax2(x, restrict="iamb", maximize="tabu")
+    assert _edges(default) == _edges(named)
+    assert default.metadata["score"] == named.metadata["score"]
 
 
 def test_rsmax2_reaches_the_score_optimum_on_gauss_5v():

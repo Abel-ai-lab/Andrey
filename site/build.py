@@ -2479,8 +2479,8 @@ COMPARISON = (
 # score or test in the same search, a wrapper, and a search that only orients a given graph count
 # with the method they extend, or not at all. Andrey's count is the supported methods of its
 # registry: gies runs ges's search, multi_group_direct_lingam extends direct_lingam, inter_iamb is a
-# variant of iamb, and mmhc is rsmax2 with its default phases, as bnlearn's are counted. The others
-# are read from each package's released code.
+# variant of iamb, and mmhc is rsmax2 with MMPC and hill climbing, as bnlearn's are counted. The
+# others are read from each package's released code.
 COUNTED_WITH = {
     "gies": "ges",
     "multi_group_direct_lingam": "direct_lingam",

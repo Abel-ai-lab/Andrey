@@ -786,14 +786,19 @@ def pcmciplus(
         is one the correction would not keep. A link the knowledge forbids is no test: it is not
         counted and keeps p-value ``1``; a required link is counted with p-value ``0``. See Notes.
     collider_rule : {"sepsets", "conservative", "majority"}, default="majority"
-        How an unshielded triple ``a - b - c`` with a same-step link ``b - c`` is judged a
-        collider ``a -> b <- c``. ``"sepsets"`` calls it a collider when ``b`` is not in the one
-        separating set the skeleton search found. ``"majority"`` and ``"conservative"`` test ``a``
-        and ``c`` again given every subset of their same-step neighbors and look at the subsets
-        that separate them: if there is at least one, ``"majority"`` calls the triple a collider
-        when fewer than half hold ``b``, and ``"conservative"`` when none does; a triple neither
-        rule can decide is ambiguous and orients nothing. The default, ``"majority"``, gives
-        orientations that do not depend on the order of the variables [1]_.
+        How an unshielded triple ``a - b - c`` with a same-step link ``b - c`` is judged a collider
+        ``a -> b <- c``. ``"sepsets"`` calls it a collider when ``b`` is not in the one separating
+        set the skeleton search found. ``"majority"`` and ``"conservative"`` test ``a`` and ``c``
+        again given every subset of their same-step neighbors and look at the subsets that separate
+        them: if there is at least one, ``"majority"`` calls the triple a collider when fewer than
+        half hold ``b``, and ``"conservative"`` when none does; a triple neither rule can decide is
+        ambiguous and orients nothing. The default, ``"majority"``, gives orientations that do not
+        depend on the order of the variables [1]_. ``"sepsets"`` gives up most same-step
+        orientations in strongly autocorrelated series, where its colliders conflict and leave the
+        links undirected: a pair the lagged phase removed has no separating set and reads as one
+        that lacks the middle node, as in the paper's rule. ``"conservative"`` and ``"majority"``
+        favor correctly oriented same-step links over ``"sepsets"`` there, with few conflicts;
+        between the two no difference held, false arrowheads included.
     possibly_separable : {"orient", "ambiguous"}, default="orient"
         How the collider phase reads a same-step triple with a link listed in
         ``metadata["possibly_separable"]``, on data with missing values. ``"orient"`` reads it as

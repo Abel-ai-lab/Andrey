@@ -114,8 +114,8 @@ def restricted(constraints: Constraints | None, candidates: np.ndarray) -> Const
 def rsmax2(
     X: np.ndarray,
     *,
-    restrict: str = "mmpc",
-    maximize: str = "hc",
+    restrict: str = "iamb",
+    maximize: str = "tabu",
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     degrees_of_freedom: str = "mean",

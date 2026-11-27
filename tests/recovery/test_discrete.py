@@ -48,9 +48,8 @@ PAG_FITS = {
 
 # Each exact search, which returns one DAG of the optimal class.
 DAG_FITS = {
-    f"exact-{method}-{name}": partial(andrey.exact_search, search_method=method, score_func=score)
+    f"exact-{name}": partial(andrey.exact_search, score_func=score)
     for name, score in (("bdeu", "bdeu"), ("bic", "discrete_bic"))
-    for method in ("astar", "dp")
 }
 
 

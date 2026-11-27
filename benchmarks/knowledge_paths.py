@@ -288,12 +288,14 @@ LANE_REFERENCES["pag"] += ("tetrad.grasp_fci",)
 #: ``ges`` with the plain BIC (``ebic_gamma=0``), the score of the FGES reference arm; ``hc_bic``
 #: and ``tabu_bic`` are the same score for the searches whose reference (bnlearn's ``bic-g``)
 #: scores with it. ``mmpc`` returns its skeleton by default, which takes no path claim; its variant
-#: returns the CPDAG, which does.
+#: returns the CPDAG, which does. ``rsmax2`` runs the MMPC restrict phase and hill climbing, the
+#: search its reference runs and ``mmhc`` is.
 VARIANTS = {
     "ges_bic": ("ges", {"ebic_gamma": 0.0}),
     "hc_bic": ("hc", {"ebic_gamma": 0.0}),
     "tabu_bic": ("tabu", {"ebic_gamma": 0.0}),
     "mmpc": ("mmpc", {"structure": "cpdag"}),
+    "rsmax2": ("rsmax2", {"restrict": "mmpc", "maximize": "hc"}),
 }
 
 

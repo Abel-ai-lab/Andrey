@@ -9,14 +9,12 @@ and :class:`~andrey.core.score.CategoricalBICScore`, and the mixed-data scores
 ``penalty_discount`` weighs; BDeu ignores it. Every parent set is scored through the score's
 ``score_many``, a batch of sets of one size per call, so the BIC solves the batch's normal
 equations in one stacked call. A parent set of more than ``n - 2`` members, or one that leaves a
-residual variance of zero up to rounding, scores ``inf`` under the BIC and is never chosen. Both
-searches, A* (``"astar"``) and the
-subset-lattice dynamic program (``"dp"``), run over the order graph, whose nodes are variable
-subsets: the shortest path from the empty set to the full set gives each variable its best parent
-set among the variables before it. Every DAG of the optimal DAG's Markov equivalence class has the
-same score, so the search's choice among them follows rounding and column order;
-:func:`_canonical_member` replaces it by one member fixed by the CPDAG and
-:func:`~andrey.core.ties.tie_ranks`.
+residual variance of zero up to rounding, scores ``inf`` under the BIC and is never chosen. A*
+(``"astar"``) runs over the order graph, whose nodes are variable subsets: the shortest path from
+the empty set to the full set gives each variable its best parent set among the variables before
+it. Every DAG of the optimal DAG's Markov equivalence class has the same score, so the search's
+choice among them follows rounding and column order; :func:`_canonical_member` replaces it by one
+member fixed by the CPDAG and :func:`~andrey.core.ties.tie_ranks`.
 """
 
 from __future__ import annotations
@@ -228,45 +226,6 @@ def _astar_shortest_path(
     raise RuntimeError("order-graph search terminated without reaching the full variable set")
 
 
-def _dp_shortest_path(
-    parent_graphs: list[list[_ParentEntry]], n_vars: int, tables: bool = True
-) -> tuple[tuple[int, ...], ...]:
-    """Shortest path over the order graph by a subset-lattice dynamic program.
-
-    Relaxes the lattice in order of increasing subset size: the optimal cost to settle a set of
-    variables plus the best local score of one more variable given that set updates the larger set.
-    Back-tracking the recorded predecessors yields the optimal parent set per variable.
-    """
-    full = (1 << n_vars) - 1
-    distance: dict[int, float] = {0: 0.0}
-    predecessor: dict[int, tuple[int, int, tuple[int, ...]]] = {}
-    first, options = _subset_lookup(parent_graphs if tables else [], n_vars)
-    for mask in sorted(range(1 << n_vars), key=int.bit_count):
-        if mask not in distance:
-            continue
-        settled = distance[mask]
-        for i in range(n_vars):
-            bit = 1 << i
-            if mask & bit:
-                continue
-            if tables:
-                parents, value = options[i][first[i][mask]]
-            else:
-                parents, value = _best_subset(parent_graphs[i], mask)
-            new_mask = mask | bit
-            candidate = settled + value
-            if new_mask not in distance or candidate < distance[new_mask]:
-                distance[new_mask] = candidate
-                predecessor[new_mask] = (mask, i, parents)
-    structures: list[tuple[int, ...]] = [() for _ in range(n_vars)]
-    mask = full
-    while mask:
-        prev_mask, i, parents = predecessor[mask]
-        structures[i] = parents
-        mask = prev_mask
-    return tuple(structures)
-
-
 def _canonical_member(
     dag: np.ndarray, ranks: np.ndarray, constraints: Constraints | None = None
 ) -> np.ndarray:
@@ -304,22 +263,20 @@ def exact_search(
     """Return the globally score-optimal DAG for ``data`` as a ``dag`` structure.
 
     Scores candidates with ``score_func``; the default is the linear-Gaussian BIC.
-    Finds the lowest-score DAG by shortest path over the order graph. ``search_method`` selects
-    ``"astar"`` (default) or ``"dp"``; both reach the same optimal total score. Exponential in the
-    number of variables, so intended for small problems.
+    Finds the lowest-score DAG by A* search for the shortest path over the order graph.
+    Exponential in the number of variables, so intended for small problems.
 
     Every DAG of the optimal Markov equivalence class scores the same, so the result is the member
     :func:`_canonical_member` fixes: the class's reversible edges that ``constraints`` leave open
     are oriented by the order of :func:`~andrey.core.ties.tie_ranks`, ranks computed from the data.
-    Both searches return this member, it does not depend on last-bit rounding, and reordering the
-    columns relabels it.
+    The member does not depend on last-bit rounding, and reordering the columns relabels it.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_vars)
         Data matrix; rows are observations, columns are variables.
     search_method : str
-        ``"astar"`` for A* search or ``"dp"`` for the subset-lattice dynamic program.
+        ``"astar"``, A* search, the only strategy.
     score_func : str
         Local score, one of :data:`~andrey.core.score.SCORES`: the linear-Gaussian BIC
         (``"bic"``), a categorical score, or a mixed-data BIC.
@@ -355,8 +312,8 @@ def exact_search(
         The score-optimal DAG, edge ``i -> j`` when ``i`` is a parent of ``j``.
     """
     X = np.asarray(data, dtype=np.float64)
-    if search_method not in ("astar", "dp"):
-        raise ValueError(f"unknown search method {search_method!r}; use 'astar' or 'dp'")
+    if search_method != "astar":
+        raise ValueError(f"unknown search method {search_method!r}; use 'astar'")
     check_parent_cap(
         None if constraints is None else constraints.required, max_parents, in_class=False
     )
@@ -379,10 +336,7 @@ def exact_search(
         for i in range(n_vars)
     ]
 
-    if search_method == "astar":
-        structures = _astar_shortest_path(parent_graphs, n_vars, tables)
-    else:
-        structures = _dp_shortest_path(parent_graphs, n_vars, tables)
+    structures = _astar_shortest_path(parent_graphs, n_vars, tables)
 
     dag = np.zeros((n_vars, n_vars), dtype=bool)
     for child, parents in enumerate(structures):

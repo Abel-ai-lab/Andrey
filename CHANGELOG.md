@@ -16,6 +16,25 @@ names its pull request.
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
   `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
+- `rsmax2` defaults to `restrict="iamb"` and `maximize="tabu"`, where it defaulted to `"mmpc"` and
+  `"hc"`. In the options study, on linear-Gaussian data, `"iamb"` made fewer errors than `"mmpc"` in
+  most settings and `"tabu"` fewer than `"hc"` with every restrict phase; `"iamb"` takes longer than
+  `"mmpc"` on many variables. The restrict phase of `"iamb"` reads the data alone, so `knowledge`
+  reaches only the score search, which still honors it. For the former behavior, pass
+  `restrict="mmpc", maximize="hc"`, which is also `mmhc`. ([#1288])
+- `igsp` and `ut_igsp` raise `ValueError` for `invariance_test="indicator"` with
+  `indep_test="fisherz"` or `"student_t"`, whose partial correlations against an indicator see only
+  a shift of a variable's mean. `"gaussian"`, the default under these tests, gives about the same
+  graph where interventions shift the mean, and also finds those that change a noise variance or
+  weights. Pass `invariance_test="gaussian"` or leave it out; `"indicator"` stays for the
+  categorical, mixed-data, and nonlinear tests. ([#1288])
+- `exact_search` no longer takes `search_method="dp"`: the dynamic program returned the same DAG as
+  A*, the default, so the option is gone, and a call that passes it raises `ValueError`. Leave
+  `search_method` out, or pass `"astar"`. ([#1288])
+
+  | Method | Removed name or value | Name now |
+  | --- | --- | --- |
+  | `exact_search` | `search_method="dp"` | none: A* is the only search, and it returns the same DAG |
 
 ### Changed
 
@@ -155,6 +174,27 @@ names its pull request.
   ([#1303])
 - `camuv` keeps each residual its sink tests fit, so it fits each variable on each set of
   regressors once, with the same output bit for bit. ([#1306])
+- `env` is supported in `ges`, `hc`, `tabu`, `boss`, `grasp`, `gfci`, `boss_fci`, and `grasp_fci`.
+  The entries of these methods say what the environment index favors and gives up against pooling
+  the rows, among them when one index holds many environments. `confounded_index` keeps `True`, and
+  the entries of `gfci`, `boss_fci`, `grasp_fci`, and `fci_jci` say what each value favors and gives
+  up. The entries of `collider_rule` in `gfci` and `pcmciplus`, `alpha` in `anm`, `pnl`, and
+  `loci`, `restrict` and `maximize` in `rsmax2`, `invariance_test` in `igsp` and `ut_igsp`, and `"bdeu"` and
+  `"discrete_bic"` in `ges` do the same, without numbers. For contributors, the quality gate fits
+  `rsmax2` at its defaults, and the knowledge-paths lane runs it with MMPC and hill climbing, the
+  search of its reference. ([#1288])
+- `indep_test="degen_gauss"` and `"cond_gauss"` are supported in `pc` and `fci`. On mixed data,
+  `"degen_gauss"` finds more of the true edges and orients more of them when the categorical
+  variables stand for latent Gaussian variables, and `"cond_gauss"` is more accurate on conditional
+  Gaussian data and where the categorical variables have only categorical parents, and more accurate
+  than reading the category codes as numbers on every kind of mixed data measured. `"cond_gauss"`
+  has one gap, named in the `pc` and `fci` entries: no reference implementation of its test could be
+  run on data like its paper's. `required_paths` is supported in `tabu`, and `forbidden_paths` in
+  `iamb`, `inter_iamb`, and `mmpc`, so a fit with them no longer warns `ExperimentalWarning`; each
+  entry states the difference a check found. With the plain BIC, `tabu` given the same required
+  edges as bnlearn's `tabu` can end at a lower-scoring graph, depending on how ties break; the
+  blanket methods return a graph with no consistent extension more often than `pc` on larger graphs,
+  where a claim acts only on an edge. ([#1288])
 
 ### Fixed
 
@@ -3120,6 +3160,7 @@ First alpha release.
 [#1278]: https://github.com/Abel-ai-lab/Andrey/pull/1278
 [#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
+[#1288]: https://github.com/Abel-ai-lab/Andrey/pull/1288
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293

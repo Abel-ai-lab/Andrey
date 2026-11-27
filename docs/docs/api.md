@@ -231,17 +231,20 @@ order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
 These parts are supported wherever [true claims measured no
 worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
 than the same fit without them and than a reference package given the same knowledge: in every
-method that honors them except six. `required_paths` is experimental in `tabu`, `mmhc`, and
-`rsmax2`, where a reference package given the required edges those paths imply made fewer errors,
-and `forbidden_paths` is experimental in `iamb`, `inter_iamb`, and `mmpc`, where the graph found at
-50 variables often has no consistent extension: a claim there acts only on an edge, the fits we
-measured dropped about 96% of the forbidden paths on such a graph, and with forbidden paths alone
-the CPDAG was 0.65 to 1.95 edges farther from the class the claims define. An
-experimental part warns with
-{py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation. A CPDAG
-method reads the claims on the graph it found, so where that graph is wrong, a true claim can direct
-an edge the wrong way, and a required path cannot restore an edge the search left out. A path claim
-says less than an edge and so directs less: when you know the edge itself, state it as `required`.
+method that honors them except two. `required_paths` is experimental in `mmhc` and `rsmax2`, where a
+reference package given the required edges those paths imply made fewer errors. An experimental part
+warns with {py:class}`~andrey.ExperimentalWarning`, and its meaning may change without deprecation.
+`tabu` supports `required_paths`, and `iamb`, `inter_iamb`, and `mmpc` support `forbidden_paths`,
+each with a difference. With the plain BIC (`ebic_gamma=0`), `tabu` can end at a lower-scoring graph
+with more errors where ties between equally scoring moves break another way, and over many datasets
+the default order-free ties are as accurate. The blanket methods return a graph with no consistent
+extension more often than `pc` on larger graphs: a claim there acts only on an edge, so the class
+the claims define can move farther than the graph does, though the graph itself moves toward it. The
+[0.20.0 release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons. A
+CPDAG method reads the claims on the graph it found, so where that graph is wrong, a true claim can
+direct an edge the wrong way, and a required path cannot restore an edge the search left out. A path
+claim says less than an edge and so directs less: when you know the edge itself, state it as
+`required`.
 
 Knowledge that no graph meets, such as required paths that form a cycle with the required edges,
 raises `ValueError` before the search. A claim the rest of the knowledge allows can still be one the
@@ -295,7 +298,12 @@ may cause both the environment index and a data variable; `gfci`, `boss_fci`, an
 it only with `env`. `True`, the default (Mooij, Magliacane, and Claassen 2020's FCI-JCI1), leaves
 the index end of an edge a circle until a rule orients it. `False` assumes the environment is set
 from outside, as in a randomized experiment (FCI-JCI123), so every edge the index keeps points out
-of it.
+of it. `False` favors finding which variables the environments act on directly, when they are
+assigned from outside; it gives up correct marks at the index when a hidden variable drives both the
+environment and a variable, where it reports the environment as a cause of that variable. `True`
+favors correct marks at the index when a hidden variable may drive both; it gives up the direct
+targets of randomized environments, whose edges it leaves partly undetermined. The graph over the
+data variables is the same or nearly so.
 
 % concept: fdr_method
 `pcmci`, `pcmciplus`, `jpcmciplus`, `rpcmci`, and `granger` take `fdr_method`, tigramite's name for
@@ -658,8 +666,11 @@ of targets and answers each in turn. On the command line, `'target=[a,b]'` names
 header or position, and the JSON result holds `multi: true` and `results`, one entry per target in
 the list's order, in place of `structure` and `metadata`. MMHC learns a skeleton with MMPC's
 conditional-independence tests, then runs hill climbing that joins only the skeleton's pairs. RSMAX2
-generalizes it: its restrict phase keeps the pairs of the skeleton of MMPC, IAMB, or Inter-IAMB, or
-of PC's skeleton, and its maximize phase runs hill climbing or tabu search among them.
+generalizes it: its restrict phase keeps the pairs of the skeleton of IAMB, the default, MMPC, or
+Inter-IAMB, or of PC's skeleton, and its maximize phase runs tabu search, the default, or hill
+climbing among them. MMHC is the MMPC skeleton with hill climbing, which `rsmax2` ran by default
+before 0.20. On linear-Gaussian data, IAMB makes fewer errors than MMPC and takes longer on many
+variables, and tabu search makes fewer errors than hill climbing with every restrict phase.
 
 FCI, GFCI, BOSS-FCI, GRaSP-FCI, and FCI-JCI use uncovered paths for their R5, R9, and R10 tail
 orientations: nodes two steps apart on each path must be non-adjacent. R5 considers every circle
@@ -708,8 +719,12 @@ IGSP (Wang et al. 2017; Yang, Katcoff, and Uhler 2018) learns from an observatio
 interventional settings whose intervention targets are all known, as GIES does, where a setting is
 the rows of one environment of `env`: it searches variable orders for the DAG with the fewest edges,
 then the fewest I-contradicting edges, the edges whose direction the settings' invariance tests
-contradict. Its default level for both tests, `alpha=None`, is one over the number of observational
-rows, as for UT-IGSP, `0.001` at 1,000 rows. Of the levels its authors swept, from `1e-4` to `0.05`,
+contradict. Its invariance test, `invariance_test=None`, is `"gaussian"` under `"fisherz"` and
+`"student_t"`, which finds an intervention that changes a variable's mechanism whether or not it
+moves the mean, and `"indicator"` under the other tests; `"indicator"` with `"fisherz"` or
+`"student_t"` raises a `ValueError`, as it sees only a shift of the mean. Its default level for both
+tests, `alpha=None`, is one over the number of observational rows, as for UT-IGSP, `0.001` at 1,000
+rows. Of the levels its authors swept, from `1e-4` to `0.05`,
 `1e-3` had the fewest errors on one set of datasets simulated as in its papers; on fresh datasets,
 against the authors' reference implementation at `1e-3`, it and one over the observational rows were
 each worse in none of 114 comparisons and had fewer errors in 17, with interval ends that are
@@ -838,7 +853,8 @@ A method becomes supported once it has:
 | `"student_t"` | Partial correlation with a Student-t p-value, exact for Gaussian data at any size | Supported |
 | `"normal_scores"` | Fisher's z-transform of the partial correlation of each column's normal scores: monotone effects, any marginals | Experimental |
 | `"chisq"`, `"gsq"` | Pearson's chi-square and G-square on category codes | Supported |
-| `"degen_gauss"`, `"cond_gauss"` | Degenerate and conditional Gaussian likelihood ratios on mixed data | Experimental |
+| `"degen_gauss"` | Degenerate Gaussian likelihood ratio on mixed data: each categorical column as indicators of latent Gaussian variables | Supported in `pc` and `fci`; experimental in the other methods |
+| `"cond_gauss"` | Conditional Gaussian likelihood ratio on mixed data: each joint category its own Gaussian | Supported in `pc` and `fci`, with one gap; experimental in the other methods |
 | `"kci"` | Kernel conditional-independence test, with a gamma approximation of its null | Supported |
 | `"rcot"` | Random-feature approximation of the kernel test; time linear in the rows | Supported |
 | `"cmiknn"` | Nearest-neighbor conditional mutual information, with a local permutation null | Supported |
@@ -846,6 +862,18 @@ A method becomes supported once it has:
 | `"gcm"` | Generalized covariance measure: the normalized covariance of the residuals of boosted-tree regressions | Experimental |
 | `"wgcm"` | Weighted generalized covariance measure: the GCM with weights on the conditioning set, for a covariance that changes sign | Experimental |
 | `"pcm"` | Projected covariance measure: whether one variable improves an additive-model prediction of the other | Experimental |
+
+On mixed data, `"degen_gauss"` favors data whose categorical variables stand for latent Gaussian
+variables, where it finds more of the true edges and orients more of them than `"cond_gauss"`; it
+gives up more false edges and false arrowheads, and accuracy on conditional Gaussian data and on
+data whose categorical variables have only categorical parents. `"cond_gauss"` favors data from the
+conditional Gaussian model and data whose categorical variables have only categorical parents, and
+on every kind of mixed data measured it is more accurate than reading the category codes as numbers
+with `"fisherz"`; it gives up some true edges and orientations to `"degen_gauss"` on data whose
+categorical variables stand for latent Gaussian variables. The one gap of `"cond_gauss"`: no
+reference implementation of its test could be run on data like its paper's, so there it was compared
+with the empty graph and with `"fisherz"` on the category codes, not with a reference. The [0.20.0
+release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html) has the comparisons.
 
 `normal_scores` ranks each column over every row its test reads, and its model is one distribution.
 Ranked over the rows of several environments, a column mixes their distributions, and its scores

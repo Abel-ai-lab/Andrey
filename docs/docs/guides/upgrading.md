@@ -39,6 +39,45 @@ datasets = data.generate(data.Ensemble(scms=scms, seeds=range(10), n=500))
 datasets = [scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]
 ```
 
+### The defaults of `rsmax2`
+
+`rsmax2` restricts with `restrict="iamb"` and maximizes with `maximize="tabu"`, where 0.19 used
+`"mmpc"` and `"hc"`. Its graphs can differ. The restrict phase of `"iamb"` reads the data alone, so
+`knowledge` reaches only the score search, which still honors it. To get the former graphs,
+pass the former values, which are also `mmhc`:
+
+```python
+# 0.19
+out = andrey.rsmax2(data)
+# 0.20
+out = andrey.rsmax2(data, restrict="mmpc", maximize="hc")  # the same as andrey.mmhc(data)
+```
+
+### The invariance test of `igsp` and `ut_igsp`
+
+`igsp` and `ut_igsp` raise `ValueError` for `invariance_test="indicator"` with `indep_test="fisherz"`
+or `"student_t"`: a partial-correlation test against an environment indicator sees only a shift of a
+variable's mean, where `"gaussian"` also sees a change of its noise variance or of its weights. Pass
+`"gaussian"`, or leave `invariance_test` out, which picks it under these two tests. `"indicator"`
+stays for the categorical, mixed-data, and nonlinear tests.
+
+```python
+# 0.19
+out = andrey.igsp(data, env, targets=targets, invariance_test="indicator")
+# 0.20
+out = andrey.igsp(data, env, targets=targets, invariance_test="gaussian")  # or leave it out
+```
+
+### Former names from 0.19
+
+`exact_search` no longer takes `search_method="dp"`: the dynamic program returned the same DAG as
+A*, the default. A call that passes `"dp"` raises `ValueError`, and the message says it was removed
+in 0.20.0. Leave `search_method` out, or pass `"astar"`.
+
+| Method | Former name | Name now |
+| --- | --- | --- |
+| `exact_search` | `search_method="dp"` | none: A* is the only search, and it returns the same DAG |
+
 ## From 0.14 to 0.15
 
 ### Former names from 0.12 and 0.14

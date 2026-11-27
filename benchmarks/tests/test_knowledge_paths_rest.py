@@ -62,6 +62,11 @@ def test_mmpc_returns_the_cpdag_the_path_claims_need():
     assert {row["arm"] for row in rows} == {"bare", "true"}
 
 
+def test_rsmax2_runs_the_search_of_its_reference_and_mmhc():
+    assert kp.VARIANTS["rsmax2"] == ("rsmax2", {"restrict": "mmpc", "maximize": "hc"})
+    assert "rsmax2" in kp.own_methods("cpdag")
+
+
 def test_fractions_keep_the_bare_fit_and_the_fractions_asked_for():
     task = ("cpdag", "d10-n500-deg2", 0, None, ("iamb",), ("bare", "true"), (0.3,))
     rows = kp.run_unit(task)

@@ -61,8 +61,8 @@ def test_scan_and_tables_build_the_same_parent_graphs(case: str) -> None:
     tabled = _graphs(x, knowledge, score_func, tables=True)
     assert _bits(_graphs(x, knowledge, score_func, tables=False)) == _bits(tabled)
     d = x.shape[1]
-    for search in (exact._astar_shortest_path, exact._dp_shortest_path):
-        assert search(tabled, d, tables=False) == search(tabled, d, tables=True)
+    search = exact._astar_shortest_path
+    assert search(tabled, d, tables=False) == search(tabled, d, tables=True)
 
 
 def test_ties_case_has_tied_scores() -> None:
@@ -72,12 +72,11 @@ def test_ties_case_has_tied_scores() -> None:
 
 
 @pytest.mark.parametrize("case", CASES)
-@pytest.mark.parametrize("search_method", ["astar", "dp"])
 def test_a_fit_over_the_byte_budget_returns_the_same_dag(
-    case: str, search_method: str, monkeypatch: pytest.MonkeyPatch
+    case: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     x, knowledge, score_func = CASES[case]
-    kwargs = {"search_method": search_method, "knowledge": knowledge, "score_func": score_func}
+    kwargs = {"knowledge": knowledge, "score_func": score_func}
     fast = andrey.exact_search(x, **kwargs)
     monkeypatch.setattr(exact, "_LOOKUP_BYTES", 0)
     with monkeypatch.context() as patch:

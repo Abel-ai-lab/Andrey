@@ -8,6 +8,7 @@ here. A run without the cap first shows that the data make the method exceed it.
 
 from __future__ import annotations
 
+import functools
 import warnings
 
 import numpy as np
@@ -245,6 +246,8 @@ def fitter(method: str):
     fit = getattr(andrey, method)
     if method == "gnies":
         return lambda data, **kw: fit(data, np.arange(len(data)) % 2, **kw)
+    if method == "rsmax2":  # the default's graph here stays within the caps; this one's does not
+        return functools.partial(fit, restrict="mmpc", maximize="hc")
     return fit
 
 
@@ -285,6 +288,18 @@ def test_max_parents_caps_every_dag_the_result_represents(method, monkeypatch):
         for cap in CAPS:
             marks = graph(data, max_parents=cap)
             assert max_parents_in_class(marks).max() <= cap, (method, cap)
+
+
+def test_max_parents_caps_the_graph_of_rsmax2_at_its_defaults():
+    data = linear_data(1, d=7, n=500)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        uncapped = max_parents_in_class(andrey.rsmax2(data).structure.to_numpy()).max()
+        binding = [cap for cap in CAPS if cap < uncapped]
+        assert binding  # the graph has a node with more parents than the smallest cap
+        for cap in binding:
+            capped = andrey.rsmax2(data, max_parents=cap).structure.to_numpy()
+            assert max_parents_in_class(capped).max() <= cap, cap
 
 
 @pytest.mark.parametrize("method", ["gies", "xges", "gfci"])

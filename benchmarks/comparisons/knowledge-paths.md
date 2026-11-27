@@ -575,10 +575,10 @@ and were worse in no row that repeated. With its default score `hc` made fewer e
 plain BIC, the like-for-like arm, `hc` was worse in no row that repeated. `tabu` with the plain BIC
 was, in one row with the required edges alone (20 variables, 500 samples, 5 % of the pairs; 3.55
 more errors per graph on seeds 0 to 19 and 3.15 on fresh seeds), so `required_paths` fails this
-comparison in `tabu`. `mmhc` and `rsmax2` made more errors than bnlearn's given the same required
-edges at expected degree 4, in 2 of 36 rows with required paths alone and 4 of 36 with all parts
-that repeated, by 1.75 to 4.9 per graph, so `required_paths` fails it in both; with forbidden paths
-they were worse in no row.
+comparison in `tabu`; Status gives the 0.20.0 reading. `mmhc` and `rsmax2` made more errors than
+bnlearn's given the same required edges at expected degree 4, in 2 of 36 rows with required paths
+alone and 4 of 36 with all parts that repeated, by 1.75 to 4.9 per graph, so `required_paths` fails
+it in both; with forbidden paths they were worse in no row.
 
 With the plain BIC, `hc` and `tabu` are not below the empty graph at 50 variables, 500 samples, and
 expected degree 2, with the claims or without, and neither is bnlearn there: in 2 rows of `hc` and 1
@@ -720,8 +720,8 @@ in `mmpc` (by 0.72 to 1.95); each of them is closer to the true DAG on seeds 100
 `pc` is worse pooled, and none of any method with required paths or with all parts. The class the
 truth and the claims define is more directed than the class without them, and these fits drop about
 96 % of the forbidden paths on a graph with no consistent extension, so they leave undirected what
-the class directs. `forbidden_paths` therefore stays experimental in the three methods
-(`no_consistent_extension`, `pooled` in the published file).
+the class directs. `forbidden_paths` therefore stayed experimental in the three methods in 0.17.0
+(`no_consistent_extension`, `pooled` in the published file); Status gives the 0.20.0 reading.
 
 ### Against reference packages under the rule
 
@@ -789,16 +789,28 @@ row that repeats. Where no reference takes the knowledge, the first two decide.
 
 | Part | Supported in | Experimental in |
 |---|---|---|
-| `required_paths` | `pc`, `cdnod`, `ges`, `xges`, `hc`, `boss`, `grasp`, `exact_search`, `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci`, `direct_lingam`, `multi_group_direct_lingam`, `iamb`, `inter_iamb`, `mmpc` | `tabu`, `mmhc`, `rsmax2` |
-| `forbidden_paths` | the same without `iamb`, `inter_iamb`, `mmpc`, and `tabu`, `mmhc`, `rsmax2` | `iamb`, `inter_iamb`, `mmpc` |
+| `required_paths` | `pc`, `cdnod`, `ges`, `xges`, `hc`, `tabu` with a difference, `boss`, `grasp`, `exact_search`, `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci`, `direct_lingam`, `multi_group_direct_lingam`, `iamb`, `inter_iamb`, `mmpc` | `mmhc`, `rsmax2` |
+| `forbidden_paths` | the same, with `mmhc` and `rsmax2` and without `tabu`'s difference; `iamb`, `inter_iamb`, and `mmpc` with a difference | |
 | `confounded` | `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, `lpcmci` | |
 
-Why a part is experimental: in `iamb`, `inter_iamb`, and `mmpc`, forbidden paths alone left the
-CPDAG 0.65 to 1.95 edges farther from the class the claims define at 50 variables and expected
-degree 2, over two sets of seeds pooled, because on a graph with no consistent extension about 96 %
-of them are dropped (`metadata["unmet_knowledge"]` lists them); in `tabu` with the
-plain BIC, and in `mmhc` and `rsmax2` at expected degree 4, the reference given the required edges
-the paths imply made fewer errors in rows that repeated.
+Why a part is experimental: in `mmhc` and `rsmax2` at expected degree 4, the reference given the
+required edges the paths imply made fewer errors in rows that repeated.
+
+Supported with a difference, where a check failed and the trace found no defect:
+
+- `tabu` with `required_paths`: with the plain BIC, the same required edges as bnlearn's `tabu` left
+  `tabu` with more errors in one row on both sets of seeds (the row above). The 0.20.0 options study
+  traced it and found no defect: the difference is the tie rule. With ties broken by column position
+  (`tie_break="position"`) `tabu` takes bnlearn's moves, and with the default order-free ties the gap
+  did not repeat on datasets outside the lane. With the default score every check passed.
+- `iamb`, `inter_iamb`, and `mmpc` with `forbidden_paths`: pooled over two sets of seeds, forbidden
+  paths alone left the CPDAG 0.65 to 1.95 edges farther from the class the claims define at 50
+  variables and expected degree 2, because on a graph with no consistent extension about 96 % of
+  them are dropped (`metadata["unmet_knowledge"]` lists them). The study found no defect in the
+  knowledge step: the graph itself moved toward the claims in every such row, and the class the
+  claims define moved farther, mostly in fits whose graph has no consistent extension, which these
+  searches return more often than `pc` on those cells, and `iamb` and `inter_iamb` as often as
+  bnlearn's.
 
 The limits the measurements show:
 

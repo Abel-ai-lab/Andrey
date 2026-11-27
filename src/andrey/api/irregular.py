@@ -153,7 +153,12 @@ def anm(
     alpha : float or None, default=None
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
-        exactly one p-value exceeds it. See Notes.
+        exactly one p-value exceeds it. ``None`` favors naming the true direction on more of the
+        pairs the model identifies; it gives up an edge on every pair of unrelated variables, and a
+        direction no better than a coin flip on a pair no direction of which can be identified, such
+        as a linear-Gaussian one. A level favors no edge on such pairs and fewer wrong directions;
+        it gives up many true directions, more with few rows, where both directions pass the test.
+        See Notes.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -302,7 +307,12 @@ def pnl(
     alpha : float or None, default=None
         ``None`` chooses the direction with the larger p-value, or with the smaller test statistic
         when the p-values are equal. A significance level such as ``0.05`` draws an edge only when
-        exactly one p-value exceeds it. See Notes.
+        exactly one p-value exceeds it. ``None`` favors naming the true direction on more of the
+        pairs the model identifies; it gives up an edge on every pair of unrelated variables, and a
+        direction no better than a coin flip on a pair no direction of which can be identified, such
+        as a linear-Gaussian one. A level favors no edge on such pairs and fewer wrong directions;
+        it gives up many true directions: with few rows both directions pass the test, and with
+        many rows both fail it, the true one included. See Notes.
     missing : {"testwise"} or None, default=None
         How missing values (``NaN``) are handled. ``"testwise"`` deletes rows per test: each test
         reads only the rows where all of its variables are observed. ``None`` picks the method's
@@ -470,7 +480,12 @@ def loci(
         Under ``criterion="independence"``: ``None`` chooses the direction with the larger p-value,
         breaking p-value ties by the smaller test statistic; a significance level such as ``0.05``
         draws an edge only when exactly one p-value exceeds it. Must be ``None`` under
-        ``criterion="likelihood"``. See Notes.
+        ``criterion="likelihood"``. Under ``criterion="independence"``, ``None`` favors naming the
+        true direction on more of the pairs the model identifies; it gives up an edge on every pair
+        of unrelated variables, and a direction no better than a coin flip on a pair no direction
+        of which can be identified, such as a linear-Gaussian one. A level favors no edge on such
+        pairs and fewer wrong directions; it gives up many true directions, more with few rows,
+        where both directions pass the test. See Notes.
     criterion : {"independence", "likelihood"}, default="independence"
         ``"independence"`` tests whether each direction's scaled residual is independent of its
         proposed cause; ``"likelihood"`` chooses the direction whose model has the larger

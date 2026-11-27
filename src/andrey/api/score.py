@@ -92,17 +92,30 @@ def ges(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data.
         ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
         continuous data that are Gaussian only after an unknown increasing transformation of each
         column [13]_ [14]_. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial
-        BIC [7]_, for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate
-        Gaussian) [4]_ and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed
-        data, continuous and categorical columns. ``"degen_gauss"`` favors time and accuracy on
-        smaller graphs; ``"cond_gauss"`` favors accuracy on larger graphs and gives up time.
-        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        BIC [7]_, for categorical data coded by whole numbers. ``"bdeu"`` favors fewer errors than
+        ``"discrete_bic"`` with few rows, mostly by adding fewer false edges, and on a larger
+        benchmark network at every sample size measured; it gives up some true edges on random and
+        small networks with few or moderate rows, where it misses more edges and orients fewer.
+        ``"discrete_bic"`` favors fewer missed edges and more correctly oriented ones there; it
+        gives up more false edges, and on the larger network accuracy altogether. With many rows the
+        two give about the same graph on small networks. ``"degen_gauss"`` (degenerate Gaussian)
+        [4]_ and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data,
+        continuous and categorical columns. ``"degen_gauss"`` favors time and accuracy on smaller
+        graphs; ``"cond_gauss"`` favors accuracy on larger graphs and gives up time. ``None`` picks
+        from the declared column types: ``"bdeu"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
         values. See Notes. ``metadata["score_func"]`` names the score the fit used: the one picked
@@ -1810,7 +1823,14 @@ def hc(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"``, the BDeu score, or ``"discrete_bic"``, the multinomial BIC, for categorical data
@@ -2174,7 +2194,14 @@ def tabu(
         ``float64`` and read as numbers, whole numbers under a categorical or mixed-data setting;
         string labels are coded ``0, 1, ...`` in sorted order, whatever the row order. When every
         row has the same value, the data come from one environment, and the graph equals the one
-        without ``env``. ``None``, the default, fits ``data`` as one environment.
+        without ``env``. ``None``, the default, fits ``data`` as one environment. ``env`` favors
+        fewer errors and more correctly oriented edges than pooling the rows, when each environment
+        shifts a few variables; it gives up accuracy when one index holds many environments read as
+        numbers: shifts that do not follow the labels' order go unnoticed, and the search adds edges
+        to explain them. Reading the labels as categories (``score_func="cond_gauss"`` with
+        ``categorical=[]``) avoids those edges and beats pooling given enough rows per environment.
+        When the environments together shift every variable, the index identifies no direction
+        beyond the pooled graph's, and the result can direct edges the data leave open.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, a covariance-based Gaussian BIC for continuous data;
         ``"bdeu"`` or ``"discrete_bic"``, the BDeu score or the multinomial BIC for categorical data
@@ -2428,9 +2455,14 @@ def tabu(
     errors than the empty graph on sparse graphs of moderate size, where :func:`~andrey.ges` reached
     hundreds of variables, on denser graphs only on small ones, and on dense graphs at no size. With
     fewer rows than columns the BIC is unreliable, and the search never selects a parent set that
-    fits its child exactly. The
-    `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
-    every setting.
+    fits its child exactly. Required paths bring the graph closer to the true graph than the same
+    search without them on small sparse linear-Gaussian graphs. At the standard BIC, the result
+    depends on how ties between equally scoring moves break: on a given dataset the search can end
+    at a lower-scoring graph with more errors than another tie order finds, and over many datasets
+    the default order-free ties are as accurate. The `0.10.0 release card
+    <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has every setting, and the
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html>`__ the comparison for
+    required paths.
 
     References
     ----------
@@ -2514,18 +2546,17 @@ def exact_search(
     """Learn the CPDAG of the globally optimal DAGs for a decomposable score by exact search.
 
     The optimum is identified up to its Markov equivalence class, so the search returns the class's
-    CPDAG, as the other score searches do; A* (``search_method="astar"``) [1]_ and dynamic
-    programming (``"dp"``) [2]_ find the same DAG of that class, which ``metadata["dag"]`` keeps.
-    Runtime is exponential in the variable count, so keep the problem small (roughly <= 20
-    variables).
+    CPDAG, as the other score searches do; A* [1]_ finds one DAG of that class, which
+    ``metadata["dag"]`` keeps. Runtime is exponential in the variable count, so keep the problem
+    small (roughly <= 20 variables).
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    search_method : {"astar", "dp"}, default="astar"
-        Exact search strategy: A* search or dynamic programming.
+    search_method : {"astar"}, default="astar"
+        Exact search strategy: A* search over the order graph, the only one.
     score_func : str or None, default=None
         Local score: ``"bic"``, the linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers; or
@@ -2712,8 +2743,8 @@ def exact_search(
 
     **Limitations.** At ``ebic_gamma=0.0`` on linear-Gaussian data it made fewer errors than the
     empty graph at every size and density it finished, but it scores every possible parent set of
-    every variable, so its run time at least doubles with each added variable, and under ``"dp"`` so
-    does its memory. With fewer rows than columns the BIC is unreliable, and the search never
+    every variable, so its run time at least doubles with each added variable, and its memory about
+    doubles. With fewer rows than columns the BIC is unreliable, and the search never
     selects a parent set that fits its child exactly. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
     every setting.

@@ -1972,11 +1972,10 @@ DISCRETE_INDEP_TESTS: tuple[str, ...] = ("chisq", "gsq")
 RANK_INDEP_TESTS: tuple[str, ...] = ("normal_scores",)
 MIXED_INDEP_TESTS: tuple[str, ...] = ("degen_gauss", "cond_gauss")
 #: The tests not yet supported, as the status column of the API reference marks them; the quality
-#: gate checks the other nonlinear tests.
+#: gate checks the other nonlinear tests. ``"degen_gauss"`` and ``"cond_gauss"`` are supported in
+#: ``pc`` and ``fci``, where they were measured, and experimental in the other methods.
 EXPERIMENTAL_INDEP_TESTS: tuple[str, ...] = (
     "normal_scores",
-    "degen_gauss",
-    "cond_gauss",
     "gcm",
     "wgcm",
     "pcm",

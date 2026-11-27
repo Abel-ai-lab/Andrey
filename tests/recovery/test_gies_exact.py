@@ -332,24 +332,22 @@ def _all_dags(d: int):
             yield adjacency
 
 
-@pytest.mark.parametrize("search_method", ["astar", "dp"])
-def test_exact_search_scores_as_well_as_every_dag(search_method):
+def test_exact_search_scores_as_well_as_every_dag():
     """On four variables the search returns one of the 543 DAGs, and none has a lower BIC."""
     x = datagen.generate("gauss_5v")[:, 1:]
     score = BICScore(x, ebic_gamma=1.0)
-    out = andrey.exact_search(x, search_method=search_method, ebic_gamma=1.0)
+    out = andrey.exact_search(x, ebic_gamma=1.0)
     found = _found_dag(out)
     dags = list(_all_dags(4))
     assert any(np.array_equal(found, dag) for dag in dags)
     assert _bic(found, score) <= min(_bic(dag, score) for dag in dags) + 1e-9
 
 
-@pytest.mark.parametrize("search_method", ["astar", "dp"])
-def test_exact_search_recovers_the_planted_class(search_method):
+def test_exact_search_recovers_the_planted_class():
     X, _ = _interventional_sem([], n=3000, seed=1)
     planted = np.zeros((8, 8), dtype=np.int8)
     planted[tuple(np.transpose(list(_GIES_EDGES)))] = 1
-    found = andrey.exact_search(X, search_method=search_method).structure
+    found = andrey.exact_search(X).structure
     assert markov_equivalent(found, planted)
 
 
@@ -382,20 +380,18 @@ def test_exact_search_directs_the_edges_the_knowledge_decides():
     assert [i, j] in out.metadata["dag"]
 
 
-@pytest.mark.parametrize("search_method", ["astar", "dp"])
-def test_exact_search_finds_no_edges_between_independent_columns(search_method):
+def test_exact_search_finds_no_edges_between_independent_columns():
     """Columns with a nonzero mean, so the score has to center them."""
     independent = np.random.default_rng(0).normal(5.0, 1.0, size=(500, 3))
-    found = andrey.exact_search(independent, search_method=search_method).structure
+    found = andrey.exact_search(independent).structure
     assert found.oriented_edges() == []
 
 
-@pytest.mark.parametrize("search_method", ["astar", "dp"])
-def test_exact_search_ignores_the_variables_means(search_method):
+def test_exact_search_ignores_the_variables_means():
     """A shift can change which score-tied DAG is returned, not its Markov equivalence class."""
     x = datagen.generate("gauss_5v")
-    centered = andrey.exact_search(x, search_method=search_method).structure
-    shifted = andrey.exact_search(x + 7.0, search_method=search_method).structure
+    centered = andrey.exact_search(x).structure
+    shifted = andrey.exact_search(x + 7.0).structure
     assert markov_equivalent(shifted, centered)
 
 
@@ -411,28 +407,23 @@ def _symmetric_chain() -> np.ndarray:
     return np.vstack([half, half[:, ::-1], -half, -half[:, ::-1]])
 
 
-@pytest.mark.parametrize("search_method", ["astar", "dp"])
-def test_exact_search_reports_one_dag_under_any_column_order(search_method):
+def test_exact_search_reports_one_dag_under_any_column_order():
     """Exactly tied DAGs of one class resolve the same way whatever the column order."""
     data = _symmetric_chain()
 
     def relabeled(perm: np.ndarray) -> np.ndarray:
-        found = exact_module.exact_search(data[:, perm], search_method=search_method).to_numpy()
+        found = exact_module.exact_search(data[:, perm]).to_numpy()
         back = np.empty_like(found)
         back[np.ix_(perm, perm)] = found
         return back
 
-    expected = exact_module.exact_search(data, search_method=search_method).to_numpy()
+    expected = exact_module.exact_search(data).to_numpy()
     perms = [np.random.default_rng(seed).permutation(3) for seed in range(6)]
     for perm in perms:
         np.testing.assert_array_equal(relabeled(perm), expected)
     with andrey.config(tie_break="position"):
         by_position = relabeled(np.arange(3))
         assert any((relabeled(perm) != by_position).any() for perm in perms)
-    other = "dp" if search_method == "astar" else "astar"
-    np.testing.assert_array_equal(
-        exact_module.exact_search(data, search_method=other).to_numpy(), expected
-    )
 
 
 def test_exact_search_holds_its_dag_when_the_data_move_one_ulp():
