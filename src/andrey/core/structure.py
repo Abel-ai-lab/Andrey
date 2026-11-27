@@ -87,6 +87,9 @@ _TYPE_CODE[[a * 4 + b for a, b in EDGE_TYPES]] = [
     _TYPE_NAMES.index(t) for t, _ in EDGE_TYPES.values()
 ]
 SUMMARY_EDGES = 30  # edges a printed summary lists before "... and N more"
+# Up to this many stored entries ``_mark_pairs`` looks partners up with ``_far_marks``; beyond it
+# SciPy's lookup is faster.
+_NUMPY_PARTNER_ENTRIES = 1024
 # Graphviz arrow shape per endpoint mark.
 _DOT_ARROWS = {TAIL: "none", ARROW: "normal", CIRCLE: "odot"}
 
@@ -1344,26 +1347,60 @@ class GraphStructure(Structure):
         indptr, indices, marks = self._sym_csr()
         if self._kind != "pag" and (marks == CIRCLE).any():
             raise ValueError(f"CIRCLE marks require kind='pag', not '{self._kind}'")
+        found = _far_marks(self._n_nodes, indptr, indices, marks)
+        if found is not None:
+            self._validate_canonical(*found, marks)
+            return
         for i, j, mi, mj in self._iter_edges():
             if i == j:
                 continue  # a self-loop (autoregressive lag edge) is single-endpoint, not bidirected
-            if self._kind in ("dag", "cpdag") and mi == ARROW and mj == ARROW:
-                raise ValueError(
-                    f"double arrowhead {i}<->{j} requires kind='pag' or 'mag' (bidirected) or "
-                    f"kind='digraph' (2-cycle)"
-                )
-            if self._kind in ("dag", "digraph") and mi == TAIL and mj == TAIL:
-                raise ValueError(
-                    f"undirected edge {i}--{j} requires kind='cpdag', 'pag', 'mag', or 'undirected'"
-                )
-            if self._kind == "undirected" and (mi, mj) != (TAIL, TAIL):
-                raise ValueError(f"edge {i}-{j} has an arrowhead, which kind='undirected' forbids")
+            self._check_edge_marks(i, j, mi, mj)
         # Support symmetry: every stored (i, j) has a matching (j, i).
         n = self._n_nodes
         rows = np.repeat(np.arange(n, dtype=np.intp), np.diff(indptr))
         for i, j in zip(rows.tolist(), indices.tolist()):
             if _lookup(indptr, indices, marks, j, i) == NULL:
                 raise ValueError(f"asymmetric half-edge: ({i}, {j}) stored but ({j}, {i}) missing")
+
+    def _check_edge_marks(self, i: int, j: int, mi: int, mj: int) -> None:
+        """Raise ``ValueError`` when the marks ``(mi, mj)`` of the edge ``i-j`` are not allowed."""
+        if self._kind in ("dag", "cpdag") and mi == ARROW and mj == ARROW:
+            raise ValueError(
+                f"double arrowhead {i}<->{j} requires kind='pag' or 'mag' (bidirected) or "
+                f"kind='digraph' (2-cycle)"
+            )
+        if self._kind in ("dag", "digraph") and mi == TAIL and mj == TAIL:
+            raise ValueError(
+                f"undirected edge {i}--{j} requires kind='cpdag', 'pag', 'mag', or 'undirected'"
+            )
+        if self._kind == "undirected" and (mi, mj) != (TAIL, TAIL):
+            raise ValueError(f"edge {i}-{j} has an arrowhead, which kind='undirected' forbids")
+
+    def _validate_canonical(
+        self, rows: np.ndarray, cols: np.ndarray, far: np.ndarray, marks: np.ndarray
+    ) -> None:
+        """``validate`` for a canonical store; ``rows``, ``cols``, ``far`` are its ``_far_marks``.
+
+        Array comparisons find the first edge in ``_iter_edges`` order that ``_check_edge_marks``
+        rejects, and that method raises for it. A stored cell without its partner raises last.
+        """
+        upper = np.flatnonzero(rows < cols)  # each edge once, in _iter_edges order
+        near, other = marks[upper], far[upper]
+        arrows, tails = (near == ARROW) & (other == ARROW), (near == TAIL) & (other == TAIL)
+        bad = np.zeros(upper.size, dtype=bool)
+        if self._kind in ("dag", "cpdag"):
+            bad |= arrows
+        if self._kind in ("dag", "digraph"):
+            bad |= tails
+        if self._kind == "undirected":
+            bad |= ~tails
+        if bad.any():
+            k = upper[int(np.argmax(bad))]
+            self._check_edge_marks(int(rows[k]), int(cols[k]), int(marks[k]), int(far[k]))
+        missing = np.flatnonzero(far == NULL)
+        if missing.size:
+            i, j = int(rows[missing[0]]), int(cols[missing[0]])
+            raise ValueError(f"asymmetric half-edge: ({i}, {j}) stored but ({j}, {i}) missing")
 
     # ---- internals ------------------------------------------------------------------------
 
@@ -1394,9 +1431,15 @@ class GraphStructure(Structure):
         The arrays hold ``(i, j, mark_i, mark_j)``. This vectorized form of ``_iter_edges`` avoids
         a search for each edge.
         """
+        indptr, indices, marks = self._sym_csr()
+        small = indices.size <= _NUMPY_PARTNER_ENTRIES
+        found = _far_marks(self._n_nodes, indptr, indices, marks) if small else None
+        if found is not None:
+            rows, cols, far = found
+            keep = rows <= cols
+            return rows[keep], cols[keep], marks[keep].astype(np.int64), far[keep].astype(np.int64)
         import scipy.sparse
 
-        indptr, indices, marks = self._sym_csr()
         rows = np.repeat(np.arange(self._n_nodes, dtype=np.intp), np.diff(indptr))
         cols = indices.astype(np.intp)
         keep = rows <= cols
@@ -2164,16 +2207,40 @@ def _as_lag_stack(
 
 def _dense_to_csr(M: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Canonical CSR (sorted columns, no stored zeros) of the dense endpoint matrix."""
-    import scipy.sparse
+    rows, cols = np.nonzero(M)  # row-major, so each row's columns come sorted
+    indptr = np.zeros(M.shape[0] + 1, dtype=np.int64)
+    np.cumsum(np.bincount(rows, minlength=M.shape[0]), out=indptr[1:])
+    return indptr, cols.astype(np.int32), M[rows, cols].astype(np.int8)
 
-    sp = scipy.sparse.csr_array(M)
-    sp.sum_duplicates()
-    sp.sort_indices()
-    return (
-        sp.indptr.astype(np.int64),
-        sp.indices.astype(np.int32),
-        sp.data.astype(np.int8),
-    )
+
+def _far_marks(
+    n: int, indptr: np.ndarray, indices: np.ndarray, marks: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """``(rows, cols, far)`` of a canonical CSR: ``far[k]`` is the mark at ``(cols[k], rows[k])``.
+
+    ``far`` is ``NULL`` where that cell is absent. Returns ``None`` for a store that is not a
+    well-formed canonical CSR (unsorted or repeated columns, an index out of range), which the
+    callers check entry by entry instead.
+    """
+    counts = np.diff(indptr)
+    if indptr.size != n + 1 or int(indptr[0]) != 0 or int(indptr[-1]) != indices.size:
+        return None
+    if marks.size != indices.size or (counts < 0).any():
+        return None
+    rows = np.repeat(np.arange(n, dtype=np.intp), counts)
+    cols = indices.astype(np.intp)
+    if cols.size and (int(cols.min()) < 0 or int(cols.max()) >= n):
+        return None
+    keys = rows * n + cols
+    if keys.size > 1 and not bool((keys[1:] > keys[:-1]).all()):
+        return None
+    want = cols * n + rows
+    pos = np.minimum(np.searchsorted(keys, want), max(keys.size - 1, 0))
+    far = np.zeros(keys.size, dtype=np.int8)
+    if keys.size:
+        hit = keys[pos] == want
+        far[hit] = marks[pos[hit]]
+    return rows, cols, far
 
 
 def _lookup(indptr: np.ndarray, indices: np.ndarray, marks: np.ndarray, a: int, b: int) -> int:
@@ -2200,8 +2267,6 @@ def _try_compact(
     """
     if kind not in ("dag", "cpdag", "undirected"):
         return None
-    import scipy.sparse
-
     n_int = int(n)
     indptr = np.asarray(indptr, dtype=np.int64)
     indices = np.asarray(indices, dtype=np.int32)
@@ -2217,12 +2282,20 @@ def _try_compact(
     same_row = rows[1:] == rows[:-1]
     if bool(np.any(same_row & (np.diff(cols) <= 0))):
         return None  # unsorted or duplicate columns within a row (non-canonical CSR)
-    sp = scipy.sparse.csr_array((marks, indices, indptr), shape=(n_int, n_int))
-    spT = sp.T.tocsr()
-    spT.sort_indices()
-    if not (np.array_equal(sp.indptr, spT.indptr) and np.array_equal(sp.indices, spT.indices)):
-        return None  # asymmetric support -> a half-edge; leave it for validate()
-    partner = spT.data.astype(np.int8)  # partner[k] = mark at (cols[k], rows[k])
+    found = _far_marks(n_int, indptr, indices, marks)
+    if found is not None:
+        partner = found[2]  # partner[k] = mark at (cols[k], rows[k]); marks hold no NULL here
+        if bool((partner == NULL).any()):
+            return None  # asymmetric support -> a half-edge; leave it for validate()
+    else:
+        import scipy.sparse
+
+        sp = scipy.sparse.csr_array((marks, indices, indptr), shape=(n_int, n_int))
+        spT = sp.T.tocsr()
+        spT.sort_indices()
+        if not (np.array_equal(sp.indptr, spT.indptr) and np.array_equal(sp.indices, spT.indices)):
+            return None  # asymmetric support -> a half-edge; leave it for validate()
+        partner = spT.data.astype(np.int8)  # partner[k] = mark at (cols[k], rows[k])
     off = rows != cols
     upper = off & (rows < cols)
     mi, mj = marks[upper], partner[upper]

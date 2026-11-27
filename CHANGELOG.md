@@ -168,6 +168,50 @@ names its pull request.
 - `pcmci` and `pcmciplus` on data with missing values stop the scan that picks each candidate's
   conditions once it has the ones the PC1 rounds keep, so they run faster on tens of variables,
   with the same output bit for bit. ([#1315])
+- A process that imports Andrey starts a fit sooner, with the same output bit for bit: `scipy.stats`
+  and the basis cache of the functional causal models are imported where they are used, a table is
+  read as a DataFrame only once pandas is imported, so a fit on an array never imports it, and the
+  forkserver preloads the method registry that a worker's first fit reads, so a bootstrap on worker
+  processes starts its workers sooner. With a CPU build of torch, the automatic backend choice
+  rules CUDA out from the build's version file, so a `direct_lingam` fit and a fit with
+  `indep_test="kci"` or `indep_test="cmiknn"` that stay on NumPy no longer import torch. A torch
+  already imported is asked, and so is a `cuda` pin. ([#1314])
+- `iamb`, `inter_iamb`, and `mmpc` with a list of `target` on data with missing values answer every
+  target with one search, so a run that several targets share is made once, and each result counts
+  the rows of the runs its target reads, as a call for that target alone counts them. These lists
+  run faster, with the same output bit for bit. ([#1317])
+- `jpcmciplus` runs faster as the number of system variables grows, with the same output bit for
+  bit: its test over the stacked design keeps the node counts and the design columns each lagged
+  node adds to a conditioning set, and forms each conditioning set once per query, instead of
+  reading them again for every column of every query. ([#1322])
+- `boss` runs faster, with the same output bit for bit: it scores each batch of added parents with
+  fewer temporary arrays and keeps each vertex's penalty and rounding terms for the fit. `grasp`,
+  `boss_fci`, `grasp_fci`, and `gfci` score their added parents the same way and return the same
+  output bit for bit. ([#1320])
+- `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` build the conditioning sets of their
+  collider test as int arrays and hand them as they are to a test that answers a set of queries at
+  once, so they run faster, with the same output bit for bit and the same queries. ([#1327])
+- Every fit reads its data with fewer passes and builds its result with NumPy, so a fit on many rows
+  starts its search sooner and a bootstrap on a few variables builds each resample's graph sooner,
+  with the same output bit for bit. The input check takes each column's maximum and minimum first
+  and runs the full finiteness pass only for data that holds `NaN` or `inf`, the constant-column
+  test reads the same extremes, and the check for whole-valued columns tests the first rows before
+  the rest. The graph's sparse store is built with `np.nonzero`, its partner marks are looked up
+  with one `searchsorted` in `validate` and in the check that halves a `dag` or `cpdag` store, and
+  a store loaded with its entries out of order or repeated takes the earlier code. ([#1325])
+- `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` on
+  data with missing values and `missing="em"` run faster, with the same output bit for bit: the
+  rows are grouped by which columns they observe once per fit, not in each of its E-steps, and the
+  groups of one row that miss the same number of columns are solved together, so a fit whose rows
+  mostly differ in their pattern, as with values missing completely at random, spends much less time
+  in the E-step. ([#1329])
+- `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` search the
+  causal order faster with `measure="skew"` or `"tanh"`, and return the same output bit for bit
+  with every measure. With `"skew"`, each column's sign comes from the mean of `x * x * x` when that
+  mean is clear of the rounding of either computation, and from `np.mean(x**3, axis=0)` on every
+  column when any column's mean is not. Every measure residualizes the columns that remain after
+  each pick with the picked column's variance taken once per step, which is what `compute_residual`
+  computes column by column. ([#1331])
 - The `gcm` test and the `pcm` test with `regression="boosting"` tune their boosted trees faster:
   each cross-validation fold grows only through the round where its early stop cuts it, and the
   repeated input checks of the many small fits are skipped, so the methods that take them as
@@ -3149,4 +3193,12 @@ First alpha release.
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
 [#1309]: https://github.com/Abel-ai-lab/Andrey/pull/1309
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
+[#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
+[#1317]: https://github.com/Abel-ai-lab/Andrey/pull/1317
+[#1320]: https://github.com/Abel-ai-lab/Andrey/pull/1320
+[#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
+[#1325]: https://github.com/Abel-ai-lab/Andrey/pull/1325
+[#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
+[#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
+[#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331

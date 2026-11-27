@@ -220,13 +220,28 @@ class ContextTest:
             for group in test.test.copies():
                 for column in group:
                     self.copies[column] = set(group) - {column}
+        self.count = nodes.count
+        self.n_series = nodes.n_series
+        self.n_system = nodes.n_system
+        self.space_dummy_node = nodes.space_dummy_node
+        self.time_dummy_node = nodes.time_dummy_node
+        # Each lagged node column's node and the design columns it adds to a conditioning set.
+        self.conditioning = {
+            column: self._conditioning(column) for column in range((2 * tau_max + 1) * nodes.count)
+        }
+
+    def _conditioning(self, column: int) -> tuple[int, tuple[int, ...]]:
+        """The node of the lagged node ``column`` and the design columns it adds as a condition."""
+        node = column % self.count
+        columns = self._columns(column)
+        return node, columns[:-1] if node in self.dummy_nodes else columns
 
     def _columns(self, column: int) -> tuple[int, ...]:
         """The design columns of the lagged node ``column``."""
-        lag, node = divmod(column, self.nodes.count)
-        if node < self.nodes.n_series:
-            return (lag * self.nodes.n_series + node,)
-        return self.fixed[node - self.nodes.n_series]
+        lag, node = divmod(column, self.count)
+        if node < self.n_series:
+            return (lag * self.n_series + node,)
+        return self.fixed[node - self.n_series]
 
     def _levels(self, column: int) -> tuple[int, ...]:
         """The columns a test of ``column`` runs on: two levels of a dummy are one test."""
@@ -237,13 +252,15 @@ class ContextTest:
         """Return the design columns of the conditioning set ``row``, and its nodes."""
         given: set[int] = set()
         present = set()
+        conditioning = self.conditioning
         for column in row:
-            present.add(column % self.nodes.count)
-            columns = self._columns(column)
-            given.update(columns[:-1] if column % self.nodes.count in self.dummy_nodes else columns)
-        if self.nodes.space_dummy_node in present:
+            entry = conditioning.get(column)
+            node, columns = self._conditioning(column) if entry is None else entry
+            present.add(node)
+            given.update(columns)
+        if self.space_dummy_node in present:
             given -= self.space_columns
-        if self.nodes.time_dummy_node in present:
+        if self.time_dummy_node in present:
             given -= self.time_columns
         return tuple(sorted(given)), present
 
@@ -262,11 +279,11 @@ class ContextTest:
 
     def _fixed_by(self, column: int, present: set[int]) -> bool:
         """Whether a dummy in ``present`` fixes the context of the lagged node ``column``."""
-        node = column % self.nodes.count
-        if self.nodes.n_system <= node < self.nodes.n_series:
-            return self.nodes.time_dummy_node in present
-        if self.nodes.n_series <= node < self.nodes.space_dummy_node:
-            return self.nodes.space_dummy_node in present
+        node = column % self.count
+        if self.n_system <= node < self.n_series:
+            return self.time_dummy_node in present
+        if self.n_series <= node < self.space_dummy_node:
+            return self.space_dummy_node in present
         return False
 
     def _in_span(self, column: np.ndarray, conditions: np.ndarray) -> bool:
@@ -346,8 +363,9 @@ class ContextTest:
             self._check_rows(given)
             left, right = self._levels(a), self._levels(b)
             tests[query] = len(left) * len(right)
+            given_set = set(given)
             for column in {left[0], right[0]} & self.system_columns:
-                if self.copies.get(column, set()) & set(given):
+                if not given_set.isdisjoint(self.copies.get(column, ())):
                     error = SingularCorrelationError(
                         "a tested column lies in the span of its conditioning columns; cannot run "
                         "a partial-correlation test"
@@ -356,7 +374,9 @@ class ContextTest:
                     raise error
             for u in left:
                 for v in right:
-                    if not (self.copies.get(u, set()) | self.copies.get(v, set())) & set(given):
+                    if given_set.isdisjoint(self.copies.get(u, ())) and given_set.isdisjoint(
+                        self.copies.get(v, ())
+                    ):
                         batches.setdefault(len(given), []).append((query, u, v, given))
         for size, batch in batches.items():
             queries = [query for query, _, _, _ in batch]

@@ -41,26 +41,30 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from functools import partial
-from itertools import combinations, islice
-from typing import Literal
+from itertools import chain, combinations
+from typing import Literal, TypeVar
 
 import numpy as np
 
 from andrey.constraint._skeleton import (
     CHUNK,
     MaskedMapping,
+    _runs,
     adjacent_pairs,
     flagged_triples,
     kept_apart,
     scan_conditioning_sets,
+    subset_rows,
 )
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
+    RowCounts,
     TestwiseDeletion,
     counts_its_tests,
     not_tested,
+    rows_tested,
     running_flags,
 )
 from andrey.core.knowledge import Constraints, orient
@@ -72,6 +76,8 @@ from andrey.core.ties import (
     tie_mask,
     tie_ranks,
 )
+
+_T = TypeVar("_T")
 
 # The sets of one size a collider test asks first; each later chunk is twice as large.
 _FIRST_CHUNK = 32
@@ -371,7 +377,7 @@ def _weakest(
     test: CITest,
     target: int,
     xs: list[int],
-    conds: list[tuple[int, ...]],
+    conds: list[tuple[int, ...]] | np.ndarray,
     sets: list[tuple[int, ...]] | None = None,
     ranks: Sequence[int] = (),
     alpha: float | None = None,
@@ -386,11 +392,17 @@ def _weakest(
     absolute partial correlation for a test with ``statistic_pvalues``, evaluated for every query
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
     scalar test. With ``sets``, each candidate's set with the largest p-value is appended to it
-    (:func:`_largest_sets`, which reads ``ranks``).
+    (:func:`_largest_sets`, which reads ``ranks``). ``conds`` is a list of tuples or an ``(N, m)``
+    int array of the sets of one size; one candidate and an array go to the test as they are
+    (:func:`_weakest_rows`), and any other array is read as the tuples of its rows.
     """
     if not xs:
         return []
     batch = getattr(test, "statistic_pvalues", None)
+    if isinstance(conds, np.ndarray):
+        if batch is not None and len(xs) == 1 and sets is None and len(conds):
+            return [_weakest_rows(batch, target, xs[0], conds, alpha)]
+        conds = [tuple(row) for row in conds.tolist()]
     if batch is None:
         batched = getattr(test, "batched_call", None)
         out = []
@@ -433,6 +445,23 @@ def _weakest(
     if alpha is not None:
         pmax[skipped & ~(pmax > alpha)] = NOT_TESTED
     return list(zip(pmax.tolist(), rmin.tolist(), strict=True))
+
+
+def _weakest_rows(
+    batch: Callable, target: int, x: int, rows: np.ndarray, alpha: float | None
+) -> tuple[float, float]:
+    """:func:`_weakest` of the one candidate ``x`` over the sets in the rows, at least one, of the
+    ``(N, m)`` int array ``rows``, by one call of ``batch``, the test's ``statistic_pvalues``."""
+    n = len(rows)
+    r, p = batch(np.full(n, target, dtype=np.intp), np.full(n, x, dtype=np.intp), rows)
+    p = np.asarray(p, dtype=np.float64)
+    pmax = float(np.fmax(-np.inf, np.fmax.reduce(p)))
+    rmin = float(np.fmin(np.inf, np.fmin.reduce(np.abs(np.asarray(r)))))
+    if math.isinf(pmax):
+        pmax = NOT_TESTED
+    if alpha is not None and not_tested(p).any() and not pmax > alpha:
+        pmax = NOT_TESTED
+    return pmax, rmin
 
 
 def _weaker(p: float, skipped: bool, alpha: float) -> float:
@@ -687,19 +716,27 @@ def prune_spouses(
 
 
 def _side_sets(sides: list[list[int]]) -> list[tuple[list[int], set[int] | None]]:
-    """The sides of :func:`_collider_sets` as :func:`~andrey.constraint._skeleton.kept_apart`
+    """The sides of :func:`_collider_rows` as :func:`~andrey.constraint._skeleton.kept_apart`
     reads them: each later side skips the subsets the first side holds."""
     return [(side, None if n == 0 else set(sides[0])) for n, side in enumerate(sides)]
 
 
-def _collider_sets(sides: list[list[int]], size: int, middle: int) -> Iterator[tuple[int, ...]]:
-    """The conditioning sets of a collider test, each once: ``middle`` with every size-``size``
-    subset of ``sides[0]``, then of the other side, less the subsets the first side holds."""
-    first = set(sides[0])
-    for n, side in enumerate(sides):
-        for rest in combinations(side, size):
-            if n == 0 or not first.issuperset(rest):
-                yield tuple(sorted((*rest, middle)))
+def _collider_rows(
+    kept: list[tuple[list[int], set[int] | None]], size: int, middle: int, first: int
+) -> Iterator[np.ndarray]:
+    """The conditioning sets of a collider test, each once, as the sorted rows of ``(N, size + 1)``
+    int arrays: ``middle`` with every size-``size`` subset of the first side of ``kept``, then of
+    each other side, in the order of :func:`itertools.combinations`, less the subsets the side's
+    skip set holds (:func:`_side_sets`, :func:`~andrey.constraint._skeleton.subset_rows`). The
+    arrays hold ``first`` rows, then twice as many each time, at most ``CHUNK``, and the last one
+    fewer."""
+    subsets = chain.from_iterable(subset_rows(side, size, skip) for side, skip in kept)
+    for rest in _runs([subsets], first, CHUNK):
+        rows = np.empty((len(rest), size + 1), dtype=np.intp)
+        rows[:, :size] = rest
+        rows[:, size] = middle
+        rows.sort(axis=1)
+        yield rows
 
 
 def blanket_colliders(
@@ -755,14 +792,16 @@ def blanket_colliders(
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
                 kept, left = kept_apart(test, (a, c, b), _side_sets(sides), size)
-                conds = iter(()) if kept is None else _collider_sets([s for s, _ in kept], size, b)
-                width = CHUNK if every else min(_FIRST_CHUNK, CHUNK)
-                while (every or p <= alpha) and (chunk := list(islice(conds, width))):
+                chunks = (
+                    iter(())
+                    if kept is None
+                    else _collider_rows(kept, size, b, CHUNK if every else min(_FIRST_CHUNK, CHUNK))
+                )
+                while (every or p <= alpha) and (chunk := next(chunks, None)) is not None:
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk, alpha=alpha)
                     skipped = bool(not_tested([p, p_chunk]).any())
                     p = _weaker(float(np.fmax(p, p_chunk)), skipped, alpha)
                     strength = float(np.fmin(strength, strength_chunk))
-                    width = min(2 * width, CHUNK)
                 if left:  # a set left out keeps no rows: not tested
                     p = _weaker(p, True, alpha)
                 if p > alpha:
@@ -934,6 +973,10 @@ class LocalSearch:
         self.n = n
         self._runs: dict[tuple[str, int], tuple[list[int], RunSepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
+        # Each run's row counts, kept once :meth:`counted` has been called, and the runs the answer
+        # it is running has read, in the order it first read them.
+        self._run_rows: dict[tuple[str, int], RowCounts] | None = None
+        self._read: dict[tuple[str, int], None] | None = None
 
     def pinned(self) -> AbstractContextManager:
         """BLAS limited to one thread when the test needs it (:func:`~andrey.core.ci.pins_blas`),
@@ -957,11 +1000,45 @@ class LocalSearch:
             sepsets: RunSepsets = (
                 MaskedMapping(np.zeros(self.d, dtype=bool)) if search is _mmpc else {}
             )
-            members = search(self, target, sepsets)
+            if self._run_rows is None:
+                members = search(self, target, sepsets)
+            else:
+                with rows_tested() as rows:
+                    members = search(self, target, sepsets)
+                self._run_rows[key] = rows
             if isinstance(sepsets, MaskedMapping):
                 sepsets = sepsets.compact()
             self._runs[key] = (members, sepsets)
+        if self._read is not None:
+            self._read.setdefault(key)
         return self._runs[key]
+
+    def counted(self, answer: Callable[[], _T]) -> tuple[_T, RowCounts]:
+        """``answer()`` and the rows its tests read (:func:`~andrey.core.ci_missing.rows_tested`).
+
+        Each run counts its own rows and keeps them with the run. The counter returned merges those
+        of the runs ``answer`` read, each once, in the order it first read them, and then the
+        tests ``answer`` made outside any run, as a new search that runs only ``answer`` counts
+        them. A search counts every run it makes after its first call, so a search that made a run
+        before it, which has no counter, raises ``ValueError``.
+        """
+        if self._run_rows is None:
+            if self._runs:
+                raise ValueError(
+                    "counted needs a search that has made no run before its first call"
+                )
+            self._run_rows = {}
+        self._read = {}
+        try:
+            with rows_tested() as own:
+                found = answer()
+            rows = RowCounts()
+            for key in self._read:
+                rows.merge(self._run_rows[key])
+            rows.merge(own)
+        finally:
+            self._read = None
+        return found, rows
 
     def parents_children(self, method: str, target: int) -> list[int]:
         """``target``'s parents and children by the ``"pc"`` learner ``method``: the members of its
