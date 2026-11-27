@@ -87,13 +87,18 @@ def _exists(name: str) -> bool:
 
 
 def _mapped_file(address: int) -> str | None:
-    """The file this process maps at ``address`` (``/proc/self/maps``), or ``None``."""
-    with open("/proc/self/maps") as fh:
-        for line in fh:
-            span, *rest = line.split()
-            low, high = (int(v, 16) for v in span.split("-"))
-            if low <= address < high:
-                return rest[4] if len(rest) > 4 else None
+    """The file this process maps at ``address`` (``/proc/self/maps``), or ``None``, also where
+    there is no ``/proc``."""
+    try:
+        with open("/proc/self/maps") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return None
+    for line in lines:
+        span, *rest = line.split()
+        low, high = (int(v, 16) for v in span.split("-"))
+        if low <= address < high:
+            return rest[4] if len(rest) > 4 else None
     return None
 
 
@@ -330,10 +335,11 @@ def test_no_segment_outlives_a_task_error(segments):
 
 @needs_shared
 def test_a_ges_pool_start_pickles_no_matrix_in_the_caller():
-    """The caller's Python allocations while the workers start stay below one matrix; each start
-    pickled one copy, and the run token another."""
-    cov = BICScore(_data(n=500, d=400)).cov
-    lazy = pg._LazyWorkerSet(BICScore.from_cov(cov, 500), 400, 3, list(range(400)))
+    """The caller's Python allocations while the workers start stay below half a matrix; each start
+    pickled one copy, and the run token another. At 1,000 columns the bound is several times the
+    start's own allocations, which do not grow with the matrix."""
+    cov = BICScore(_data(n=500, d=1000)).cov
+    lazy = pg._LazyWorkerSet(BICScore.from_cov(cov, 500), 1000, 3, list(range(1000)))
     tracemalloc.start()
     try:
         base = tracemalloc.get_traced_memory()[0]
@@ -347,7 +353,7 @@ def test_a_ges_pool_start_pickles_no_matrix_in_the_caller():
 
 @needs_shared
 def test_a_skeleton_pool_start_pickles_no_matrix_in_the_caller():
-    test = make_indep_test("fisherz", _data(n=500, d=400))
+    test = make_indep_test("fisherz", _data(n=500, d=1000))
     corr, _ = test.to_seed()
     pool = sk.SkeletonWorkerPool(test, 3)
     tracemalloc.start()
