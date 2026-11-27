@@ -62,7 +62,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 
-from andrey.core import backend
+from andrey.core import _checkpoint, backend
 from andrey.core.orient import pdag2dag
 from andrey.core.score import copy_groups
 from andrey.core.structure import ARROW, TAIL
@@ -371,6 +371,8 @@ def structural_em(
         marks = found
         adjacency = _dag_adjacency(graph)[np.ix_(order, order)]
         precision = _precision(*fit_dag(adjacency, cov))
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("em.round", k, mean=mean, cov=cov, marks=marks, precision=precision)
     with backend.one_blas_thread():
         loglik.append(expected_moments(plan, mean, precision)[2])
     if changed[-1]:

@@ -57,7 +57,7 @@ from andrey.constraint._skeleton import (
     scan_conditioning_sets,
     subset_rows,
 )
-from andrey.core import ARROW, NULL, TAIL, backend
+from andrey.core import ARROW, NULL, TAIL, _checkpoint, backend
 from andrey.core.ci import CITest, PartialCorrelationTest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
@@ -285,6 +285,8 @@ def markov_blanket(
         blanket.extend(sorted(stay, key=lambda x: ranks[x]))
         if interleaved and stay:
             _shrink(test, target, alpha, blanket, required, sepsets)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.grow", target=target, members=blanket)
     if not interleaved:
         _shrink(test, target, alpha, blanket, required, sepsets)
     if sepsets is not None:
@@ -296,6 +298,8 @@ def markov_blanket(
         blanket = [x for x in blanket if support[x]]
     if undecided:
         _count_beside_undecided(test, target, blanket, required, max_depth, undecided)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.shrink", target=target, members=blanket, sepsets=sepsets)
     return blanket
 
 
@@ -608,6 +612,8 @@ def parents_children(
         del open_[best]
         admit(best, open_)
         weakest = open_
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.grow", target=target, members=members)
     for x in list(members):
         if x in required:
             continue
@@ -623,6 +629,8 @@ def parents_children(
                 break
     if undecided:
         _count_beside_undecided(test, target, members, required, max_depth, undecided)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.shrink", target=target, members=members, sepsets=sepsets)
     return members
 
 
@@ -1162,6 +1170,8 @@ class LocalSearch:
             mb = self._sets(lambda i: self.local(method, i)[1] or [])
             blankets = mb & mb.T
             skeleton = blankets if structure == "moral" else sets & sets.T
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("blanket.structure", sets=sets, skeleton=skeleton)
         if structure != "cpdag":
             return np.where(skeleton, TAIL, NULL).astype(np.int8)
         return blanket_cpdag(

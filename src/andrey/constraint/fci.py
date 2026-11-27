@@ -34,7 +34,7 @@ from andrey.constraint.pc import (
     knowledge_cycle,
     knowledge_masks,
 )
-from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, backend
+from andrey.core import ARROW, CIRCLE, NULL, TAIL, GraphStructure, _checkpoint, backend
 from andrey.core._bitset import row_masks, semidirected_reach_set
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
@@ -412,6 +412,8 @@ def orient_colliders(
                     continue
                 marks[b, a] = ARROW
                 marks[b, c] = ARROW
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("fci.colliders", marks=marks)
 
 
 # ---- possible-d-separation refinement -----------------------------------------------------------
@@ -802,6 +804,8 @@ def possible_dsep_step(
     knowledge_marks(marks, constraints)
     if constraints is not None:
         check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("fci.possible_dsep", marks=marks, sepsets=sepsets)
     return marks
 
 
@@ -1017,7 +1021,10 @@ def fci_orient(
             _rule_r8(marks, False, out=implied)
             _rule_r9(marks, False, ambiguous, out=implied)
             _rule_r10(marks, False, ambiguous, out=implied)
-            if not implied.apply(marks):
+            changed = implied.apply(marks)
+            if (take := _checkpoint.TAKE.get()) is not None:
+                take("fci.rules", marks=marks, implied=implied)
+            if not changed:
                 return
     change = True
     while change:

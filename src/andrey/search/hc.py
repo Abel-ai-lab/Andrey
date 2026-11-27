@@ -15,7 +15,7 @@ from operator import ne
 
 import numpy as np
 
-from andrey.core import GraphStructure, backend
+from andrey.core import GraphStructure, _checkpoint, backend
 from andrey.core._bitset import nodes
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import dag2cpdag, orient_out_of, to_structure
@@ -492,6 +492,8 @@ def perturb(
             if _reaches(rest, u, v):
                 continue
         apply_move(adj_int, parents_of, (op, u, v))
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("hc.perturb", move=(op, u, v), parents=adj_int)
         made += 1
         if op == "add":
             edge[i, j] = True
@@ -527,6 +529,8 @@ def _climb(
         if best is None:
             break
         apply_move(adj_int, parents_of, best[4])
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("hc.climb", best=best, parents=adj_int)
         moves += 1
     return moves
 

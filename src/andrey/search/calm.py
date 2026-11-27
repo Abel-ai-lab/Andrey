@@ -25,7 +25,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from andrey.constraint.blanket import blanket_graph
-from andrey.core import GraphStructure
+from andrey.core import GraphStructure, _checkpoint
 from andrey.core.ci import FisherZ
 from andrey.core.knowledge import Constraints
 from andrey.core.orient import to_structure
@@ -160,7 +160,7 @@ def _optimize_gated_dag(
             return float(acyclicity(gate(sample=False)))
 
     rho, h_val = rho_init, hard_h()
-    for _outer in range(max_outer):
+    for outer in range(max_outer):
         opt = torch.optim.Adam([weight, logit], lr=lr)
         prev = float("inf")
         for step in range(subproblem_iter):
@@ -180,6 +180,15 @@ def _optimize_gated_dag(
                 break
             prev = cur
         h_val = hard_h()
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take(
+                "calm.outer",
+                outer,
+                rho=rho,
+                h=h_val,
+                weight=weight.detach().cpu().numpy(),
+                logit=logit.detach().cpu().numpy(),
+            )
         if h_val <= h_tol or rho >= rho_max:
             break
         rho *= rho_mult

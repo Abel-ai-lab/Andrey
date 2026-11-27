@@ -32,7 +32,7 @@ from andrey.constraint._skeleton import (
     vote_triples,
 )
 from andrey.constraint.mvpc import IndicatorTest, PermutationCorrection, candidate_edges
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, _checkpoint, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     counts_its_tests,
@@ -179,6 +179,8 @@ def pc(
     )
     if _trace is None:
         cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("pc.meek", cpdag=cpdag)
         return to_structure(undirect_conflicts(cpdag), kind="cpdag")
     firings: list[dict] = []
     cpdag = meek(
@@ -434,6 +436,8 @@ def orient_colliders(
                         after=pdag.copy(),
                     )
                 )
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("pc.colliders", pdag=pdag)
     return pdag
 
 
@@ -643,6 +647,8 @@ def adjacency_search(
                 sepsets[(x, y)] = separating
                 if p is not None:
                     pvalues[(x, y)] = p
+            if (take := _checkpoint.TAKE.get()) is not None:
+                take("skeleton.size", size, adjacency=support, sepsets=sepsets, pvalues=pvalues)
             size += 1
 
     if undecided is not None:
@@ -663,4 +669,12 @@ def adjacency_search(
             sepsets[(x, y)] = separating
             if p is not None:
                 pvalues[(x, y)] = p
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take(
+            "skeleton.end",
+            adjacency=support,
+            sepsets=sepsets,
+            pvalues=pvalues,
+            undecided=undecided,
+        )
     return np.where(support, np.int8(TAIL), np.int8(NULL)), sepsets, pvalues

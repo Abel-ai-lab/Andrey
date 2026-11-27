@@ -21,7 +21,7 @@ import numpy as np
 import scipy.linalg
 import scipy.optimize
 
-from andrey.core import GraphStructure
+from andrey.core import GraphStructure, _checkpoint
 from andrey.core.orient import to_structure
 from andrey.core.structure import endpoint_marks, has_cycle
 from andrey.core.ties import tie_ranks
@@ -382,6 +382,15 @@ def augmented_lagrangian(
                 objective, w_est, args=(rho, alpha), method="L-BFGS-B", jac=True, bounds=bounds
             )
             w_new = solution.x
+            if (take := _checkpoint.TAKE.get()) is not None:
+                take(
+                    "notears.solve",
+                    rho=rho,
+                    alpha=alpha,
+                    w=w_new,
+                    nit=solution.nit,
+                    fun=solution.fun,
+                )
             h_new, _ = trace_exponential(split_to_weights(w_new)[:d])
             if h_new > 0.25 * h:
                 rho *= 10.0
@@ -389,6 +398,8 @@ def augmented_lagrangian(
                 break
         w_est, h = w_new, h_new
         alpha += rho * h
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("notears.dual", weights=w_est, rho=rho, alpha=alpha, h=h)
         if h <= h_tol or rho >= rho_max:
             break
     else:
@@ -475,6 +486,8 @@ def adam_augmented_lagrangian(
                 break
         w_est, h = w_new, h_new
         alpha += rho * h
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("notears.dual", weights=w_est, rho=rho, alpha=alpha, h=h)
         if h <= h_tol or rho >= rho_max:
             break
     else:
@@ -591,6 +604,8 @@ def central_path(
                 rate *= 0.5
                 schedule[t] += 0.1
         weights, mu = candidate, mu * 0.1
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("dagma.stage", t, weights=weights, mu=mu, s=schedule[t], rate=rate)
     if capped:
         warn_search_limit("dagma", "max_iter", max_iter, "Adam steps of the last stage")
     return weights
@@ -643,6 +658,8 @@ def likelihood_path(
             break
         best, best_value, steps = candidate, value, steps + 1
         lam, delta = lam * decay, delta * decay
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("path.step", steps, weights=best, value=best_value, lam=lam, delta=delta)
     if steps == max_steps:
         warn_search_limit(method, "max_path", max_steps, "path steps")
     return best, steps

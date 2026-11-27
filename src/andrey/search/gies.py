@@ -40,7 +40,7 @@ from typing import Protocol
 import numpy as np
 import numpy.typing as npt
 
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend, score_delta, stats
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, _checkpoint, backend, score_delta, stats
 from andrey.core.knowledge import Constraints, mpdag, orient, violates
 from andrey.core.orient import pdag2dag, to_structure
 from andrey.core.score import (
@@ -853,6 +853,14 @@ class GIESSearch:
                 if self.debug:
                     self.log_tie(move, adj, cut)
                 self.apply(adj)
+                if (take := _checkpoint.TAKE.get()) is not None:
+                    take(
+                        "gies.step",
+                        phase=move,
+                        move=found,
+                        cpdag=self.adj,
+                        total=self.objective.total,
+                    )
                 return True
             excluded.add((found[0], found[1], frozenset(found[2])))
         return False

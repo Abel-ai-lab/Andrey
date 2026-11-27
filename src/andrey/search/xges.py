@@ -37,7 +37,7 @@ from itertools import chain, count
 
 import numpy as np
 
-from andrey.core import ARROW, TAIL, GraphStructure, backend
+from andrey.core import ARROW, TAIL, GraphStructure, _checkpoint, backend
 from andrey.core.knowledge import Constraints, admits, mpdag
 from andrey.core.orient import cpdag_of_pdag, to_structure
 from andrey.core.score import BICScore, LocalScore, make_score
@@ -1007,6 +1007,8 @@ class XGESSearch:
             visits.setdefault(fingerprint, []).append(len(moves))
             self.fingerprint = fingerprint
             self.update(log)
+            if (take := _checkpoint.TAKE.get()) is not None:
+                take("xges.move", changes=log, graph_key=self.fingerprint)
 
     def extend(self, n_samples: int) -> float:
         """Force each Delete of the converged graph, rerun the base search, keep a lower score, and
@@ -1052,6 +1054,8 @@ class XGESSearch:
                 trial.g.forbidden.add((x, y))
                 trial.fingerprint = log.rekey(trial.fingerprint)
                 trial.update(log)
+                if (take := _checkpoint.TAKE.get()) is not None:
+                    take("xges.branch", changes=log, graph_key=trial.fingerprint)
                 trial.base_search()
                 g, h = self.g, trial.g
                 # A node the branch never changed keeps its parents and neighbors.
@@ -1067,6 +1071,8 @@ class XGESSearch:
                     snapshot = None
                     local, total = trial_local, trial_total
                     fresh = False
+                    if (take := _checkpoint.TAKE.get()) is not None:
+                        take("xges.accept", total=total)
             return total
 
 
