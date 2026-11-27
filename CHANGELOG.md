@@ -237,6 +237,9 @@ names its pull request.
   without the absolute value of the whole stack, so the collider test of `iamb`, `inter_iamb`, and
   `mmpc` with `structure="cpdag"` runs faster, with the same output bit for bit and the same
   queries. ([#1352])
+- `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
+  as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
+  longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
 
 ### Fixed
 
@@ -3232,5 +3235,6 @@ First alpha release.
 [#1336]: https://github.com/Abel-ai-lab/Andrey/pull/1336
 [#1339]: https://github.com/Abel-ai-lab/Andrey/pull/1339
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
+[#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
