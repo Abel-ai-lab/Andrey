@@ -542,9 +542,10 @@ def adjacency_search(
     passes take them (all-pairs marginal threshold, then one first-order batch per surviving pair)
     in place of the dense scalar scan -- same removals, same separating sets, same p-values. The
     pairs the size-0 pass then removes are held as one boolean matrix, and their p-values as the
-    marginal p-value matrix (:class:`~andrey.constraint._skeleton.MaskedMapping`), in place of a
-    dict entry per pair; the returns are mappings that read as the dicts the search fills. With
-    ``workers > 1`` and a FisherZ or StudentT test, an ``|S| >= 2`` pass of at least
+    marginal p-value matrix (:class:`~andrey.constraint._skeleton.MaskedMapping`), where that
+    takes fewer bytes than a dict entry per pair, as when most pairs are marginally independent;
+    the returns read as the dicts the search fills either way. With ``workers > 1`` and a FisherZ
+    or StudentT test, an ``|S| >= 2`` pass of at least
     :data:`~andrey.constraint._parallel_skeleton.MIN_POOL_QUERIES` tests, or the
     ``ANDREY_SKELETON_PARALLEL_MIN_WORK`` that overrides it, fans out across worker processes; the
     per-chunk removals are concatenated in pair order, so the result, a raised error included, is
@@ -596,9 +597,10 @@ def adjacency_search(
                 separated, pmat = marginal_removals(test, np.triu(testable, 1), alpha, trace)
                 support &= ~(separated | separated.T)
                 separated.flags.writeable = False
-                sepsets = MaskedMapping(separated)
+                sepsets = MaskedMapping(separated).compact()
                 if record_pvalues:
-                    pvalues = MaskedMapping(separated, pmat)
+                    pvalues = MaskedMapping(separated, pmat).compact()
+                del separated, pmat  # the mappings keep what they hold
                 removals = []
             elif can_prescreen and size == 1:
                 removals = first_order_removals(

@@ -4,8 +4,10 @@ The size-0 pass of the adjacency search and MMPC's forward phase hold the pairs 
 the empty set separates as one boolean mask, and the p-values of those pairs as the marginal
 p-value matrix. The mapping must read as the dict the search would fill entry by entry: the same
 entries, in the same order, under every lookup and change the searches and their callers make.
-The memory checks bound what the searches keep by a few bytes per pair, where a dict entry per
-pair takes about a hundred.
+Where the empty set separates few pairs, a dict entry for each takes fewer bytes than the mask,
+and the searches keep the dict. The memory checks bound what the searches keep by a few bytes per
+pair, where a dict entry per pair takes about a hundred, and, where few pairs are separated, by
+the skeleton alone.
 """
 
 from __future__ import annotations
@@ -117,29 +119,68 @@ def test_int_mapping_marks_an_empty_mapping() -> None:
         mapping.mark([3])
 
 
+def _hub(rng: np.random.Generator, n: int, d: int, driven: int) -> np.ndarray:
+    """Columns ``1..driven`` driven by column 0, so every pair of them is marginally dependent;
+    the other columns are independent noise."""
+    x = rng.standard_normal((n, d))
+    x[:, 1 : driven + 1] += x[:, [0]] * rng.uniform(1.0, 2.0, driven)
+    return x
+
+
+# Data, the largest conditioning size, then the type of the separating sets and of the recorded
+# p-values: most pairs separated by the empty set (the mask and the p-value matrix), a few (the
+# mask, and a dict of p-values, which the matrix's 8 bytes per pair outweigh), and none (dicts).
+# A hub's remaining edges share every neighbor, so larger sizes test every subset of them.
+_SEPARATIONS = {
+    "most": (lambda rng: _hub(rng, 300, 14, 3), None, MaskedMapping, MaskedMapping),
+    "few": (lambda rng: _hub(rng, 300, 30, 28), 1, MaskedMapping, dict),
+    "none": (lambda rng: _hub(rng, 300, 14, 13), 1, dict, dict),
+}
+
+
+@pytest.mark.parametrize("separated", list(_SEPARATIONS))
 @pytest.mark.parametrize("indep_test", ["fisherz", "chisq"])
 @pytest.mark.parametrize("record_pvalues", [True, False])
 def test_search_returns_read_as_the_dicts_of_the_generic_scan(
-    indep_test: str, record_pvalues: bool
+    separated: str, indep_test: str, record_pvalues: bool
 ) -> None:
     # The generic scan, which a test without the vectorized size-0 pass takes, fills plain dicts
-    # pair by pair: the mask's returns hold the same entries in the same order.
-    rng = np.random.default_rng(3)
-    x = rng.standard_normal((300, 14))
-    x[:, 1:4] += x[:, [0]]
+    # pair by pair: the returns hold the same entries in the same order, whichever way they are
+    # held.
+    data, max_depth, sepsets_type, pvalues_type = _SEPARATIONS[separated]
+    x = data(np.random.default_rng(3))
     if indep_test == "chisq":
         x = np.digitize(x, [-0.5, 0.5]).astype(float)
+    d = x.shape[1]
     test = make_indep_test(indep_test, x)
-    fast = adjacency_search(test, 14, 0.05, record_pvalues=record_pvalues)
+    fast = adjacency_search(test, d, 0.05, max_depth=max_depth, record_pvalues=record_pvalues)
     with pytest.MonkeyPatch.context() as patch:
         pc_module = importlib.import_module("andrey.constraint.pc")
         patch.setattr(pc_module, "prescreen_capable", lambda test: False)
-        generic = adjacency_search(test, 14, 0.05, record_pvalues=record_pvalues)
-    assert isinstance(fast[1], MaskedMapping)
+        generic = adjacency_search(
+            test, d, 0.05, max_depth=max_depth, record_pvalues=record_pvalues
+        )
+    assert type(fast[1]) is sepsets_type
+    assert type(fast[2]) is (pvalues_type if record_pvalues else dict)
     assert np.array_equal(fast[0], generic[0])
     assert list(fast[1].items()) == list(generic[1].items())
     assert list(fast[2].items()) == list(generic[2].items())
     assert bool(fast[2]) == record_pvalues
+
+
+@pytest.mark.parametrize("with_values", [False, True])
+def test_compact_keeps_the_mask_only_where_it_is_smaller(with_values: bool) -> None:
+    d = 200
+    values = np.random.default_rng(6).random((d, d)) if with_values else None
+    few = np.zeros((d, d), dtype=bool)
+    few[0, 1:4] = True
+    every = np.triu(np.ones((d, d), dtype=bool), 1)
+    for mask, held in ((few, dict), (every, MaskedMapping)):
+        mapping = MaskedMapping(mask, values)
+        mapping[(5, 1)] = (2,)
+        compact = mapping.compact()
+        assert type(compact) is held
+        assert list(compact.items()) == list(mapping.items())
 
 
 def _kept_bytes(build) -> int:
@@ -163,6 +204,26 @@ def test_adjacency_search_keeps_a_few_bytes_per_pair() -> None:
     test = make_indep_test("fisherz", x)
     kept = _kept_bytes(lambda: adjacency_search(test, d, 0.05, max_depth=0, record_pvalues=True))
     assert kept < 16 * d * d, f"{kept / 2**20:.1f} MiB kept at d={d}"
+
+
+def test_adjacency_search_keeps_the_skeleton_where_few_pairs_are_separated() -> None:
+    # Column 0 drives every other column: no pair is marginally independent, so the returns hold
+    # the skeleton, d^2 bytes, and dicts with no entry, not the mask and the p-value matrix.
+    d = 400
+    x = _hub(np.random.default_rng(7), 200, d, d - 1)
+    test = make_indep_test("fisherz", x)
+    kept = _kept_bytes(lambda: adjacency_search(test, d, 0.05, max_depth=0, record_pvalues=True))
+    assert kept < 2 * d * d, f"{kept / 2**20:.2f} MiB kept at d={d}"
+
+
+@pytest.mark.parametrize(("driven", "held"), [(0, MaskedMapping), (59, dict)])
+def test_mmpc_runs_keep_the_mask_only_where_it_is_smaller(driven: int, held: type) -> None:
+    # Independent columns: each run's forward phase separates nearly every candidate, held as a
+    # mask. A hub that drives every other column: no candidate, and each run keeps a dict.
+    d = 60
+    x = _hub(np.random.default_rng(8), 200, d, driven)
+    search = local_search(x, alpha=0.05, indep_test="fisherz", max_depth=0)
+    assert {type(search.run("mmpc", t)[1]) for t in range(d)} == {held}
 
 
 def test_mmpc_runs_keep_a_few_bytes_per_candidate() -> None:

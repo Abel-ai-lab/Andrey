@@ -422,8 +422,12 @@ class MaskedMapping(MutableMapping):
     value, and a deleted key is gone. Iteration, ``len``, ``==`` with a dict, ``[]``, ``get``, and
     ``in`` agree with that dict. A reversed or negative pair, a key outside the mask, and a key that
     is neither an integer nor a pair of integers (read with :func:`operator.index`) are marked by
-    no bit. :meth:`copy` returns that dict. A read-only ``mask`` is copied before a deletion or
-    :meth:`mark` writes it, so two mappings may share one.
+    no bit. :meth:`copy` returns that dict, and :meth:`compact` returns it in place of the mapping
+    where a dict entry for each marked key takes fewer bytes than the mask and ``values``. Two
+    operations differ from the dict's: :func:`copy.copy` returns a mapping that shares the mask
+    and the dict on top with the original, and ``popitem`` removes the first entry, not the last.
+    A read-only ``mask`` is copied before a deletion or :meth:`mark` writes it, so two mappings may
+    share one.
     """
 
     def __init__(self, mask: np.ndarray, values: np.ndarray | None = None) -> None:
@@ -523,11 +527,22 @@ class MaskedMapping(MutableMapping):
         out.update(self._overlay)
         return out
 
+    def compact(self) -> MaskedMapping | dict[Any, Any]:
+        """This mapping, or, when a dict entry for each marked key takes fewer bytes than the mask
+        and ``values`` together, the dict it reads as (:meth:`copy`)."""
+        held = self._mask.nbytes + (0 if self._values is None else self._values.nbytes)
+        return self if self._marked * _ENTRY_BYTES[self._mask.ndim] >= held else self.copy()
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.copy()!r})"
 
 
 _ABSENT = object()
+#: A floor on the bytes one dict entry takes, its key included, by the number of axes of the mask
+#: that marks it: an integer key, whose integer the search already holds, takes about 26 to 54
+#: bytes, and a pair key about 87 to 165 once the dict holds a few thousand entries (CPython 3.11
+#: and 3.14).
+_ENTRY_BYTES = {1: 24, 2: 80}
 
 
 def first_order_removals(

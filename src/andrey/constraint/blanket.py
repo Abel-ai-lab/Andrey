@@ -80,9 +80,9 @@ _FIRST_CHUNK = 32
 _Dependence = Callable[[int, int, Sequence[int]], tuple[float, float]]
 #: A separating set for each candidate a learner dropped, ascending, keyed by the candidate.
 Sepsets = dict[int, tuple[int, ...]]
-#: The :data:`Sepsets` one run of a learner records: a dict, or, for MMPC, a
-#: :class:`~andrey.constraint._skeleton.MaskedMapping` that holds the candidates the empty set
-#: separates as a mask and reads as the dict.
+#: The :data:`Sepsets` one run of a learner records: a dict, or, for an MMPC run where that takes
+#: fewer bytes, a :class:`~andrey.constraint._skeleton.MaskedMapping` that holds the candidates the
+#: empty set separates as a mask and reads as the dict.
 RunSepsets = Sepsets | MaskedMapping
 
 
@@ -937,11 +937,15 @@ class LocalSearch:
             search = LEARNERS[method].search
             if search is None:
                 raise ValueError(f"{method!r} has no search of its own; ask LocalSearch.local")
-            # MMPC marks the candidates the empty set separates in a mask of d bytes.
+            # MMPC marks the candidates the empty set separates in a mask of d bytes, kept where a
+            # dict entry for each takes more.
             sepsets: RunSepsets = (
                 MaskedMapping(np.zeros(self.d, dtype=bool)) if search is _mmpc else {}
             )
-            self._runs[key] = (search(self, target, sepsets), sepsets)
+            members = search(self, target, sepsets)
+            if isinstance(sepsets, MaskedMapping):
+                sepsets = sepsets.compact()
+            self._runs[key] = (members, sepsets)
         return self._runs[key]
 
     def parents_children(self, method: str, target: int) -> list[int]:
