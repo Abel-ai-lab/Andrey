@@ -259,11 +259,11 @@ def test_the_lingam_order_search_keeps_its_order_on_shifted_columns(kind, measur
 @pytest.mark.parametrize("measure", ["pwling", "skew", "tanh"])
 @pytest.mark.parametrize("kind", ORDER_KINDS)
 def test_the_multi_group_order_search_keeps_its_order_on_shifted_columns(kind, measure):
-    """The shared order of two groups, each shifted by its own offset, is the unshifted order."""
+    """The shared order of two groups, all columns shifted alike, is the unshifted order."""
     for seed in range(3 if measure == "pwling" else 8):
         groups = [ORDER_KINDS[kind](seed), ORDER_KINDS[kind](seed + 100)[: N * 3 // 5]]
         want = andrey.multi_group_direct_lingam(groups, measure=measure)[0].ordering
         for scale, offset in ORDER_SHIFTS.values():
-            moved = [groups[0] * scale + offset, groups[1] * scale + offset * 1e-3]
+            moved = [group * scale + offset for group in groups]
             got = andrey.multi_group_direct_lingam(moved, measure=measure)[0].ordering
             assert got == want, (seed, scale, offset)

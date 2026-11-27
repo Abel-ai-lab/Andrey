@@ -395,12 +395,11 @@ def find_causal_order(
     ``"pwling"`` scores with :func:`pruned_scores`, which gives the pick of
     :func:`score_candidates` from fewer entropies.
 
-    The columns are centered once first, so a column's offset moves nothing but the last bits of the
-    values the search reads, and the order is the one of the column without it. Each pick is
-    residualized out of the rest. Only one column of each copy group
-    (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the order.
-    Ties and copy representatives are decided by :func:`~andrey.core.ties.tie_ranks` of the input
-    columns, which are identical on every machine and keep their ranks when the columns are
+    The columns are centered once first, so each step works with values of the columns' spread
+    whatever their offsets. Each pick is residualized out of the rest. Only one column of each copy
+    group (:func:`copy_groups`) is scored; when it is picked, its copies follow it directly in the
+    order. Ties and copy representatives are decided by :func:`~andrey.core.ties.tie_ranks` of the
+    input columns, which are identical on every machine and keep their ranks when the columns are
     reordered; residualized columns differ in the last bits across machines. Single-dataset;
     MultiGroupDirectLiNGAM runs its own group loop (per-group residualization), reusing
     :func:`copy_groups`, :func:`scorer`, and :func:`pick` directly. With ``precedence``

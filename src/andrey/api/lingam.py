@@ -194,7 +194,7 @@ def direct_lingam(
     by the sign of its skewness; it orients correctly when the noise is skewed, whatever the sign
     of the skewness, and says little when the noise is symmetric, where the skewness is near zero.
     All three center the columns once and standardize them at each step, so none depends on their
-    units or offsets.
+    units.
 
     **Ties.** Two candidates that are interchangeable in the sample, such as two binary columns
     with the same number of ones, have equal scores up to rounding, which differs between CPUs.
