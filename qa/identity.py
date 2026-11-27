@@ -31,10 +31,19 @@ metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near
 bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
 only by rounding is reported as information.
 
+``--checkpoints`` (with ``-o``) also records, for each draw's first fit, a digest of the
+algorithm's state at its stages (:class:`Checkpoints`), the stages the package passes to its
+private sink, ``andrey.core._checkpoint.TAKE``, which :func:`checkpointing` sets for the fit. The
+manifest row gains two fields, the pieces' bytes go to a sidecar file next to the manifest, and
+``--compare`` of two such manifests names, for each fit that differs, the first stage and piece
+where the builds part, and groups the differences by fingerprint (:func:`report_checkpoints`). The
+exit status is the one the output hashes and counts decide.
+
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
     uv run python -m qa.identity --shuffle 3                # exit 1 if an order changes a graph
     uv run python -m qa.identity GES GFCI --workers 4       # exit 1 if 4 workers change one
+    uv run python -m qa.identity PC -o a.json --checkpoints # a manifest and its sidecar
 """
 
 from __future__ import annotations
