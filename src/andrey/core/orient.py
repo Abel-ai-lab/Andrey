@@ -35,7 +35,7 @@ from itertools import combinations
 import numpy as np
 from scipy.sparse.csgraph import connected_components
 
-from ._bitset import nodes, row_masks
+from ._bitset import nodes, row_lists, row_masks
 from .structure import ARROW, NULL, TAIL, GraphStructure, Kind, topological_order
 
 __all__ = [
@@ -403,9 +403,9 @@ def pdag2dag(pdag: np.ndarray) -> np.ndarray:
     out[directed] = TAIL
     out.T[directed] = ARROW
 
-    children = [set(np.flatnonzero(row).tolist()) for row in directed]
-    undirected = [set(np.flatnonzero(row).tolist()) for row in (src == TAIL) & (src.T == TAIL)]
-    adjacent = [set(np.flatnonzero(row).tolist()) for row in src != NULL]
+    children = [set(row) for row in row_lists(directed)]
+    undirected = [set(row) for row in row_lists((src == TAIL) & (src.T == TAIL))]
+    adjacent = [set(row) for row in row_lists(src != NULL)]
     active = set(range(n))
 
     def removable(x: int) -> bool:

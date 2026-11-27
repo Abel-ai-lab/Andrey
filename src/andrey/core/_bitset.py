@@ -1,9 +1,10 @@
 """Node sets stored as Python integers, with traversal along semi-directed paths.
 
 A set bit ``v`` means that node ``v`` belongs to the set. :func:`row_masks` converts a boolean
-matrix to one such integer per row. :func:`semidirected_reach_set` follows the successors in
-these sets to find reachable nodes while excluding a specified set of blocked nodes. Python
-integers allow these sets to represent graphs with more than 64 nodes without losing bits.
+matrix to one such integer per row, and :func:`row_lists` to one ascending list of columns per row.
+:func:`semidirected_reach_set` follows the successors in these sets to find reachable nodes while
+excluding a specified set of blocked nodes. Python integers allow these sets to represent graphs
+with more than 64 nodes without losing bits.
 """
 
 from __future__ import annotations
@@ -36,6 +37,18 @@ def nodes(mask: int) -> list[int]:
         out.append(low.bit_length() - 1)
         mask ^= low
     return out
+
+
+def row_lists(mask: np.ndarray) -> list[list[int]]:
+    """The column indices of each row's ``True`` entries, ascending, one list per row.
+
+    Equal to ``[np.flatnonzero(row).tolist() for row in mask]`` for a 2-D boolean ``mask``, from
+    one ``np.nonzero`` and the row bounds of its sorted row indices.
+    """
+    rows, cols = np.nonzero(mask)
+    bounds = np.searchsorted(rows, np.arange(mask.shape[0] + 1)).tolist()
+    flat = cols.tolist()
+    return [flat[start:stop] for start, stop in zip(bounds, bounds[1:])]
 
 
 def row_masks(matrix: np.ndarray) -> list[int]:
