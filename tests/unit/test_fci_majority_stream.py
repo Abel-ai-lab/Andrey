@@ -1,4 +1,9 @@
-"""The majority vote tests its conditioning subsets in bounded chunks, with unchanged decisions."""
+"""The majority vote tests its conditioning subsets in bounded chunks, with unchanged decisions.
+
+A test with no canonical route votes pair by pair, ``_VOTE_CHUNK`` subsets to a call; a FisherZ,
+StudentT, NormalScores, or degenerate Gaussian test votes on stacks of canonical queries, whatever
+the cap on a stack and on a chunk.
+"""
 
 from __future__ import annotations
 
@@ -69,11 +74,24 @@ def test_chunked_decisions_equal_one_call(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("engine", ["fci", "gfci"])
-def test_public_majority_results_do_not_depend_on_the_chunk(engine, monkeypatch):
+def test_public_majority_results_do_not_depend_on_the_stack_or_the_chunk(engine, monkeypatch):
+    """The stacked vote gives the same graph at every cap on a stack and on a chunk, and with the
+    pair-by-pair vote."""
     dataset = data.sample_scm(d=12, n=600, density=3.0, seed=3, scale="raw")
     fit = getattr(andrey, engine)
     results = []
-    for chunk in (2, 10**9):
-        monkeypatch.setattr(_skeleton, "_VOTE_CHUNK", chunk)
+    for stack, chunk, route in (
+        (1, 2, True),
+        (4096, 5, True),
+        (None, None, True),
+        (None, None, False),
+    ):
+        if stack is not None:
+            monkeypatch.setattr(_skeleton, "_STACK_BYTES", stack)
+            monkeypatch.setattr(_skeleton, "CHUNK", chunk)
+        if not route:
+            monkeypatch.setattr(_skeleton, "_canonical_route", lambda test: None)
         results.append(fit(dataset.data, collider_rule="majority").structure.to_numpy())
-    np.testing.assert_array_equal(*results)
+        monkeypatch.undo()
+    for result in results[1:]:
+        np.testing.assert_array_equal(results[0], result)
