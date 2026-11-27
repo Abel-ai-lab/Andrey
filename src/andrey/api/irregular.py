@@ -240,10 +240,12 @@ def anm(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
     count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
-    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
-    which means that whether a value is missing depends on no value in the data; the rows a test
-    reads are then a random sample of all rows, and otherwise they are a selected sample that more
-    rows do not correct.
+    raises ``ValueError``. Which column is the effect is what the fit asks, so values missing at
+    random given the other column are not enough: a gap in one column that depends on the other
+    selects the rows on the effect when the other is the effect. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** On cause-effect pairs with a nonlinear additive-noise mechanism it named the
     true direction on nearly every pair with many rows, and less often with few rows. Each
@@ -401,10 +403,12 @@ def pnl(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
     count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
-    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
-    which means that whether a value is missing depends on no value in the data; the rows a test
-    reads are then a random sample of all rows, and otherwise they are a selected sample that more
-    rows do not correct.
+    raises ``ValueError``. Which column is the effect is what the fit asks, so values missing at
+    random given the other column are not enough: a gap in one column that depends on the other
+    selects the rows on the effect when the other is the effect. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** On post-nonlinear cause-effect pairs with Laplace noise it named the true
     direction on every pair with many rows, and less often with few rows. Each HSIC test builds
@@ -557,10 +561,12 @@ def loci(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
     count as both ``min`` and ``median``. Fewer than 2 such rows, or a column constant on them,
-    raises ``ValueError``. Test-wise deletion is valid when values are missing completely at random,
-    which means that whether a value is missing depends on no value in the data; the rows a test
-    reads are then a random sample of all rows, and otherwise they are a selected sample that more
-    rows do not correct.
+    raises ``ValueError``. Which column is the effect is what the fit asks, so values missing at
+    random given the other column are not enough: a gap in one column that depends on the other
+    selects the rows on the effect when the other is the effect. Test-wise deletion is valid when
+    values are missing completely at random, which means that whether a value is missing depends on
+    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
+    they are a selected sample that more rows do not correct.
 
     **Limitations.** Under ``criterion="independence"`` it named the true direction on most
     location-scale and additive-noise pairs, those of [5]_ included, but its time and memory grow
@@ -992,10 +998,13 @@ def skewd(
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both fits use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
     count as both ``min`` and ``median``. Fewer than 8 such rows (one for each cross-validation
-    fold), or a column constant on them, raises ``ValueError``. Test-wise deletion is valid when
-    values are missing completely at random, which means that whether a value is missing depends on
-    no value in the data; the rows a test reads are then a random sample of all rows, and otherwise
-    they are a selected sample that more rows do not correct.
+    fold), or a column constant on them, raises ``ValueError``. Which column is the effect is what
+    the fit asks, so values missing at random given the other column are not enough: a gap in one
+    column that depends on the other selects the rows on the effect when the other is the effect.
+    Test-wise deletion is valid when values are missing completely at random, which means that
+    whether a value is missing depends on no value in the data; the rows a test reads are then a
+    random sample of all rows, and otherwise they are a selected sample that more rows do not
+    correct.
 
     **Limitations.** It was ahead of :func:`~andrey.loci`, its model with Gaussian noise, only on
     the most skewed location-scale pairs; on most other pair sets LOCI was as accurate, in a

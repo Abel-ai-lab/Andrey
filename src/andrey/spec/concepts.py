@@ -1281,10 +1281,11 @@ _CONCEPTS = (
             *EM_METHODS,
         ),
         exempt=(
-            *_exempt(
-                "Its score phase reads every column.",
-                *("gfci", "boss_fci", "grasp_fci", "mmhc", "rsmax2"),
-            ),
+            *_exempt("Its GES phase scores every variable over the same rows.", "gfci"),
+            *_exempt("Its BOSS phase scores every variable over the same rows.", "boss_fci"),
+            *_exempt("Its GRaSP phase scores every variable over the same rows.", "grasp_fci"),
+            *_exempt("Its hill-climbing phase scores every variable over the same rows.", "mmhc"),
+            *_exempt("Its score phase scores every variable over the same rows.", "rsmax2"),
             *_exempt(
                 "Its score reads data from several environments, and no published EM covers them.",
                 "gies",
@@ -1301,25 +1302,74 @@ _CONCEPTS = (
                 "lges",
             ),
             *_exempt(
-                "A score or a regression reads every column.",
+                "Its regressions, and the tests of their residuals, read every row of every "
+                "variable.",
                 "cam",
                 "resit",
-                "skewd_mv",
+                "camuv",
+            ),
+            *_exempt("Its skew-normal fits read every row of every variable.", "skewd_mv"),
+            *_exempt(
+                "Its estimate of the score's Jacobian reads every row of every variable.",
                 "score_matching",
-                "nogam",
                 "das",
-                "cpcm",
+            ),
+            *_exempt(
+                "Its estimates of the score and of the residuals read every row of every variable.",
+                "nogam",
+            ),
+            *_exempt("Its fit of one column given the other reads every row of both.", "cpcm"),
+            *_exempt(
+                "Its fit of each variable given its parents reads every row of every variable.",
                 "cpcm_graph",
-                *LINGAM,
-                "gin",
+            ),
+            *_exempt(
+                "Its causal order compares the residuals of every variable over the same rows.",
+                "direct_lingam",
+                "multi_group_direct_lingam",
                 "rcd",
                 "bottom_up_parce_lingam",
-                "camuv",
+            ),
+            *_exempt(
+                "Its independent components need complete rows to unmix every variable.",
+                "ica_lingam",
+            ),
+            *_exempt(
+                "A series cannot drop a step, and its VARMA fit and the LiNGAM step on the "
+                "residuals need every step.",
+                "varma_lingam",
+            ),
+            *_exempt(
+                "Each time point's fit compares the residuals of every variable over the same "
+                "units.",
+                "longitudinal_lingam",
+            ),
+            *_exempt("Its tests compare clusters of variables over the same rows.", "gin"),
+            *_exempt(
+                "Each invariance test regresses the target on a set of the other variables in "
+                "each environment.",
                 "icp",
+            ),
+            *_exempt(
+                "Each invariance test regresses or tests a variable on all of its conditioning "
+                "variables in each environment.",
                 "igsp",
                 "ut_igsp",
             ),
-            *_exempt("A series cannot drop a step.", "granger", "dynotears", "rpcmci"),
+            *_exempt(
+                "A series cannot drop a step, and each variable's regression reads every row of "
+                "the lagged design.",
+                "granger",
+            ),
+            *_exempt(
+                "A series cannot drop a step, and its loss fits every step on the steps before it.",
+                "dynotears",
+            ),
+            *_exempt(
+                "A series cannot drop a step: a missing value would remove its step from every "
+                "regime's fit and leave its regime unknown.",
+                "rpcmci",
+            ),
             *_exempt("Its stacked design reads every step of every dataset.", "jpcmciplus"),
         ),
         deviations=(
