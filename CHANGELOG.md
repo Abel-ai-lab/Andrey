@@ -180,6 +180,10 @@ names its pull request.
   target with one search, so a run that several targets share is made once, and each result counts
   the rows of the runs its target reads, as a call for that target alone counts them. These lists
   run faster, with the same output bit for bit. ([#1317])
+- `jpcmciplus` runs faster as the number of system variables grows, with the same output bit for
+  bit: its test over the stacked design keeps the node counts and the design columns each lagged
+  node adds to a conditioning set, and forms each conditioning set once per query, instead of
+  reading them again for every column of every query. ([#1322])
 - `iamb`, `inter_iamb`, and `mmpc` with `structure="cpdag"` build the conditioning sets of their
   collider test as int arrays and hand them as they are to a test that answers a set of queries at
   once, so they run faster, with the same output bit for bit and the same queries. ([#1327])
@@ -3162,4 +3166,5 @@ First alpha release.
 [#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
 [#1317]: https://github.com/Abel-ai-lab/Andrey/pull/1317
+[#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
