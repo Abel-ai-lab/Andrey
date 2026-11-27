@@ -84,6 +84,8 @@ names its pull request.
   list the sets of a small neighborhood at once, so they run faster on many variables, with the
   same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
   ([#1287])
+- For contributors, git and CI enforce LF line endings: `.gitattributes` stores text files with LF,
+  and `ruff format --check` fails a Python file that has CRLF. ([#1293])
 
 ### Fixed
 
@@ -3043,3 +3045,4 @@ First alpha release.
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
+[#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
