@@ -17,6 +17,7 @@ import dataclasses
 import functools
 import inspect
 import logging
+import sys
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -693,9 +694,8 @@ def _missing_cells(data: object) -> np.ndarray | None:
 
     ``None`` for data that is neither a DataFrame nor one table of numbers.
     """
-    import pandas as pd
-
-    if isinstance(data, pd.DataFrame):  # of any column types
+    pandas = sys.modules.get("pandas")  # no DataFrame exists before pandas is imported
+    if pandas is not None and isinstance(data, pandas.DataFrame):  # of any column types
         return np.asarray(data.isna(), dtype=bool)
     try:
         array = np.asarray(data)

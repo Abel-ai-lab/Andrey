@@ -116,7 +116,8 @@ def fork_safe() -> bool:
 
 # Modules the forkserver template preloads, so forked workers inherit them instead of re-importing
 # numpy, scipy, and andrey.core on their first task (slow on a network filesystem). List every
-# module that defines a worker initializer or task. A bad name is skipped silently;
+# module that defines a worker initializer or task, and the method registry that a worker's first
+# facade call reads. A bad name is skipped silently;
 # test_forkserver_template_preloads_worker_modules checks each one.
 _FORKSERVER_PRELOAD = (
     "andrey.search._parallel_ges",
@@ -124,6 +125,7 @@ _FORKSERVER_PRELOAD = (
     "andrey.constraint._parallel_targets",
     "andrey.resample",
     "andrey.core.ci_kernel",
+    "andrey.spec.registry",
 )
 
 

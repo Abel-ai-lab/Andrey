@@ -56,6 +56,7 @@ MODULE_CACHES = {
     "andrey.constraint._skeleton._combination_table": "m, r",
     "andrey.core.backend._thread_pools": "the number of imported modules",
     "andrey.core.backend.torch": "whether torch is installed",
+    "andrey.core.backend._torch_is_cpu_build": "whether torch is installed, and its build",
     "andrey.core.ci_missing._apart": "k",
     "andrey.core.mixed._triangle": "d",
     "andrey.core.score.ebic_penalty": "n_parents, n_variables, ebic_gamma",

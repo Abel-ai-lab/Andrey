@@ -21,7 +21,6 @@ from andrey.core import ARROW, CIRCLE, GraphStructure
 from andrey.core.backend import one_blas_thread
 from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.score import check_columns, copies_error, copy_groups
-from andrey.fcm.gam import BasisCache
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -63,6 +62,8 @@ def _smooth_columns(X: np.ndarray, labels: tuple[str, ...] | None, method: str) 
 
 def _required_rows(X: np.ndarray, required: np.ndarray, labels: tuple[str, ...] | None) -> None:
     """Raise ``ValueError`` when a column's required parents have more coefficients than rows."""
+    from andrey.fcm.gam import BasisCache
+
     name = column_namer(labels)
     bases = BasisCache(X)
     n = X.shape[0]
