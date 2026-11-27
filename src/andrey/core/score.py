@@ -227,7 +227,7 @@ def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
         return ()
     first = np.arange(d)
     for rows in _row_blocks(d):
-        first = _join_copies(first, *_copy_pairs(corr[rows], rows))
+        first = _join_copies(first, _copy_mask(corr[rows], rows), rows.start)
     return _groups_by_first(first)
 
 
@@ -241,35 +241,53 @@ def _row_blocks(d: int) -> Iterator[slice]:
     return (slice(start, min(start + step, d)) for start in range(0, d, step))
 
 
-def _copy_pairs(block: np.ndarray, rows: slice) -> tuple[np.ndarray, np.ndarray]:
-    """Positions ``(i, j)``, ``i != j``, of the copies in ``block``, correlation rows ``rows``."""
-    alike = np.abs(block)
-    alike[np.arange(alike.shape[0]), np.arange(rows.start, rows.stop)] = 0.0
+def _copy_mask(block: np.ndarray, rows: slice) -> np.ndarray:
+    """``True`` where ``block``, correlation rows ``rows``, marks a copy off the diagonal.
+
+    The entries are taken in floating point, in the precision of ``block`` when it is floating.
+    """
+    alike = np.abs(block, dtype=np.result_type(block, 1.0))
+    np.fill_diagonal(alike[:, rows.start :], 0.0)
     np.square(alike, out=alike)
     np.subtract(1.0, alike, out=alike)
-    i, j = np.nonzero(alike <= ZERO_RESIDUAL)
-    return i + rows.start, j
+    return alike <= ZERO_RESIDUAL
 
 
-def _join_copies(first: np.ndarray, i: np.ndarray, j: np.ndarray) -> np.ndarray:
-    """Each column's smallest connected column, ``first``, updated with the copies ``(i, j)``.
+def _join_copies(first: np.ndarray, copies: np.ndarray, start: int) -> np.ndarray:
+    """Each column's smallest connected column, ``first``, updated with the copies ``copies``.
 
-    The graph holds one edge from each column to its ``first`` and the new pairs, so it stays
+    ``copies`` is the mask of :func:`_copy_mask` for the rows ``start, start + 1, ...``. The graph
+    holds one edge from each column to its ``first`` and the pairs the mask marks, so it stays
     within a block's pairs plus one edge per column, however large a group of copies grows.
     """
-    if not i.size:
+    if not copies.any():
         return first
     d = first.size
-    linked = np.flatnonzero(first != np.arange(d))
-    edges = (np.concatenate([first[linked], i]), np.concatenate([linked, j]))
-    graph = csr_array((np.ones(edges[0].size), edges), shape=(d, d))
+    links = (np.ones(d), first.astype(np.int32), np.arange(d + 1, dtype=np.int32))
+    graph = _pairs_graph(copies, start) + csr_array(links, shape=(d, d))
     _, label = connected_components(graph, directed=False)
     _, smallest = np.unique(label, return_index=True)
     return smallest[label]
 
 
+def _pairs_graph(copies: np.ndarray, start: int) -> csr_array:
+    """The ``(d, d)`` graph of the pairs ``copies`` marks in the rows ``start, start + 1, ...``.
+
+    It is built from the mask row by row, with 32-bit indices, without listing the pairs' positions
+    first.
+    """
+    rows, d = copies.shape
+    indptr = np.zeros(d + 1, dtype=np.int32)
+    indptr[start + 1 : start + rows + 1] = np.cumsum(copies.sum(axis=1))
+    indptr[start + rows + 1 :] = indptr[start + rows]
+    columns = np.broadcast_to(np.arange(d, dtype=np.int32), copies.shape)[copies]
+    return csr_array((np.ones(columns.size), columns, indptr), shape=(d, d))
+
+
 def _groups_by_first(first: np.ndarray) -> tuple[tuple[int, ...], ...]:
     """The groups of :func:`copy_groups` from each column's smallest connected column ``first``."""
+    if (first == np.arange(first.size)).all():
+        return ()
     members: dict[int, list[int]] = {}
     for column, kept in enumerate(first.tolist()):
         members.setdefault(kept, []).append(column)
@@ -357,7 +375,7 @@ def check_columns(cov: np.ndarray, n: int, name: Callable[[int], str] | None = N
         np.divide(cov[rows], block, out=block)
         if corr is not None:
             corr[rows] = block
-        first = _join_copies(first, *_copy_pairs(block, rows))
+        first = _join_copies(first, _copy_mask(block, rows), rows.start)
     groups = _groups_by_first(first)
     if groups:
         raise copies_error(groups)

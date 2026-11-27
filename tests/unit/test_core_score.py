@@ -319,6 +319,12 @@ def test_copy_groups_is_empty_without_copies_or_with_two_rows(n, d):
     assert copy_groups(np.corrcoef(_columns(n, d), rowvar=False), n) == ()
 
 
+@pytest.mark.parametrize("dtype", [int, bool])
+def test_copy_groups_reads_integer_and_boolean_matrices(dtype):
+    corr = np.array([[1, 1, 0, 0], [1, 1, 0, 0], [0, 0, 1, -1], [0, 0, -1, 1]], dtype=dtype)
+    assert copy_groups(corr, 30) == ((0, 1), (2, 3))
+
+
 def _copies_by_definition(corr, n):
     """The groups of copies from the whole matrix ``1 - corr**2 <= ZERO_RESIDUAL`` at once."""
     alike = np.abs(corr)
@@ -367,18 +373,29 @@ def test_copy_groups_in_any_block_of_rows_is_the_whole_matrix_definition(monkeyp
     assert corr.tobytes() == before.tobytes()
 
 
+def _traced_peak(call):
+    """``call()`` and the peak of the memory it traced above the memory traced before it.
+
+    Tracing starts and stops here only when it is not already on, so a traced session keeps it.
+    """
+    started = not tracemalloc.is_tracing()
+    if started:
+        tracemalloc.start()
+    try:
+        tracemalloc.reset_peak()
+        before = tracemalloc.get_traced_memory()[0]
+        result = call()
+        return result, tracemalloc.get_traced_memory()[1] - before
+    finally:
+        if started:
+            tracemalloc.stop()
+
+
 def test_a_large_group_of_copies_keeps_the_check_within_its_blocks(monkeypatch):
     n, d = 300, 1500
     corr = np.corrcoef(_columns(n, 1) * np.arange(1.0, d + 1), rowvar=False)
     monkeypatch.setattr(score_module, "COPY_BLOCK_ENTRIES", 7 * d)
-    tracemalloc.start()
-    try:
-        tracemalloc.reset_peak()
-        start = tracemalloc.get_traced_memory()[0]
-        groups = copy_groups(corr, n)
-        peak = tracemalloc.get_traced_memory()[1] - start
-    finally:
-        tracemalloc.stop()
+    groups, peak = _traced_peak(lambda: copy_groups(corr, n))
     assert groups == (tuple(range(d)),)
     assert peak < corr.nbytes / 4
 
@@ -411,15 +428,32 @@ def test_the_copy_check_holds_a_few_blocks_beyond_its_input(check, blocks):
     n, d = 300, 1500
     x = _columns(n, d)
     matrix = np.corrcoef(x, rowvar=False) if check == "copy_groups" else np.cov(x, rowvar=False)
-    tracemalloc.start()
-    try:
-        tracemalloc.reset_peak()
-        start = tracemalloc.get_traced_memory()[0]
-        getattr(score_module, check)(matrix, n)
-        peak = tracemalloc.get_traced_memory()[1] - start
-    finally:
-        tracemalloc.stop()
+    _, peak = _traced_peak(lambda: getattr(score_module, check)(matrix, n))
     assert peak < blocks * score_module.COPY_BLOCK_ENTRIES * matrix.itemsize
+
+
+def _copies_raised(cov, n):
+    """The groups of the :class:`CopiedColumnsError` that ``check_columns(cov, n)`` raises."""
+    with pytest.raises(CopiedColumnsError) as error:
+        check_columns(cov, n)
+    return error.value.groups
+
+
+@pytest.mark.parametrize("check", ["copy_groups", "check_columns"])
+def test_the_copy_check_holds_less_than_the_whole_matrix_when_every_column_is_a_copy(check):
+    n, d = 300, 1000  # the whole matrix is one block of the default size
+    x = _columns(n, 1) * np.arange(1.0, d + 1)
+    if check == "copy_groups":
+        corr = np.corrcoef(x, rowvar=False)
+        groups, peak = _traced_peak(lambda: copy_groups(corr, n))
+        whole, whole_peak = _traced_peak(lambda: _copies_by_definition(corr, n))
+    else:
+        cov = np.cov(x, rowvar=False)
+        sd = np.sqrt(np.diag(cov))
+        groups, peak = _traced_peak(lambda: _copies_raised(cov, n))
+        whole, whole_peak = _traced_peak(lambda: _copies_by_definition(cov / np.outer(sd, sd), n))
+    assert groups == whole == (tuple(range(d)),)
+    assert peak < whole_peak
 
 
 def test_check_columns_names_every_group_of_copies_and_the_fix():
