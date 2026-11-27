@@ -833,7 +833,9 @@ class Counts:
     returned ``p > alpha``, its first separating set; it needs ``alpha``. ``ci_sets`` and
     ``score_sets`` count the distinct conditioning sets of each size: a CI test's conditioning set
     and a local score's parent set. ``ci_queries`` and ``score_queries`` count every query, one
-    per p-value or per parent set scored.
+    per p-value or per parent set scored; a test that answers stacked queries up to the first
+    separating one (``pvalues_until_separated``) counts the p-values it returns, not the queries
+    it computed ahead and dropped.
     """
 
     def __init__(self, alpha: float | None) -> None:
@@ -904,6 +906,11 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
     "separating_prefix": lambda ps, test, x, y, sets, alpha: [
         (x, y, s, p) for s, p in zip(sets, ps)
     ],
+    # The stacked queries answered, up to the first separating one; the queries after it are
+    # computed ahead and dropped, so they are not queries.
+    "pvalues_until_separated": lambda ps, test, x, y, conditions, alpha: _rows(
+        x, y, conditions, ps
+    ),
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
     "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
         (x, y, condition_set, p) for y, p in zip(ys, rp[1])
