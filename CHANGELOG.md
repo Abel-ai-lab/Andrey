@@ -70,6 +70,11 @@ names its pull request.
 - On the website, the AI statement that ends each blog post and release card has its own container:
   a left rule in the accent color on a faint accent tint, with its label in small uppercase above
   the text. The label underlines under the pointer and under keyboard focus. ([#1267])
+- For contributors, SkewD's tests of a property that holds for every optimizer run on L-BFGS-B in
+  pull requests, and their CMA-ES cases, with the CMA-ES recovery tests, carry the `release` mark, so
+  the unit tests of `tests/unit/test_skewd.py` take 120 s on one core instead of 625 s, and the macOS
+  unit job skips the `release` cases unless a manual run asks for them, and then has 90 minutes
+  instead of 40. ([#1257])
 
 ### Fixed
 
@@ -3022,4 +3027,5 @@ First alpha release.
 [#1247]: https://github.com/Abel-ai-lab/Andrey/pull/1247
 [#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
 [#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
+[#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
