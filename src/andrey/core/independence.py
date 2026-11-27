@@ -41,6 +41,8 @@ from scipy.spatial.distance import pdist, squareform
 from scipy.special import gammaincc, gammaln
 from scipy.stats import zscore
 
+from andrey.core._symmetric import exp_symmetric, gram_is_symmetric, median_exact, strict_upper
+
 
 def _as_columns(data: np.ndarray) -> np.ndarray:
     """Return ``data`` as a float64 ``(n, d)`` matrix, promoting a 1-D vector to a single column."""
@@ -108,17 +110,20 @@ def _kernel_into(z: np.ndarray, width: float, out: np.ndarray, block: np.ndarray
 
     Every element takes ``exp(-0.5 * d**2 * width)``, then ``K - (col_sum_j + col_sum_i) / n +
     total / n**2``, as :func:`_gaussian_kernel` and :func:`_center_kernel` do, but in row blocks of
-    ``block``'s size written into ``out``, so no ``n x n`` temporary is allocated.
+    ``block``'s size written into ``out``, so no ``n x n`` temporary is allocated. The distances are
+    symmetric, so each block is built from the diagonal on and the entries below it copy the
+    transposed block.
     """
     n = z.shape[0]
     rows = block.shape[0]
     for start in range(0, n, rows):
-        part = out[start : start + rows]
-        np.subtract(z[start : start + rows, None], z[None, :], out=part)
+        part = out[start : start + rows, start:]
+        np.subtract(z[start : start + rows, None], z[None, start:], out=part)
         np.square(part, out=part)
         np.multiply(part, -0.5, out=part)
         np.multiply(part, width, out=part)
         np.exp(part, out=part)
+        out[start + rows :, start : start + rows] = part[:, rows:].T
     col_sums = out.sum(axis=0)
     shift = col_sums.sum() / n**2
     for start in range(0, n, rows):
@@ -240,25 +245,30 @@ def _upper(sq_dists: np.ndarray) -> np.ndarray:
     """The strict upper triangle of a square matrix, row by row.
 
     Up to :data:`_TRIU_CACHED_ROWS` rows through the memoized indices of :func:`_triu_k1`; a larger
-    matrix, which only a median over every row meets, through a boolean mask of one byte per entry
-    that is not kept, in the same order.
+    matrix, which only a median over every row meets, row by row, in the same order.
     """
     n = sq_dists.shape[0]
     if n <= _TRIU_CACHED_ROWS:
         return sq_dists[_triu_k1(n)]
-    return sq_dists[np.triu(np.ones((n, n), dtype=bool), k=1)]
+    return strict_upper(sq_dists)
 
 
 def _sq_dists(data: np.ndarray) -> np.ndarray:
     """Squared Euclidean distances between the rows of ``data``, ``x^2 + y^2 - 2xy``."""
     sq_norms = np.sum(data * data, axis=1)
+    if data.shape[1] == 1:  # the products are single multiplications, so outer products match
+        dists = np.add.outer(sq_norms, sq_norms)
+        products = np.multiply.outer(data[:, 0], data[:, 0])
+        products *= 2.0
+        dists -= products
+        return dists
     return sq_norms[None, :] + sq_norms[:, None] - 2.0 * (data @ data.T)
 
 
 def _median_width(sq_dists: np.ndarray) -> float:
     """``sqrt(0.5 * median(positive squared pairwise distances))`` from squared distances."""
     upper = _upper(sq_dists)
-    return float(np.sqrt(0.5 * np.median(upper[upper > 0])))
+    return float(np.sqrt(0.5 * median_exact(upper[upper > 0])))
 
 
 def _median_width_gamma(column: np.ndarray, rows: int | None = 100) -> float:
@@ -272,26 +282,33 @@ def _median_width_gamma(column: np.ndarray, rows: int | None = 100) -> float:
     return _median_width(_sq_dists(data))
 
 
-def _gram_from_sq_dists(sq_dists: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
+def _gram_from_sq_dists(
+    sq_dists: np.ndarray, width: float, *, symmetric: bool
+) -> tuple[np.ndarray, np.ndarray]:
     """Raw and doubly-centered RBF gram matrices from squared distances, which are overwritten.
 
     The centered matrix is ``H K H`` with ``H = I - 1/n`` in row/column-sum form (the biased
-    estimate).
+    estimate), written into ``sq_dists``'s buffer. ``symmetric`` says that the squared distances
+    equal their transpose bit for bit, as :func:`~andrey.core._symmetric.gram_is_symmetric` finds
+    for the data they come from, so the exponential runs on one triangle.
     """
     n = sq_dists.shape[0]
     np.negative(sq_dists, out=sq_dists)  # scale the exponent in place: -sq_dists / 2 / width**2
     sq_dists /= 2.0
     sq_dists /= width**2
-    raw = np.exp(sq_dists)
+    raw = exp_symmetric(sq_dists) if symmetric else np.exp(sq_dists)
     col_sums = raw.sum(axis=0)
     row_sums = raw.sum(axis=1)
-    centered = raw - (col_sums[None, :] + row_sums[:, None]) / n + (row_sums.sum() / n**2)
+    centered = np.add(col_sums[None, :], row_sums[:, None], out=sq_dists)
+    centered /= n
+    np.subtract(raw, centered, out=centered)
+    centered += row_sums.sum() / n**2
     return raw, centered
 
 
 def _gram_gamma(column: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
     """Raw and doubly-centered RBF gram matrices of an ``(n, q)`` matrix at bandwidth ``sigma``."""
-    return _gram_from_sq_dists(_sq_dists(column), width)
+    return _gram_from_sq_dists(_sq_dists(column), width, symmetric=gram_is_symmetric(column))
 
 
 #: One side of the gamma HSIC: its centered gram and its raw kernel's off-diagonal mean, and
@@ -320,7 +337,9 @@ def gamma_gram(column: np.ndarray, *, median_rows: int | None = 100) -> tuple[np
     n = col.shape[0]
     if median_rows is None or n <= median_rows:
         sq_dists = _sq_dists(col)
-        raw, centered = _gram_from_sq_dists(sq_dists, _median_width(sq_dists))
+        raw, centered = _gram_from_sq_dists(
+            sq_dists, _median_width(sq_dists), symmetric=gram_is_symmetric(col)
+        )
     else:
         raw, centered = _gram_gamma(col, _median_width_gamma(col, median_rows))
     raw[np.diag_indices(n)] = 0.0

@@ -82,6 +82,47 @@ names its pull request.
   knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
   which took memory quadratic in the number of variables; the trees of a search share one tuple of
   the variables. Results are unchanged, bit for bit. ([#1274])
+- With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
+  searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
+  targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
+  in `/dev/shm` instead of a copy each, and starting them no longer holds a copy per worker in the
+  caller. The copy has no name in `/dev/shm`, so its memory goes back when the last worker exits,
+  even when a fit is killed. Where `/dev/shm` cannot hold the matrix, each worker gets its own copy
+  as before. The results are the same bit for bit. For contributors, the benchmark harness's `poll`
+  route caps on the process tree's Pss, which counts a shared page once, once the tree's RSS sum
+  passes the cap, and records it as `tree_peak_pss_mb`; the tree's sums leave out a child started by
+  `vfork` that has not yet called exec. ([#1276])
+- Methods that check their data for copied columns, those with a partial-correlation test or the
+  linear-Gaussian BIC among them, return the same results while the check holds less memory on data
+  with many columns. It reads the correlation matrix in blocks of rows instead of making three
+  temporary copies of it, and the BIC's check keeps the whole correlation matrix only when the data
+  have more rows than columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's
+  check peaks at about 17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB.
+  ([#1275])
+- The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  reads the p-values of a scan as one array where the test answers a scan at once, so with
+  `fisherz`, `student_t`, or `normal_scores` on complete data these searches run faster on hundreds
+  of variables, with the same output bit for bit. ([#1289])
+- `pc`, `fci`, `cdnod`, `fci_jci`, `rsmax2`, and the other methods that run the PC family's skeleton
+  search with `fisherz`, `student_t`, or `normal_scores` on complete data build the queries of the
+  conditioning-size-1 pass from arrays, and the scans of conditioning sets of two or more variables
+  list the sets of a small neighborhood at once, so they run faster on many variables, with the
+  same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
+  ([#1287])
+- `resit`, `camuv`, `loci`, `anm`, `pnl`, `rcd`, `bottom_up_parce_lingam`, `gin`, `cpcm`,
+  `score_matching`, `das`, `nogam`, `skewd` with `criterion="independence"`, and the queries of
+  `indep_test="kci"` without a conditioning set build their Gaussian kernel matrices faster, with the
+  same output bit for bit. ([#1290])
+- For contributors, git and CI enforce LF line endings: `.gitattributes` stores text files with LF,
+  and `ruff format --check` fails a Python file that has CRLF. ([#1293])
+- `bdeu` and `discrete_bic` count each family's table faster, and `bdeu` scores a batch of tables
+  together, so `exact_search`, `hc`, `tabu`, `ges`, `xges`, `lges`, `boss`, `grasp`, `boss_fci`,
+  `grasp_fci`, `gfci`, `mmhc`, `rsmax2`, and `gies` run faster with either score, with the same
+  scores and graphs bit for bit. ([#1284])
+- `pc`, `fci`, `cdnod`, and `fci_jci` with `fisherz` or `student_t` on data with missing values
+  build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
+  the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
+  output bit for bit and the same counts of the queries not tested. ([#1296])
 
 ### Fixed
 
@@ -3041,3 +3082,11 @@ First alpha release.
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1274]: https://github.com/Abel-ai-lab/Andrey/pull/1274
+[#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
+[#1276]: https://github.com/Abel-ai-lab/Andrey/pull/1276
+[#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
+[#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
+[#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
+[#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
+[#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
+[#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
