@@ -685,8 +685,8 @@ def _parent_sets(d: int, node: int, size: int = 3) -> list[tuple[int, ...]]:
     return [c for k in range(size + 1) for c in combinations(others, k)]
 
 
-#: A score under test, as the batched and the one-table paths and a table numbered by
-#: :func:`configurations` must all score it.
+#: The scores whose batched and one-table paths must give the same bits, with the settings the
+#: BDeu prior and the multinomial penalty read.
 SCORES = [
     pytest.param(lambda x: BDeuScore(x), id="bdeu"),
     pytest.param(
@@ -713,7 +713,7 @@ def test_a_score_is_the_same_alone_or_in_a_batch(make):
     x = _mixed_tables()
     for node in range(x.shape[1]):
         sets = _parent_sets(x.shape[1], node)
-        alone = _exact(make(x).score(node, s) for s in sets)
+        alone = _exact(make(x).score(node, s) for s in sets)  # each set on a fresh score
         assert _exact(make(x).score_many(node, sets)) == alone
         rng = np.random.default_rng(node)
         for size in (1, 2, 3, 7):
@@ -753,8 +753,8 @@ def test_a_batch_scores_the_tables_of_the_configurations_numbering(monkeypatch, 
 
 @pytest.mark.parametrize("make", SCORES)
 def test_on_rows_scores_the_rows_with_the_categories_of_all_rows(make):
-    """``on_rows`` by a mask or by indices scores the selected rows over the full data's
-    categories, and every row selected is the score itself."""
+    """``on_rows`` by a mask or by indices scores the selected rows over the categories of all
+    rows, and selecting every row gives the score's own values."""
     x = _mixed_tables()
     codes, cards = categorical.encode(x)
     rng = np.random.default_rng(1)
