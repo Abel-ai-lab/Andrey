@@ -94,6 +94,10 @@ names its pull request.
   same output bit for bit. ([#1290])
 - For contributors, git and CI enforce LF line endings: `.gitattributes` stores text files with LF,
   and `ruff format --check` fails a Python file that has CRLF. ([#1293])
+- `bdeu` and `discrete_bic` count each family's table faster, and `bdeu` scores a batch of tables
+  together, so `exact_search`, `hc`, `tabu`, `ges`, `xges`, `lges`, `boss`, `grasp`, `boss_fci`,
+  `grasp_fci`, `gfci`, `mmhc`, `rsmax2`, and `gies` run faster with either score, with the same
+  scores and graphs bit for bit. ([#1284])
 - `nogam` runs faster: each fold of its cross-validated kernel regressions is assembled from slices
   of the kernel, the kernels are built in place, and the repeated non-finite checks of the Cholesky
   steps are skipped, with the same output bit for bit. ([#1298])
@@ -3055,6 +3059,7 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
