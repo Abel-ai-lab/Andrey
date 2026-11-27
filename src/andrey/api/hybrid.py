@@ -144,16 +144,15 @@ def mmhc(
     score_func : str or None, default=None
         Local score of the hill-climbing phase, any of :func:`~andrey.hc`'s: ``"bic"`` (Gaussian
         BIC) for continuous data, ``"bdeu"`` or ``"discrete_bic"`` for categorical data,
-        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data. ``"normal_scores"``, experimental, is
-        ``"bic"`` on each column's normal scores, for continuous data that are Gaussian only after
-        an unknown increasing transformation of each column, as :func:`~andrey.ges` describes, with
-        its limits. With ``indep_test="normal_scores"`` both phases read one nonparanormal model,
-        and a strictly increasing transformation of any column leaves the graph unchanged; the
-        consistency results for the rank-based test and score cover PC, GES, and ARGES, so with this
-        search it is the analogous construction, not a proven result. ``None`` picks from the
-        declared column types, as for :func:`~andrey.ges`.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        ``"degen_gauss"`` or ``"cond_gauss"`` for mixed data. ``"normal_scores"`` is ``"bic"`` on
+        each column's normal scores, for continuous data that are Gaussian only after an unknown
+        increasing transformation of each column, as :func:`~andrey.ges` describes, with its limits.
+        With ``indep_test="normal_scores"`` both phases read one nonparanormal model, and a strictly
+        increasing transformation of any column leaves the graph unchanged; the consistency results
+        for the rank-based test and score cover PC, GES, and ARGES, so with this search it is the
+        analogous construction, not a proven result. ``None`` picks from the declared column types,
+        as for :func:`~andrey.ges`. ``metadata["score_func"]`` names the score the fit used: the one
+        picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0
@@ -390,16 +389,15 @@ def rsmax2(
         independences more often than the nominal rate. Only ``"chisq"`` and ``"gsq"`` read it:
         passing it with another test raises ``ValueError``.
     score_func : str or None, default=None
-        Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"``,
-        experimental, is ``"bic"`` on each column's normal scores, for continuous data that are
-        Gaussian only after an unknown increasing transformation of each column, as
-        :func:`~andrey.ges` describes, with its limits. With ``indep_test="normal_scores"`` both
-        phases read one nonparanormal model, and a strictly increasing transformation of any column
-        leaves the graph unchanged; the consistency results for the rank-based test and score cover
-        PC, GES, and ARGES, so with this search it is the analogous construction, not a proven
-        result. ``None`` picks from the declared column types, as for :func:`~andrey.ges`.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        Local score of the maximize phase, any of :func:`~andrey.hc`'s. ``"normal_scores"`` is
+        ``"bic"`` on each column's normal scores, for continuous data that are Gaussian only after
+        an unknown increasing transformation of each column, as :func:`~andrey.ges` describes, with
+        its limits. With ``indep_test="normal_scores"`` both phases read one nonparanormal model,
+        and a strictly increasing transformation of any column leaves the graph unchanged; the
+        consistency results for the rank-based test and score cover PC, GES, and ARGES, so with this
+        search it is the analogous construction, not a proven result. ``None`` picks from the
+        declared column types, as for :func:`~andrey.ges`. ``metadata["score_func"]`` names the
+        score the fit used: the one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty, as for :func:`~andrey.hc`. BDeu ignores it.
     ebic_gamma : float, default=1.0

@@ -67,6 +67,13 @@ _INDEP_TEST = concept_param(
     doc=_PARTIAL_CORRELATION + "; normal_scores = fisherz on each column's normal scores, for data "
     "whose columns are monotone transformations of Gaussian variables. " + _OTHER_TESTS,
 )
+#: indep_test of lpcmci, where normal_scores is experimental.
+_LPCMCI_INDEP_TEST = concept_param(
+    "indep_test",
+    doc=_PARTIAL_CORRELATION + "; normal_scores = experimental here, fisherz on each column's "
+    "normal scores: its graph did not always equal the graph of fisherz on the normal scores of "
+    "the data. " + _OTHER_TESTS,
+)
 #: indep_test of a method whose tests always read several environments: no normal_scores.
 _POOLED_INDEP_TEST = concept_param(
     "indep_test",
@@ -77,6 +84,8 @@ _POOLED_INDEP_TEST = concept_param(
 _DEGREES_OF_FREEDOM = concept_param("degrees_of_freedom")
 _CATEGORICAL = concept_param("categorical")
 _COLLIDER_RULE = concept_param("collider_rule")
+#: The rule of a method whose default stays "sepsets" until the rule is measured in it.
+_COLLIDER_RULE_SEPSETS = concept_param("collider_rule", default="sepsets")
 _POSSIBLY_SEPARABLE = concept_param("possibly_separable")
 _LINKS_POSSIBLY_SEPARABLE = concept_param(
     "possibly_separable",
@@ -116,7 +125,7 @@ _OTHER_SCORES = (
     + _DECLARED.format(every="bdeu", fallback="bic")
 )
 _SCORE_DOC = (
-    "Local score: bic = linear-Gaussian BIC; normal_scores = experimental, bic on each column's "
+    "Local score: bic = linear-Gaussian BIC; normal_scores = bic on each column's "
     "normal scores, for continuous data whose columns are monotone transformations of Gaussian "
     "variables, with no env and no missing values; " + _OTHER_SCORES
 )
@@ -320,7 +329,7 @@ _add(
             _INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _ALPHA,
-            _COLLIDER_RULE,
+            _COLLIDER_RULE_SEPSETS,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
             concept_param(
@@ -396,7 +405,7 @@ _add(
             _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _COLLIDER_ORDER,
-            _COLLIDER_RULE,
+            _COLLIDER_RULE_SEPSETS,
             _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             ParamSpec(
@@ -463,7 +472,7 @@ _add(
             _ALPHA,
             _POOLED_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
-            _COLLIDER_RULE,
+            _COLLIDER_RULE_SEPSETS,
             _POSSIBLY_SEPARABLE,
             _CATEGORICAL,
             _POSSIBLE_DSEP,
@@ -1701,7 +1710,7 @@ for _name, _summary, _own, _refs in (
                 _INDEP_TEST,
                 _DEGREES_OF_FREEDOM,
                 _ALPHA,
-                _COLLIDER_RULE,
+                _COLLIDER_RULE_SEPSETS,
                 _CATEGORICAL,
                 _PERMUTATION_FCI_EDGE_REMOVAL,
                 concept_param("confounded_index"),
@@ -2857,7 +2866,7 @@ _add(
                 doc="Preliminary rounds before the final one; each passes the parents it found "
                 "to the next as conditions.",
             ),
-            _INDEP_TEST,
+            _LPCMCI_INDEP_TEST,
             _DEGREES_OF_FREEDOM,
             _CATEGORICAL,
             _TEST_SEED,

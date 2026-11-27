@@ -61,7 +61,7 @@ def fci(
     *,
     alpha: float = 0.05,
     indep_test: str = "fisherz",
-    collider_rule: str = "sepsets",
+    collider_rule: str = "majority",
     categorical: np.ndarray | None = None,
     possible_dsep: str = "order_free",
     max_depth: int | None = None,

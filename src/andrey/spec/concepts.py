@@ -1587,7 +1587,7 @@ _CONCEPTS = (
         param=_template(
             "collider_rule",
             "str",
-            "sepsets",
+            "majority",
             "How colliders are decided on x - z - y: sepsets = z is a collider when it is not in "
             "the separating set of x and y; conservative and majority = test x and y given every "
             "subset of each one's neighbors and, if at least one subset separates them, z is a "
@@ -1621,13 +1621,13 @@ _CONCEPTS = (
             Deviation(
                 method=m,
                 name="collider_rule",
-                default="majority",
+                default="sepsets",
                 choices=COLLIDER_RULES,
-                reason="majority orients the same-step links without regard to the order of the "
-                "variables, where sepsets reads the one separating set the skeleton phase stored, "
-                "which can change with it (Runge 2020).",
+                reason="The rule's default was measured in pc and fci, where majority makes fewer "
+                "errors overall than sepsets in most settings measured, with far fewer false "
+                "arrowheads; this method keeps sepsets until the rule is measured in it.",
             )
-            for m in ("pcmciplus", "jpcmciplus")
+            for m in ("gfci", "boss_fci", "grasp_fci", "cdnod", "fci_jci")
         ),
     ),
     Concept(

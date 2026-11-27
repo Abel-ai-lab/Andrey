@@ -58,7 +58,7 @@ def pc(
     alpha: float = 0.05,
     indep_test: str = "fisherz",
     collider_order: str = "p_value",
-    collider_rule: str = "sepsets",
+    collider_rule: str = "majority",
     categorical: np.ndarray | None = None,
     max_depth: int | None = None,
     constraints: Constraints | None = None,

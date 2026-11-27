@@ -95,18 +95,20 @@ def ges(
         without ``env``. ``None``, the default, fits ``data`` as one environment.
     score_func : str or None, default=None
         Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data.
-        ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
-        continuous data that are Gaussian only after an unknown increasing transformation of each
-        column [13]_ [14]_. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial
-        BIC [7]_, for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate
-        Gaussian) [4]_ and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed
-        data, continuous and categorical columns. ``"degen_gauss"`` favors time and accuracy on
-        smaller graphs; ``"cond_gauss"`` favors accuracy on larger graphs and gives up time.
-        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. See Notes. ``metadata["score_func"]`` names the score the fit used: the one picked
-        from the declared column types when this is ``None``.
+        ``"normal_scores"`` is ``"bic"`` on each column's normal scores, for continuous data that
+        are Gaussian only after an unknown increasing transformation of each column [13]_ [14]_. It
+        favors such data, where ``"bic"`` does no better than the empty graph; it gives up accuracy
+        on linear data with heavy-tailed noise, where it adds false edges, and on Gaussian data with
+        few rows, where it misses some edges. ``"bdeu"`` is the BDeu score [3]_ and
+        ``"discrete_bic"`` the multinomial BIC [7]_, for categorical data coded by whole numbers.
+        ``"degen_gauss"`` (degenerate Gaussian) [4]_ and ``"cond_gauss"`` (conditional Gaussian)
+        [5]_ are BIC scores for mixed data, continuous and categorical columns. ``"degen_gauss"``
+        favors time and accuracy on smaller graphs; ``"cond_gauss"`` favors accuracy on larger
+        graphs and gives up time. ``None`` picks from the declared column types: ``"bdeu"`` when
+        every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. See Notes. ``metadata["score_func"]`` names the score the fit
+        used: the one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
@@ -298,9 +300,8 @@ def ges(
     ``ebic_gamma=0.0`` by a constant per variable, so it finds the same graph. Moves are scored in
     this process.
 
-    **Monotone transformations.** ``"normal_scores"`` is experimental: no benchmark has compared it
-    with a reference yet. It replaces each column by its normal scores, ``Phi^-1(rank / (n + 1))``
-    with tied values sharing their average rank, the transformation of
+    **Monotone transformations.** ``"normal_scores"`` replaces each column by its normal scores,
+    ``Phi^-1(rank / (n + 1))`` with tied values sharing their average rank, the transformation of
     ``indep_test="normal_scores"``, and scores them with ``"bic"``, ``penalty_discount`` and
     ``ebic_gamma`` included. Its model is the nonparanormal, or Gaussian copula [13]_: each column
     is an unknown strictly increasing function of a latent variable, and the latent variables follow
@@ -314,11 +315,12 @@ def ges(
     to estimate the same latent correlation, and prove GES and its restricted hybrid ARGES
     consistent with it in high dimensions. With GES it is a published variant of their score, with
     the normal-score estimate in place of theirs; with the other searches it is the analogous
-    construction, not a result they prove. Ties lose information: a column with few distinct values
-    has few distinct scores, and a column whose ranks repeat another's, such as ``x`` and
-    ``exp(x)``, is a copy and raises as copies do. Ranks see a dependence only through its monotone
-    part. It reads one distribution, so it takes no ``env`` and no ``missing="em"``, and continuous
-    columns only: a declared categorical column raises.
+    construction, not a result they prove. Its accuracy was measured against ground truth and
+    against ``"bic"`` on the data before the transformation, not against another package. Ties lose
+    information: a column with few distinct values has few distinct scores, and a column whose ranks
+    repeat another's, such as ``x`` and ``exp(x)``, is a copy and raises as copies do. Ranks see a
+    dependence only through its monotone part. It reads one distribution, so it takes no ``env`` and
+    no ``missing="em"``, and continuous columns only: a declared categorical column raises.
 
     **Several environments.** With ``env``, the environment index joins the data as a last variable
     that no Insert gives a parent: the background knowledge Joint Causal Inference gives a context
@@ -1268,15 +1270,14 @@ def xges(
         continuous data. ``"bdeu"`` is the BDeu score and ``"discrete_bic"`` the multinomial BIC,
         for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and
         ``"cond_gauss"`` (conditional Gaussian) are BIC scores for mixed data, continuous and
-        categorical columns. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
-        scores, for continuous data that are Gaussian only after an unknown increasing
-        transformation of each column, as :func:`~andrey.ges` describes, with its limits; the
-        consistency result for this score covers GES, so with this search it is the analogous
-        construction, not a proven result. ``None`` picks from the declared column types: ``"bdeu"``
-        when every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column
-        is declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or
-        text type, never by its values.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        categorical columns. ``"normal_scores"`` is ``"bic"`` on each column's normal scores, for
+        continuous data that are Gaussian only after an unknown increasing transformation of each
+        column, as :func:`~andrey.ges` describes, with its limits; the consistency result for this
+        score covers GES, so with this search it is the analogous construction, not a proven result.
+        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
@@ -1568,13 +1569,13 @@ def lges(
         continuous data. ``"bdeu"`` is the BDeu score and ``"discrete_bic"`` the multinomial BIC,
         for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) and
         ``"cond_gauss"`` (conditional Gaussian) are BIC scores for mixed data, continuous and
-        categorical columns. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
-        scores, for continuous data that are Gaussian only after an unknown increasing
-        transformation of each column, as :func:`~andrey.ges` describes, with its limits. ``None``
-        picks from the declared column types: ``"bdeu"`` when every column is categorical,
-        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
-        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values. ``metadata["score_func"]`` names the score used, including the choice for ``None``.
+        categorical columns. ``"normal_scores"`` is ``"bic"`` on each column's normal scores, for
+        continuous data that are Gaussian only after an unknown increasing transformation of each
+        column, as :func:`~andrey.ges` describes, with its limits. ``None`` picks from the declared
+        column types: ``"bdeu"`` when every column is categorical, ``"cond_gauss"`` when some are,
+        else ``"bic"``. A column is declared categorical by ``categorical`` or by a DataFrame's
+        ``category``, ``bool``, or text type, never by its values. ``metadata["score_func"]`` names
+        the score used, including the choice for ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0``,
@@ -1818,15 +1819,15 @@ def hc(
         conditional Gaussian BICs for mixed data, as for :func:`~andrey.ges`. On mixed data
         ``"degen_gauss"`` favors time and ``"cond_gauss"`` gives up time, with neither ahead at
         every size. On categorical data ``"bdeu"`` favors accuracy, at about the time of
-        ``"discrete_bic"``. ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal
-        scores, for continuous data that are Gaussian only after an unknown increasing
-        transformation of each column, as :func:`~andrey.ges` describes, with its limits; the
-        consistency result for this score covers GES, so with this search it is the analogous
-        construction, not a proven result. ``None`` picks from the declared column types: ``"bdeu"``
-        when every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column
-        is declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or
-        text type, never by its values. ``metadata["score_func"]`` names the score the fit used: the
-        one picked from the declared column types when this is ``None``.
+        ``"discrete_bic"``. ``"normal_scores"`` is ``"bic"`` on each column's normal scores, for
+        continuous data that are Gaussian only after an unknown increasing transformation of each
+        column, as :func:`~andrey.ges` describes, with its limits; the consistency result for this
+        score covers GES, so with this search it is the analogous construction, not a proven result.
+        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
+        ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
+        values. ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is the
@@ -2180,15 +2181,14 @@ def tabu(
         ``"bdeu"`` or ``"discrete_bic"``, the BDeu score or the multinomial BIC for categorical data
         coded by whole numbers; or ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or
         conditional Gaussian BIC for mixed data; each as for :func:`~andrey.ges`.
-        ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
-        continuous data that are Gaussian only after an unknown increasing transformation of each
-        column, as :func:`~andrey.ges` describes, with its limits; the consistency result for this
-        score covers GES, so with this search it is the analogous construction, not a proven result.
-        ``None`` picks from the declared column types: ``"bdeu"`` when every column is categorical,
+        ``"normal_scores"`` is ``"bic"`` on each column's normal scores, for continuous data that
+        are Gaussian only after an unknown increasing transformation of each column, as
+        :func:`~andrey.ges` describes, with its limits; the consistency result for this score covers
+        GES, so with this search it is the analogous construction, not a proven result. ``None``
+        picks from the declared column types: ``"bdeu"`` when every column is categorical,
         ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared categorical by
         ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type, never by its
-        values.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
+        values. ``metadata["score_func"]`` names the score the fit used: the one picked from the
         declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
@@ -2530,16 +2530,15 @@ def exact_search(
         Local score: ``"bic"``, the linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers; or
         ``"degen_gauss"`` or ``"cond_gauss"``, the degenerate or conditional Gaussian BIC for mixed
-        data, as for :func:`~andrey.ges`. ``"normal_scores"``, experimental, is ``"bic"`` on each
-        column's normal scores, for continuous data that are Gaussian only after an unknown
-        increasing transformation of each column, as :func:`~andrey.ges` describes, with its limits;
-        the consistency result for this score covers GES, so with this search it is the analogous
+        data, as for :func:`~andrey.ges`. ``"normal_scores"`` is ``"bic"`` on each column's normal
+        scores, for continuous data that are Gaussian only after an unknown increasing
+        transformation of each column, as :func:`~andrey.ges` describes, with its limits; the
+        consistency result for this score covers GES, so with this search it is the analogous
         construction, not a proven result. ``None`` picks from the declared column types: ``"bdeu"``
         when every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column
         is declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or
-        text type, never by its values.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        text type, never by its values. ``metadata["score_func"]`` names the score the fit used: the
+        one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
