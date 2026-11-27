@@ -34,9 +34,11 @@ tells whether each round changed the graph, and a fit whose last round did logs 
 
 The rows are grouped by which columns they observe once per fit (:class:`Patterns`). Each E-step
 solves a group of several rows with one solve, and the groups of one row that miss the same number
-of columns together, in stacks, with the arithmetic each group has alone. The E-step runs on the
-columns in order of their :func:`~andrey.core.ties.tie_ranks`, with BLAS on one thread, so a new
-column order or more threads move no bit of ``S``.
+of columns together, in stacks, with the arithmetic each group has alone. A group of one row that
+observes one column or misses one stays alone: a stack of it multiplies in dot products, which
+some BLAS sum by each slice's memory alignment. The E-step runs on the columns in order of their
+:func:`~andrey.core.ties.tie_ranks`, with BLAS on one thread, so a new column order or more threads
+move no bit of ``S``.
 
 The missingness must be ignorable: missing completely at random or at random given observed
 values. Under values missing not at random the expected covariance is biased, and nothing in the
@@ -113,11 +115,14 @@ class Patterns:
     """The rows of ``X`` grouped by which columns they observe, built once for a fit's E-steps.
 
     Patterns come in the order of :func:`numpy.unique` over the observed masks. The patterns that
-    hold one row and miss the same number of columns are solved as stacks of at most
-    :data:`STACK_LIMIT` patterns, fewer when :data:`PLAN_CELLS` bounds their arrays; every other
-    pattern is solved alone, and so is every pattern when the shares of ``K_mm^-1`` of all of them
-    hold more than :data:`PLAN_CELLS` entries. Either way each pattern's arithmetic is the one it
-    has alone.
+    hold one row, observe at least two columns, and miss the same number of at least two columns are
+    solved as stacks of at most :data:`STACK_LIMIT` patterns, fewer when :data:`PLAN_CELLS` bounds
+    their arrays; every other pattern is solved alone, and so is every pattern when the shares of
+    ``K_mm^-1`` of all of them hold more than :data:`PLAN_CELLS` entries. Either way each pattern's
+    arithmetic is the one it has alone. A stack of patterns that observe one column or miss one
+    would multiply a row by a column, a dot product, on each slice in place, and some BLAS (Apple's
+    Accelerate) sum a dot product by the memory alignment of its second operand, which a slice of
+    odd size does not share with an array of its own.
     """
 
     def __init__(self, X: np.ndarray) -> None:
@@ -140,7 +145,7 @@ class Patterns:
         for k, pattern in enumerate(patterns):
             rows = order[bounds[k] : bounds[k + 1]]
             o, m = np.flatnonzero(pattern), np.flatnonzero(~pattern)
-            if rows.size == 1 and m.size and o.size and not self.direct_adds:
+            if rows.size == 1 and m.size > 1 and o.size > 1 and not self.direct_adds:
                 by_size.setdefault(int(m.size), []).append((k, int(rows[0]), o, m))
             else:
                 self.alone.append(
