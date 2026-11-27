@@ -217,14 +217,18 @@ def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
     ----------
     corr : ndarray, shape (d, d)
         Correlation matrix of the data's columns. It is read in blocks of whole rows of at most
-        ``COPY_BLOCK_ENTRIES`` entries, so the check holds about one such block beyond it.
+        ``COPY_BLOCK_ENTRIES`` entries, so beyond it the check holds about one such block and the
+        copies found in it.
     n : int
         Sample count.
     """
     d = corr.shape[0]
     if n <= 2 or d < 2:
         return ()
-    return _connected_copies([_copy_pairs(corr[rows], rows) for rows in _row_blocks(d)], d)
+    first = np.arange(d)
+    for rows in _row_blocks(d):
+        first = _join_copies(first, *_copy_pairs(corr[rows], rows))
+    return _groups_by_first(first)
 
 
 #: Correlation entries the copy check holds at once, 8 MB of float64.
@@ -247,20 +251,28 @@ def _copy_pairs(block: np.ndarray, rows: slice) -> tuple[np.ndarray, np.ndarray]
     return i + rows.start, j
 
 
-def _connected_copies(
-    pairs: Sequence[tuple[np.ndarray, np.ndarray]], d: int
-) -> tuple[tuple[int, ...], ...]:
-    """The groups of :func:`copy_groups` for the copies at positions ``pairs`` of ``d`` columns."""
-    i = np.concatenate([rows for rows, _ in pairs])
+def _join_copies(first: np.ndarray, i: np.ndarray, j: np.ndarray) -> np.ndarray:
+    """Each column's smallest connected column, ``first``, updated with the copies ``(i, j)``.
+
+    The graph holds one edge from each column to its ``first`` and the new pairs, so it stays
+    within a block's pairs plus one edge per column, however large a group of copies grows.
+    """
     if not i.size:
-        return ()
-    j = np.concatenate([columns for _, columns in pairs])
-    _, component = connected_components(
-        csr_array((np.ones(i.size), (i, j)), shape=(d, d)), directed=False
-    )
+        return first
+    d = first.size
+    linked = np.flatnonzero(first != np.arange(d))
+    edges = (np.concatenate([first[linked], i]), np.concatenate([linked, j]))
+    graph = csr_array((np.ones(edges[0].size), edges), shape=(d, d))
+    _, label = connected_components(graph, directed=False)
+    _, smallest = np.unique(label, return_index=True)
+    return smallest[label]
+
+
+def _groups_by_first(first: np.ndarray) -> tuple[tuple[int, ...], ...]:
+    """The groups of :func:`copy_groups` from each column's smallest connected column ``first``."""
     members: dict[int, list[int]] = {}
-    for column, label in enumerate(component.tolist()):
-        members.setdefault(label, []).append(column)
+    for column, kept in enumerate(first.tolist()):
+        members.setdefault(kept, []).append(column)
     return tuple(tuple(group) for group in members.values() if len(group) > 1)
 
 
@@ -339,14 +351,14 @@ def check_columns(cov: np.ndarray, n: int, name: Callable[[int], str] | None = N
         return
     sd = np.sqrt(variance)
     corr = np.empty((d, d), dtype=np.result_type(cov, sd)) if n > d else None
-    pairs = []
+    first = np.arange(d)
     for rows in _row_blocks(d):
         block = np.outer(sd[rows], sd)
         np.divide(cov[rows], block, out=block)
         if corr is not None:
             corr[rows] = block
-        pairs.append(_copy_pairs(block, rows))
-    groups = _connected_copies(pairs, d)
+        first = _join_copies(first, *_copy_pairs(block, rows))
+    groups = _groups_by_first(first)
     if groups:
         raise copies_error(groups)
     if corr is None:

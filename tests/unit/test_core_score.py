@@ -367,6 +367,22 @@ def test_copy_groups_in_any_block_of_rows_is_the_whole_matrix_definition(monkeyp
     assert corr.tobytes() == before.tobytes()
 
 
+def test_a_large_group_of_copies_keeps_the_check_within_its_blocks(monkeypatch):
+    n, d = 300, 1500
+    corr = np.corrcoef(_columns(n, 1) * np.arange(1.0, d + 1), rowvar=False)
+    monkeypatch.setattr(score_module, "COPY_BLOCK_ENTRIES", 7 * d)
+    tracemalloc.start()
+    try:
+        tracemalloc.reset_peak()
+        start = tracemalloc.get_traced_memory()[0]
+        groups = copy_groups(corr, n)
+        peak = tracemalloc.get_traced_memory()[1] - start
+    finally:
+        tracemalloc.stop()
+    assert groups == (tuple(range(d)),)
+    assert peak < corr.nbytes / 4
+
+
 @pytest.mark.parametrize("rows", [1, 7, 41])
 def test_check_columns_in_any_block_of_rows_finds_the_same_copies(monkeypatch, rows):
     monkeypatch.setattr(score_module, "COPY_BLOCK_ENTRIES", rows * 8)
