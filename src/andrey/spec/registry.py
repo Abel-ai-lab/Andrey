@@ -1077,7 +1077,7 @@ _add(
     MethodSpec(
         name="exact_search",
         family="score",
-        summary="Globally optimal score search over DAGs (A* or dynamic programming). Exact but "
+        summary="Globally optimal score search over DAGs (A*). Exact but "
         "exponential in the number of variables; keep to about 20 or fewer. Returns the CPDAG of "
         "the best-scoring equivalence class. BIC by default, BDeu when every column is "
         "categorical, conditional Gaussian when some are; score_func=bdeu or "
@@ -1099,8 +1099,8 @@ _add(
                 name="search_method",
                 type="str",
                 default="astar",
-                doc="Exact search strategy: A* or dynamic programming.",
-                choices=("astar", "dp"),
+                doc="Exact search strategy: A* search, the only one.",
+                choices=("astar",),
             ),
             _SCORE_FUNC,
             _PENALTY_DISCOUNT,
@@ -1487,7 +1487,7 @@ _add(
             ParamSpec(
                 name="restrict",
                 type="str",
-                default="mmpc",
+                default="iamb",
                 doc="The restrict phase: mmpc = each variable in the other's MMPC parents and "
                 "children; iamb and inter_iamb = each in the other's Markov blanket and not "
                 "separated by a subset of the smaller blanket (their skeleton); pc = PC's "
@@ -1497,7 +1497,7 @@ _add(
             ParamSpec(
                 name="maximize",
                 type="str",
-                default="hc",
+                default="tabu",
                 doc="The maximize phase: hc = hill climbing; tabu = tabu search.",
                 choices=MAXIMIZES,
             ),

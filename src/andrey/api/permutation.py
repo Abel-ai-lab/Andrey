@@ -890,8 +890,13 @@ def igsp(
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
         others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
         ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
-        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
-        the test the fit used. See Notes.
+        mixed-data ``indep_test`` it raises ``ValueError``. ``"gaussian"`` favors interventions that
+        change a variable's mechanism, such as a new noise variance or weaker causes, whether or
+        not they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where
+        they keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``:
+        it sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
+        interventions shift it and gives up the edges and the exact class when they keep it.
+        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -946,12 +951,12 @@ def igsp(
         malformed, or leaves an environment's targets unknown, as :func:`~andrey.gies` lists; if no
         environment is observational, or every one is, as with ``env`` and ``targets`` both
         ``None``; if an environment has fewer than 3 rows; if ``invariance_test="gaussian"`` comes
-        with a categorical or mixed-data ``indep_test``; if ``data`` holds a missing or infinite
-        value, a column constant on every row or on the observational rows, or does not suit the
-        test, as for :func:`~andrey.pc`. With a partial-correlation test, also if a column repeats
-        another up to scale and shift on the observational rows; one message names every group of
-        copies. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        with a categorical or mixed-data ``indep_test``, or ``"indicator"`` with ``"fisherz"`` or
+        ``"student_t"``; if ``data`` holds a missing or infinite value, a column constant on every
+        row or on the observational rows, or does not suit the test, as for :func:`~andrey.pc`. With
+        a partial-correlation test, also if a column repeats another up to scale and shift on the
+        observational rows; one message names every group of copies. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1017,7 +1022,7 @@ def igsp(
     ``"indicator"``, a variable is invariant when ``indep_test`` finds it independent of a 0/1
     indicator of the setting's rows given the others, on the rows of the setting and the
     observational ones [5]_; under ``"fisherz"`` and ``"student_t"`` this sees a change of the mean
-    alone, which is why ``"gaussian"`` is their default.
+    alone, which is why ``"gaussian"`` is their default and ``"indicator"`` is refused.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -1213,8 +1218,13 @@ def ut_igsp(
         ``indep_test`` between the variable and a 0/1 indicator of the setting's rows given the
         others. ``None`` picks ``"gaussian"`` under ``"fisherz"`` and ``"student_t"``, else
         ``"indicator"``. ``"gaussian"`` reads every column as numbers, so with a categorical or
-        mixed-data ``indep_test`` it raises ``ValueError``. ``metadata["invariance_test"]`` names
-        the test the fit used. See Notes.
+        mixed-data ``indep_test`` it raises ``ValueError``. ``"gaussian"`` favors interventions that
+        change a variable's mechanism, such as a new noise variance or weaker causes, whether or
+        not they move its mean; in ``ut_igsp`` it gives up a few more false targets on data where
+        they keep it. ``"indicator"`` with ``"fisherz"`` or ``"student_t"`` raises ``ValueError``:
+        it sees only a shift of the mean, so it gives about the graph of ``"gaussian"`` when
+        interventions shift it and gives up the edges and the exact class when they keep it.
+        ``metadata["invariance_test"]`` names the test the fit used. See Notes.
     n_starts : int, default=10
         Number of searches, at least ``1``, each from a minimum-degree order of the variables:
         the first breaks ties by each column's rank, and each later one draws them, and the order
@@ -1285,12 +1295,12 @@ def ut_igsp(
         :func:`~andrey.gies` lists; if no environment is observational, or every one is; if an
         environment has fewer than 3 rows; if, without ``env``, two environments' known targets join
         to one key, as when a column label holds a comma; if ``invariance_test="gaussian"`` comes
-        with a categorical or mixed-data ``indep_test``; if ``data`` holds a missing or infinite
-        value, a column constant on every row or on the observational rows, or does not suit the
-        test, as for :func:`~andrey.pc`. With a partial-correlation test, also if a column repeats
-        another up to scale and shift on the observational rows; one message names every group of
-        copies. Also if ``knowledge`` names a column ``data`` lacks or contradicts itself, as
-        :class:`~andrey.Knowledge` lists.
+        with a categorical or mixed-data ``indep_test``, or ``"indicator"`` with ``"fisherz"`` or
+        ``"student_t"``; if ``data`` holds a missing or infinite value, a column constant on every
+        row or on the observational rows, or does not suit the test, as for :func:`~andrey.pc`. With
+        a partial-correlation test, also if a column repeats another up to scale and shift on the
+        observational rows; one message names every group of copies. Also if ``knowledge`` names a
+        column ``data`` lacks or contradicts itself, as :class:`~andrey.Knowledge` lists.
 
     Warns
     -----
@@ -1354,7 +1364,7 @@ def ut_igsp(
     ``indep_test`` finds it independent of a 0/1 indicator of the setting's rows given the others,
     on the rows of the setting and the observational ones [4]_; under ``"fisherz"`` and
     ``"student_t"`` this sees a change of the mean alone, which is why ``"gaussian"`` is their
-    default.
+    default and ``"indicator"`` is refused.
 
     **Environments and targets.** Every environment whose targets are ``[]`` is observational, and
     their rows are pooled. Every other environment is a setting, compared with the observational
@@ -2134,10 +2144,11 @@ def _chosen_tests(
 
     Returns the conditional-independence test, the invariance test (``None`` picks it to match),
     the checked data, and the categorical mask. Raises ``ValueError`` when ``"gaussian"`` comes
-    with a categorical or mixed-data test, which reads category codes.
+    with a categorical or mixed-data test, which reads category codes, and when ``"indicator"``
+    comes with a partial-correlation test, which sees only a shift of the mean.
     """
     from andrey.core.ci import DISCRETE_INDEP_TESTS, MIXED_INDEP_TESTS
-    from andrey.core.invariance import default_invariance_test
+    from andrey.core.invariance import GAUSSIAN_INVARIANCE, default_invariance_test
 
     assert indep_test is not None  # method_spec picks it from the column types
     invariance_test = invariance_test or default_invariance_test(indep_test)
@@ -2146,6 +2157,11 @@ def _chosen_tests(
             f"{method}: invariance_test='gaussian' regresses on the columns' values and so cannot "
             f"read categorical columns, which indep_test={indep_test!r} reads; use 'indicator' "
             "or None"
+        )
+    if invariance_test == "indicator" and indep_test in GAUSSIAN_INVARIANCE:
+        raise ValueError(
+            f"{method}: invariance_test='indicator' with indep_test={indep_test!r} sees only a "
+            "shift of a variable's mean; use 'gaussian' or None, which picks it"
         )
     X, mask = checked_data(data, categorical, "indep_test", indep_test, method=method)
     return indep_test, invariance_test, X, mask

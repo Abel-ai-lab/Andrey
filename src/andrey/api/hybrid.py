@@ -328,8 +328,8 @@ def mmhc(
 def rsmax2(
     data: npt.ArrayLike,
     *,
-    restrict: str = "mmpc",
-    maximize: str = "hc",
+    restrict: str = "iamb",
+    maximize: str = "tabu",
     alpha: float = 0.05,
     indep_test: str | None = None,
     degrees_of_freedom: str = "mean",
@@ -357,7 +357,7 @@ def rsmax2(
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    restrict : {"mmpc", "iamb", "inter_iamb", "pc"}, default="mmpc"
+    restrict : {"mmpc", "iamb", "inter_iamb", "pc"}, default="iamb"
         The restrict phase. ``"mmpc"`` keeps a pair when each variable is in the other's MMPC
         parents and children [2]_, as :func:`~andrey.mmhc` does. ``"iamb"`` and ``"inter_iamb"``
         keep a pair when each variable is in the other's Markov blanket from IAMB or Inter-IAMB [3]_
@@ -365,10 +365,17 @@ def rsmax2(
         ``iamb(structure="skeleton")``, which drops the pairs of parents of a common child. ``"pc"``
         keeps the skeleton of :func:`~andrey.pc`'s adjacency search [4]_. With ``knowledge``,
         ``"mmpc"`` and ``"pc"`` read it in the restrict phase, and ``"iamb"`` and ``"inter_iamb"``
-        read the data alone; ``knowledge`` below says why. ``"mmpc"`` favors time; it gives up
-        accuracy. ``"iamb"`` favors accuracy; it gives up time. See Notes.
-    maximize : {"hc", "tabu"}, default="hc"
-        The maximize phase: :func:`~andrey.hc` or :func:`~andrey.tabu`.
+        read the data alone; ``knowledge`` below says why. On linear-Gaussian data, ``"iamb"``
+        favors accuracy against ``"mmpc"`` and ``"pc"``: fewer missing and extra edges and more
+        correctly oriented ones, most on denser graphs; it gives up time against ``"mmpc"`` on many
+        variables. ``"inter_iamb"`` is about as accurate as ``"iamb"`` and gives up the same time.
+        ``"mmpc"`` favors time against the two blanket restricts; it gives up accuracy to them.
+        ``"pc"`` gives up accuracy on denser graphs. See Notes.
+    maximize : {"hc", "tabu"}, default="tabu"
+        The maximize phase: :func:`~andrey.tabu` or :func:`~andrey.hc`. On linear-Gaussian data,
+        ``"tabu"`` favors fewer errors, more correctly oriented edges, and a better-scoring graph
+        than ``"hc"``, with any ``restrict``; ``"hc"`` gives up that accuracy. ``restrict="mmpc"``
+        with ``maximize="hc"`` is :func:`~andrey.mmhc`'s search.
     alpha : float, default=0.05
         Significance level of the restrict phase's tests, in ``(0, 1)``. Smaller values keep fewer
         pairs.
@@ -539,21 +546,21 @@ def rsmax2(
     and rows, and more in two: 38.0 against 36.3 on the 46-variable ECOLI70 network with 1,000
     simulated rows, where one of three draws moved by 7, and 39.2 against 38.8 with 50 variables,
     mean degree 4, ``scale="unitless"``, and 1,000 rows. With 200 variables and 2,000 rows it made
-    42 errors against 65 (200 true edges). The default ``restrict="mmpc"`` with ``maximize="hc"``
-    is :func:`~andrey.mmhc`'s search, whose numbers are given there.
+    42 errors against 65 (200 true edges). ``restrict="mmpc"`` with ``maximize="hc"`` is
+    :func:`~andrey.mmhc`'s search, whose numbers are given there.
 
     **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: its score phase scores every
     variable over the same rows, and score terms over different rows do not add up to the score of
     one dataset. Drop the incomplete rows yourself, which suits values missing completely at random,
     or use :func:`~andrey.pc` or :func:`~andrey.fci`, whose tests delete rows per test.
 
-    **Limitations.** With ``restrict="mmpc"`` or ``"iamb"`` and ``maximize="hc"``, on
-    linear-Gaussian data it made fewer errors than the empty graph in every setting, by the least
-    margin on small, denser graphs. An edge the restrict phase misses is never recovered, and the
-    maximize phase stops at a local optimum. A true path claim cannot restore a missed edge and can
-    direct an edge of a wrong graph the wrong way; a known edge belongs in ``required``. The
+    **Limitations.** On linear-Gaussian data, with every ``restrict`` and ``maximize``, it made
+    fewer errors than the empty graph in every setting measured, by the least margin on small,
+    denser graphs. An edge the restrict phase misses is never recovered, and the maximize phase
+    stops at a local optimum. A true path claim cannot restore a missed edge and can direct an edge
+    of a wrong graph the wrong way; a known edge belongs in ``required``. The
     `0.12.0 release card <https://andrey.abel.ai/docs/benchmarks/0.12.0.html#rsmax2>`__ has the
-    numbers.
+    numbers for hill climbing.
 
     References
     ----------

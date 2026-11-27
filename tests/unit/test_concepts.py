@@ -1009,7 +1009,7 @@ CI_CASES = {
     "inter_iamb": [{}],
     "mmpc": [{}, {"target": 0}],
     "mmhc": [{}],
-    "rsmax2": [{"restrict": "pc"}, {"restrict": "iamb"}],
+    "rsmax2": [{"restrict": "mmpc"}, {"restrict": "pc"}, {"restrict": "iamb"}],
     "pcmci": [{}],
     "pcmciplus": [{}],
     "lpcmci": [{}],
@@ -1250,7 +1250,8 @@ def test_a_removed_name_is_an_unknown_argument_that_says_what_it_is_called_now(m
 def test_a_removed_score_name_is_refused_with_the_score_it_is_called_now(method, row):
     param = next(p for p in REGISTRY[method].params if p.name == row.name)
     assert not param.choice_aliases
-    assert row.value not in param.choices and row.now in param.choices
+    assert row.value not in param.choices
+    assert row.now is None or row.now in param.choices  # a dropped value has no current one
     with pytest.raises(ValueError, match=f"{method}: {row.name}.*{row.value}") as error:
         call_with(method, **{row.name: row.value})
     assert removal_hint(method, row.name, row.value) in str(error.value)

@@ -2514,18 +2514,17 @@ def exact_search(
     """Learn the CPDAG of the globally optimal DAGs for a decomposable score by exact search.
 
     The optimum is identified up to its Markov equivalence class, so the search returns the class's
-    CPDAG, as the other score searches do; A* (``search_method="astar"``) [1]_ and dynamic
-    programming (``"dp"``) [2]_ find the same DAG of that class, which ``metadata["dag"]`` keeps.
-    Runtime is exponential in the variable count, so keep the problem small (roughly <= 20
-    variables).
+    CPDAG, as the other score searches do; A* [1]_ finds one DAG of that class, which
+    ``metadata["dag"]`` keeps. Runtime is exponential in the variable count, so keep the problem
+    small (roughly <= 20 variables).
 
     Parameters
     ----------
     data : array-like of shape (n_samples, n_variables)
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
-    search_method : {"astar", "dp"}, default="astar"
-        Exact search strategy: A* search or dynamic programming.
+    search_method : {"astar"}, default="astar"
+        Exact search strategy: A* search over the order graph, the only one.
     score_func : str or None, default=None
         Local score: ``"bic"``, the linear-Gaussian BIC; ``"bdeu"`` or ``"discrete_bic"``, the BDeu
         score or the multinomial BIC for categorical data coded by whole numbers; or
@@ -2712,8 +2711,8 @@ def exact_search(
 
     **Limitations.** At ``ebic_gamma=0.0`` on linear-Gaussian data it made fewer errors than the
     empty graph at every size and density it finished, but it scores every possible parent set of
-    every variable, so its run time at least doubles with each added variable, and under ``"dp"`` so
-    does its memory. With fewer rows than columns the BIC is unreliable, and the search never
+    every variable, so its run time at least doubles with each added variable, and its memory about
+    doubles. With fewer rows than columns the BIC is unreliable, and the search never
     selects a parent set that fits its child exactly. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
     every setting.
