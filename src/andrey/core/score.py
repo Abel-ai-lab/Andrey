@@ -621,11 +621,12 @@ class BICScore:
 class _CountScore:
     """Memoized local scores computed from a node's counts in each configuration of its parents.
 
-    A subclass sets ``n``, ``_codes`` and ``_cardinalities`` (see
-    :func:`~andrey.core.categorical.encode`) and ``_memo``, and scores one table in :meth:`_local`.
-    :meth:`score_many` counts the tables of every parent set not yet memoized together
-    (:func:`~andrey.core.categorical.table_counts`); a score is the same whether it is computed
-    alone or in a batch.
+    A subclass sets ``n``, ``_codes`` (column-major, so each column is read contiguously) and
+    ``_cardinalities`` (see :func:`~andrey.core.categorical.encode`) and ``_memo``, and scores one
+    table in :meth:`_local`. :meth:`score_many` counts the tables of every parent set not yet
+    memoized together (:func:`~andrey.core.categorical.table_counts`) and scores them in
+    :meth:`_local_many`, which a subclass overrides to score a batch of tables at once; a score is
+    the same whether it is computed alone or in a batch.
     """
 
     n: int
@@ -635,6 +636,12 @@ class _CountScore:
 
     def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
         raise NotImplementedError
+
+    def _local_many(
+        self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
+    ) -> list[float]:
+        """Return the score of each parent set in ``keys`` from its table in ``tables``."""
+        return [self._local(node, key, counts) for key, counts in zip(keys, tables, strict=True)]
 
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the memoized local score for ``node`` given ``parents``.
@@ -658,9 +665,9 @@ class _CountScore:
         todo = [key for key, value in found.items() if value is None]
         if todo:
             tables = categorical.table_counts(self._codes, self._cardinalities, node, todo)
-            for key, counts in zip(todo, tables, strict=True):
-                found[key] = self._local(node, key, counts)
-                self._memo.put((node, key), found[key])
+            for key, value in zip(todo, self._local_many(node, todo, tables), strict=True):
+                found[key] = value
+                self._memo.put((node, key), value)
         return [found[key] for key in keys]
 
     def on_rows(self, rows: np.ndarray, cache_size: int | None = 1_000_000) -> Self:
@@ -669,7 +676,12 @@ class _CountScore:
         Every other setting is kept, the multinomial BIC's ``log(n)`` of all rows included.
         """
         out = copy.copy(self)
-        out._codes = self._codes[rows]
+        mask = np.asarray(rows)
+        if mask.dtype == np.bool_:
+            if mask.shape != (self.n,):
+                raise IndexError(f"rows marks {mask.size} rows of {self.n}")
+            mask = np.flatnonzero(mask)
+        out._codes = self._codes.T.take(mask, axis=1).T  # each column of the rows stays contiguous
         out.n = out._codes.shape[0]
         out._memo = _LRU(cache_size)
         return out
@@ -741,12 +753,69 @@ class BDeuScore(_CountScore):
         self.n: int = arr.shape[0]
         self.equivalent_sample_size = float(equivalent_sample_size)
         self.structure_prior = float(structure_prior)
-        self._codes, self._cardinalities = categorical.encode(arr)
+        self._codes, self._cardinalities = categorical.encode(arr, order="F")
         others = arr.shape[1] - 1
         p = self.structure_prior / others if others > 0 else 1.0
         # Per-parent and per-non-parent log prior, or none when p is not a probability below 1.
         self._prior = (float(np.log(p)), float(np.log1p(-p)), others) if p < 1.0 else None
         self._memo = _LRU(cache_size)
+
+    def _local_many(
+        self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
+    ) -> list[float]:
+        """Score the tables in chunks of at most ``BATCH_CELLS`` cells (a larger table alone), each
+        chunk with one ``gammaln`` call over its tables' ``N_ij`` and one over their ``N_ijk``, and
+        each table's terms summed over its own slice in the order of :meth:`_local`."""
+        out: list[float] = []
+        start = 0
+        while start < len(tables):
+            stop, cells = start + 1, tables[start].size
+            while stop < len(tables) and cells + tables[stop].size <= categorical.BATCH_CELLS:
+                cells += tables[stop].size
+                stop += 1
+            out += self._local_chunk(node, keys[start:stop], tables[start:stop])
+            start = stop
+        return out
+
+    def _local_chunk(
+        self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
+    ) -> list[float]:
+        if len(tables) < 2:
+            return super()._local_many(node, keys, tables)
+        r = tables[0].shape[1]
+        a_j = [
+            self.equivalent_sample_size
+            / float(np.prod([float(self._cardinalities[p]) for p in key]))
+            for key in keys
+        ]
+        a_jk = [a / r for a in a_j]
+        n_ij = [counts.sum(axis=1) for counts in tables]
+        n_ijk = [counts[counts > 0] for counts in tables]
+        rows = [x.size for x in n_ij]
+        cells = [x.size for x in n_ijk]
+        g_ij = gammaln(np.concatenate(n_ij) + np.repeat(a_j, rows))
+        g_ijk = gammaln(np.concatenate(n_ijk) + np.repeat(a_jk, cells))
+        g_a_j = gammaln(np.array(a_j)).tolist()
+        g_a_jk = gammaln(np.array(a_jk)).tolist()
+        out: list[float] = []
+        i = k = 0
+        for t, key in enumerate(keys):
+            log_likelihood = (
+                rows[t] * g_a_j[t]
+                - float(np.sum(g_ij[i : i + rows[t]]))
+                + float(np.sum(g_ijk[k : k + cells[t]]))
+                - cells[t] * g_a_jk[t]
+            )
+            i += rows[t]
+            k += cells[t]
+            out.append(-2.0 * (log_likelihood + self._log_prior(len(key))))
+        return out
+
+    def _log_prior(self, parents: int) -> float:
+        if self._prior is None:
+            return 0.0
+        log_p, log_not_p, others = self._prior
+        return parents * log_p + (others - parents) * log_not_p
 
     def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
         m, r = counts.shape
@@ -761,12 +830,7 @@ class BDeuScore(_CountScore):
             + float(np.sum(gammaln(n_ijk + a_jk)))
             - n_ijk.size * float(gammaln(a_jk))
         )
-        log_prior = 0.0
-        if self._prior is not None:
-            log_p, log_not_p, others = self._prior
-            k = len(parents)
-            log_prior = k * log_p + (others - k) * log_not_p
-        return -2.0 * (log_likelihood + log_prior)
+        return -2.0 * (log_likelihood + self._log_prior(len(parents)))
 
 
 class CategoricalBICScore(_CountScore):
@@ -825,7 +889,7 @@ class CategoricalBICScore(_CountScore):
         self.n: int = arr.shape[0]
         self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
-        self._codes, self._cardinalities = categorical.encode(arr)
+        self._codes, self._cardinalities = categorical.encode(arr, order="F")
         self._memo = _LRU(cache_size)
 
     def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
