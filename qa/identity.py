@@ -66,6 +66,7 @@ import andrey
 from andrey import GraphStructure, StructureOutput, TemporalStructure, data
 from andrey.core import ci, ci_cmiknn, ci_gpdc, ci_kernel, ci_missing, score, score_delta
 from andrey.search import hc, xges
+from andrey.temporal.lpcmci_lattice import SubsetLattice
 from qa import quality_gate as qg
 
 # ==================================================================================================
@@ -912,6 +913,12 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         x, y, conditions, ps
     ),
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    # The subsets of a lattice answered, up to the first separating one; the chunk's subsets after
+    # it are computed ahead and dropped, so they are not queries.
+    "prefix": lambda rp, lattice, start, stop, alpha: [
+        (lattice.x, lattice.y, row, p)
+        for row, p in zip(lattice.rows(np.arange(start, start + len(rp[1]))), rp[1])
+    ],
     "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
         (x, y, condition_set, p) for y, p in zip(ys, rp[1])
     ],
@@ -939,6 +946,8 @@ CI_CLASSES = (
     ci_missing.GaussianDeletion,
     ci_missing.ChiSquareDeletion,
     ci_missing.BoundedDeletion,
+    # LPCMCI's partial correlations of the subsets of a search, read from the previous size's.
+    SubsetLattice,
 )
 #: The local scores' query methods and the score-delta functions, each with the parent sets one
 #: call scores, read from the call's result, the score, and the call's arguments. A delta scores
