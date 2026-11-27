@@ -58,7 +58,6 @@ from typing import Any, Protocol
 
 import numpy as np
 import numpy.typing as npt
-from scipy import stats
 
 from .ci import MIXED_INDEP_TESTS, make_indep_test
 
@@ -177,6 +176,8 @@ class GaussianInvariance:
         self._sizes = [int((g == k).sum()) for k in (0, 1)]
 
     def __call__(self, y: int, condition_set: Iterable[int] = ()) -> float:
+        from scipy import stats
+
         cols = [0, *(int(s) + 1 for s in sorted(set(condition_set)))]
         target = int(y) + 1
         fits = [_regression(G, cols, target) for G in self._grams]
@@ -213,6 +214,8 @@ def _regression(gram: np.ndarray, cols: list[int], target: int) -> tuple[float, 
 
 def _two_sided(s1: float, s0: float, df_1: int, df_0: int) -> float:
     """The two-sided p-value of the variance ratio ``s1 / s0`` on ``F(df_1, df_0)``."""
+    from scipy import stats
+
     if s0 == 0 and s1 == 0:
         return 1.0
     ratio = np.inf if s0 == 0 else s1 / s0
@@ -316,6 +319,8 @@ class ApproximateInvariance(RegressionInvariance):
     name = "icp_approximate"
 
     def _p_values(self, grams, rows, pooled, beta, rss) -> np.ndarray:
+        from scipy import stats
+
         sizes, y = self._sizes, grams.shape[1] - 1
         A = grams[:, rows[:, :, None], rows[:, None, :]]
         # Each group's residual sum and sum of squares, from its Gram block.
@@ -349,6 +354,8 @@ class ExactInvariance(RegressionInvariance):
     name = "icp_exact"
 
     def _p_values(self, grams, rows, pooled, beta, rss) -> np.ndarray:
+        from scipy import stats
+
         sizes, y = self._sizes, grams.shape[1] - 1
         G = grams.sum(axis=0)
         k = rows.shape[1]
