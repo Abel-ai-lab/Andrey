@@ -63,7 +63,7 @@ names its pull request.
   been since 0.7.0, and an update note points to the 0.7.0 release card. ([#1254])
 - For contributors, SkewD's tests of a property that holds for every optimizer run on L-BFGS-B in
   pull requests, and their CMA-ES cases, with the CMA-ES recovery tests, carry the `release` mark, so
-  the unit tests of `tests/unit/test_skewd.py` take 140 s on one core instead of 625 s, and the macOS
+  the unit tests of `tests/unit/test_skewd.py` take 120 s on one core instead of 625 s, and the macOS
   unit job skips the `release` cases unless a manual run asks for them. ([#1257])
 
 ### Fixed
