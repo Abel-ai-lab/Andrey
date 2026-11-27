@@ -208,3 +208,23 @@ def test_constants_stay_per_score_object(first: dict, second: dict, fallbacks: l
             assert _hex(got[0]) == _hex(want[0])
             assert _hex(got[1]) == _hex(want[1])
     assert fallbacks == []
+
+
+def test_constants_are_bounded(monkeypatch: pytest.MonkeyPatch, fallbacks: list[int]) -> None:
+    """A score's store of constants starts over at its cap, and the batches are scored as before."""
+    monkeypatch.setattr(sd, "_ADD_CONSTANTS_CAP", 5)
+    d, n = 16, 400
+    cov = np.cov(np.random.default_rng(9).standard_normal((n, d)).T)
+    lean, reference = _scores(cov, n)
+    rng = np.random.default_rng(10)
+    for v in range(d):
+        others = [u for u in range(d) if u != v]
+        for size in range(8):
+            base = sorted(int(u) for u in rng.permutation(others)[:size])
+            moves = _adds(d, v, base)
+            got = _public(lean, v, base, moves)
+            want = _general(reference, v, base, moves)
+            assert _hex(got[0]) == _hex(want[0])
+            assert _hex(got[1]) == _hex(want[1])
+            assert len(sd._ADD_CONSTANTS[lean]) <= 5
+    assert fallbacks == []

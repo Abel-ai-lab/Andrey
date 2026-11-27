@@ -433,6 +433,8 @@ class _AddConstants:
 
 # The constants of a batch of adds, per score object and per ``(vertex, base size)``. They read the
 # score's penalty, which scores sharing one inv-cov cache do not share, so they are not kept there.
+# A score's store starts over at this many entries; each is cheap to compute again.
+_ADD_CONSTANTS_CAP = _INV_CACHE_CAP
 _ADD_CONSTANTS: WeakKeyDictionary[BICScore, dict[tuple[int, int], _AddConstants]] = (
     WeakKeyDictionary()
 )
@@ -637,6 +639,8 @@ def _score_adds_with_base(
         per_score = _ADD_CONSTANTS[score_obj] = {}
     constants = per_score.get((i, s))
     if constants is None:
+        if len(per_score) >= _ADD_CONSTANTS_CAP:
+            per_score.clear()
         var_v = float(cov_diag[i])
         pen_add = score_obj.log_n * (s + 1) * score_obj.penalty_discount
         if score_obj.ebic_gamma:
