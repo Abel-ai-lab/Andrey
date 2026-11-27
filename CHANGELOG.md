@@ -86,6 +86,12 @@ names its pull request.
   candidates the empty set separates from its target the same way. Where it separates few pairs,
   the search keeps a separating set and a p-value for each, as before. On a sparse graph of 2,000
   variables and 300 rows, the peak memory `pc` adds falls to about a third. ([#1277])
+- `pc`, `fci`, `cdnod`, `fci_jci`, `rsmax2`, and the other methods that run the PC family's skeleton
+  search with `fisherz`, `student_t`, or `normal_scores` on complete data build the queries of the
+  conditioning-size-1 pass from arrays, and the scans of conditioning sets of two or more variables
+  list the sets of a small neighborhood at once, so they run faster on many variables, with the
+  same output bit for bit. The size-1 pass holds a boolean matrix of the variables' adjacency.
+  ([#1287])
 
 ### Fixed
 
@@ -3045,3 +3051,4 @@ First alpha release.
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1277]: https://github.com/Abel-ai-lab/Andrey/pull/1277
+[#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
