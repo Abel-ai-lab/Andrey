@@ -1040,6 +1040,8 @@ def fci_orient(
         change = _rule_r8(marks, change)
         change = _rule_r9(marks, change, ambiguous)
         change = _rule_r10(marks, change, ambiguous)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("fci.rules", marks=marks)
 
 
 def _memoized(test: CITest) -> CITest:

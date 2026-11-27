@@ -928,6 +928,25 @@ def test_a_skeleton_search_records_every_size_from_zero_in_order_and_then_its_en
     assert [stage for stage, _ in skeleton].count("skeleton.end") == 1
 
 
+@pytest.mark.parametrize("tie_break", ["rank", "position"])
+def test_fci_records_its_rule_sweeps_under_either_tie_break(x: np.ndarray, tie_break: str) -> None:
+    with andrey.config(tie_break=tie_break):
+        plain = andrey.fci(x, seed=0)
+        with identity.checkpointing(True) as recorder:
+            checkpointed = andrey.fci(x, seed=0)
+    assert identity.digest(checkpointed) == identity.digest(plain)
+    rules = [r for r in recorder.records if r.stage == "fci.rules"]
+    assert rules and all(r.pieces[0].name == "marks" for r in rules)
+
+
+@pytest.mark.parametrize("stage", ["ages.forward", "ages.backward"])
+def test_ages_records_each_moves_limit_with_the_move(stage: str) -> None:
+    dataset = FAMILY_STAGES["AGES"][0]
+    _, _, records = _fit_on("AGES", dataset, checkpoints=True)
+    moves = [r for r in records if r.stage == stage]
+    assert moves and all([p.name for p in r.pieces] == ["move", "cpdag", "limit"] for r in moves)
+
+
 def test_hc_records_its_perturbations_and_climbs(x: np.ndarray) -> None:
     with identity.checkpointing(True) as recorder:
         andrey.hc(x, n_starts=2, n_perturbations=2, seed=0)
@@ -1143,6 +1162,22 @@ def test_bits_are_told_from_values_sequences_and_missing_records(capsys) -> None
     assert identity.first_difference(identity.stages_of(one), identity.stages_of(one)) is None
     rc, out = _compared(one, nudged, capsys)
     assert "(bits)" in out and rc == 1
+
+
+def test_the_same_bytes_under_another_form_width_or_record_are_a_difference() -> None:
+    row = _fit_record([("a", None, {"total": [1.0, 2.0]})])
+    matrix = _fit_record([("a", None, {"total": np.array([[1.0, 2.0]])})])
+    pair = _fit_record([("a", None, {"x": [1.0], "y": [2.0]})])
+    split = _fit_record([("a", None, {"x": [1.0]}), ("a", None, {"y": [2.0]})])
+    assert identity.first_difference(identity.stages_of(row), identity.stages_of(row)) is None
+    layout = identity.first_difference(identity.stages_of(row), identity.stages_of(matrix))
+    assert layout is not None and layout.kind == "sequence" and layout.piece == "total"
+    assert (
+        layout.where == "a total (record 0, list, width 0) -> a total (record 0, matrix, width 2)"
+    )
+    regrouped = identity.first_difference(identity.stages_of(pair), identity.stages_of(split))
+    assert regrouped is not None and regrouped.kind == "sequence" and regrouped.piece == "y"
+    assert "(record 0," in regrouped.where and "(record 1," in regrouped.where
 
 
 def test_two_fits_that_part_alike_group_under_one_fingerprint_and_one_stage(capsys) -> None:

@@ -1794,9 +1794,10 @@ class Difference:
 
     ``kind`` is ``"value"``, the same piece with different elements; ``"bits"``, a float piece
     whose differing elements all agree up to :data:`RTOL` and :data:`ATOL`; ``"sequence"``, another
-    stage or piece at that position; or ``"missing"``, a fit that ends first. ``index`` is the first
-    element whose bytes differ, ``where`` reads it by the piece's form, ``change`` shows the two
-    values, and ``lengths`` are the arrays' lengths (:data:`FORMS`).
+    stage or piece at that position, or the same bytes under another record, form, or width; or
+    ``"missing"``, a fit that ends first. ``index`` is the first element whose bytes differ,
+    ``where`` reads it by the piece's form, ``change`` shows the two values, and ``lengths`` are the
+    arrays' lengths (:data:`FORMS`).
     """
 
     record: int
@@ -1879,7 +1880,15 @@ def first_difference(before: Stages, after: Stages) -> Difference | None:
                 a.record, a.stage, a.level, a.piece, "sequence", None, where=f"{here} -> {there}"
             )
         if a.digest == b.digest:
-            continue
+            if (a.record, a.form, a.width, a.length) == (b.record, b.form, b.width, b.length):
+                continue
+            layout = (
+                f"{a.stage} {a.piece} (record {a.record}, {a.form}, width {a.width}) -> "
+                f"{b.stage} {b.piece} (record {b.record}, {b.form}, width {b.width})"
+            )
+            return Difference(
+                a.record, a.stage, a.level, a.piece, "sequence", None, (a.length, b.length), layout
+            )
         x, y = before.array(i), after.array(i)
         differs = _bytes_differ(x, y)
         index = int(np.flatnonzero(differs)[0]) if differs.any() else min(x.size, y.size)
