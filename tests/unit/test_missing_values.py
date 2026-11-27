@@ -24,7 +24,7 @@ import pytest
 import andrey
 from andrey.cli import main
 from andrey.constraint import blanket
-from andrey.core import ci, ci_missing, warning_policy
+from andrey.core import categorical, ci, ci_missing, warning_policy
 from andrey.core.ci import (
     FisherZ,
     PartialCorrelationTest,
@@ -384,6 +384,221 @@ def test_a_scan_takes_its_conditioning_set_as_one_query_does():
         assert r.shape == p.shape == (0,)
 
 
+#: The gaps of :func:`_discrete_scan_data`, each sending the queries of a chi-square scan down one
+#: path of :class:`~andrey.core.ci_missing.ChiSquareDeletion`.
+DISCRETE_SCAN_KINDS = ["cells", "rare", "few", "apart", "pair", "flat"]
+
+
+def _discrete_scan_data(kind: str, seed: int, d: int = 10, n: int = 600) -> np.ndarray:
+    """Categorical data of ``d`` columns, each close to the one before it, with gaps of one kind.
+
+    ``cells`` are missing completely at random. In ``rare``, columns 1 and 4 hold a level that three
+    rows have, so a block can lose it, column 0 holds non-integer values, and a fifth of the cells
+    are missing. ``few`` has few rows and many gaps, so queries are not tested. In ``apart``,
+    columns 2 and 6 are never observed together; in ``pair``, only on two rows, the fewest a query
+    is tested on. In ``flat``, column 5 holds one category, so a query over it has no degrees of
+    freedom.
+    """
+    rng = np.random.default_rng(seed)
+    x = rng.integers(0, 3, (n, d)).astype(np.float64)
+    for column in range(1, d):
+        x[:, column] = np.where(rng.random(n) < 0.5, x[:, column - 1], x[:, column])
+    rate = 0.06
+    if kind == "rare":
+        for column in (1, 4):
+            x[rng.choice(n, 3, replace=False), column] = 7.0
+        x[:, 0] = x[:, 0] * 0.5 - 1.25
+        rate = 0.2
+    elif kind == "few":
+        x = x[:40]
+        rate = 0.45
+    elif kind in ("apart", "pair"):
+        x[: n // 2, 2] = np.nan
+        x[n // 2 :, 6] = np.nan
+    elif kind == "flat":
+        x[:, 5] = 1.0
+    x[rng.random(x.shape) < rate] = np.nan
+    if kind == "pair":  # two rows observe every column, and differ in columns 2 and 6
+        x[[0, -1]] = rng.integers(0, 3, (2, d))
+        x[0, [2, 6]], x[-1, [2, 6]] = 0.0, 1.0
+    return x
+
+
+def _bits(p) -> list[int]:
+    """The bits of each p-value, so a ``NaN`` equals a ``NaN``."""
+    return np.asarray(p, dtype=np.float64).view(np.uint64).tolist()
+
+
+@pytest.mark.parametrize("flags", [False, True], ids=["no_flags", "flags"])
+@pytest.mark.parametrize("degrees_of_freedom", ["mean", "nonempty"])
+@pytest.mark.parametrize("name", ["chisq", "gsq"])
+@pytest.mark.parametrize("kind", DISCRETE_SCAN_KINDS)
+def test_a_chi_square_scan_on_missing_values_is_each_candidate_asked_alone_bit_for_bit(
+    kind, name, degrees_of_freedom, flags, monkeypatch
+):
+    """``pvalues_given`` gives each candidate the p-value of the same query asked alone on a fresh
+    test, bit for bit and ``NaN`` for ``NaN``, and the running counter holds what the separate calls
+    leave in it: the rows, the queries not tested, their pairs and sets, and the largest p-values,
+    whichever way the query goes: a block that lost a category, too few rows, a pair never observed
+    together, or no degrees of freedom."""
+    x = _discrete_scan_data(kind, seed=1, **({"n": 40} if kind == "few" else {}))
+    built = [0]
+    real = ci_missing.ChiSquareDeletion._block_pvalue
+
+    def counting(self, *args):
+        built[0] += 1
+        return real(self, *args)
+
+    monkeypatch.setattr(ci_missing.ChiSquareDeletion, "_block_pvalue", counting)
+    untested = lost = fewest = 0
+    for target, xs, cond in _scans(x.shape[1], np.random.default_rng(1)):
+        scanned = make_indep_test(name, x, degrees_of_freedom=degrees_of_freedom)
+        alone = make_indep_test(name, x, degrees_of_freedom=degrees_of_freedom)
+        assert type(scanned) is ci_missing.ChiSquareDeletion
+        with reading_flags(flags), rows_tested() as got_counter:
+            got = scanned.pvalues_given(target, xs, cond)
+        with reading_flags(flags), rows_tested() as want_counter:
+            want = [alone(target, y, cond) for y in xs]
+        assert _bits(got) == _bits(want)
+        assert _counted(got_counter) == _counted(want_counter)
+        untested += int(np.isnan(got).sum())
+        fewest += 2 in got_counter  # a query tested on two rows
+        for y in xs:  # a block with fewer categories in a column than the column has
+            kept = ~np.isnan(x[:, [target, y, *cond]]).any(axis=1)
+            lost += any(
+                len(np.unique(x[kept, c])) < len(np.unique(x[~np.isnan(x[:, c]), c]))
+                for c in (target, y, *cond)
+                if kept.any()
+            )
+    assert built[0]
+    assert untested or kind in ("cells", "rare")
+    assert lost or kind != "rare"
+    assert fewest or kind != "pair"
+
+
+def test_a_chi_square_scan_numbers_each_block_as_the_test_numbers_a_block_it_is_built_over(
+    monkeypatch,
+):
+    """The codes a scan gives a candidate's block, its categories, and the numbering of the
+    conditioning set's configurations are those of the test built over the block's values, also
+    where the block lost a category or a configuration the other candidates have."""
+    x = _discrete_scan_data("rare", seed=8)
+    seen = []
+    real = ci.ChiSquare.from_codes.__func__  # ty: ignore[unresolved-attribute]
+
+    def capture(cls, codes, cardinalities, **options):
+        seen.append((codes.copy(), cardinalities.copy()))
+        return real(cls, codes, cardinalities, **options)
+
+    monkeypatch.setattr(ci.ChiSquare, "from_codes", classmethod(capture))
+    lost = checked = 0
+    for target, xs, cond in _scans(x.shape[1], np.random.default_rng(8)):
+        seen.clear()
+        make_indep_test("chisq", x).pvalues_given(target, xs, cond)
+        blocks = iter(seen)
+        for y in xs:
+            a, b = sorted((target, y))
+            columns = sorted((a, b, *cond))
+            rows = np.flatnonzero(~np.isnan(x[:, columns]).any(axis=1))
+            if len(rows) < 2:
+                continue
+            codes, cardinalities = next(blocks)
+            block = ci.ChiSquare(x[np.ix_(rows, columns)])
+            at = {column: i for i, column in enumerate(columns)}
+            for i, column in enumerate((a, b)):
+                np.testing.assert_array_equal(codes[:, i], block._codes[:, at[column]])
+                assert cardinalities[i] == block._cardinalities[at[column]]
+            if cond:
+                layer, held = categorical.configurations(
+                    block._rows.T, block._cardinalities, [at[c] for c in sorted(cond)]
+                )
+                np.testing.assert_array_equal(codes[:, 2], layer)
+                assert cardinalities[2] == held
+            assert len(cardinalities) == 2 + bool(cond)
+            categories = [len(np.unique(x[~np.isnan(x[:, c]), c])) for c in (a, b)]
+            base = ~np.isnan(x[:, [target, *cond]]).any(axis=1)
+            configurations_of_base = len(np.unique(x[base][:, sorted(cond)], axis=0))
+            lost += bool(
+                (cardinalities[:2] < categories).any() or (cond and held < configurations_of_base)
+            )
+            checked += 1
+    assert checked > 200
+    assert lost
+
+
+def test_a_chi_square_scan_answers_a_held_block_an_environment_and_a_source_as_separate_calls():
+    """A candidate whose block the test holds, a scan over an environment column, and a test whose
+    columns are another matrix's (``from_columns``) give the answers and the counter of the
+    separate calls."""
+    x = _discrete_scan_data("cells", seed=2, d=8)
+    x[:, 7] = np.random.default_rng(2).integers(0, 2, len(x))  # an environment indicator
+    x[np.random.default_rng(3).random(x.shape) < 0.1] = np.nan
+    source = np.random.default_rng(4).permutation(11)[:8]
+    for setup in ("held", "environment", "source"):
+        scanned, alone = make_indep_test("chisq", x), make_indep_test("chisq", x)
+        for test in (scanned, alone):
+            if setup == "environment":
+                test.mark_environments([7])
+            if setup == "source":
+                test.from_columns(source)
+        for target, xs, cond in _scans(8, np.random.default_rng(5), always=(1, 3)):
+            if setup == "held":  # both hold the blocks of every other candidate
+                for y in xs[::2]:
+                    scanned(target, y, cond)
+                    alone(target, y, cond)
+            with rows_tested() as got_counter:
+                got = scanned.pvalues_given(target, xs, cond)
+            with rows_tested() as want_counter:
+                want = [alone(target, y, cond) for y in xs]
+            assert _bits(got) == _bits(want)
+            assert _counted(got_counter) == _counted(want_counter)
+
+
+def test_a_chi_square_scan_that_raises_counts_the_queries_before_it(monkeypatch):
+    """A scan whose fourth query fails, as one asked alone does, raises its error and leaves the
+    first three in the counter; so does a candidate that is in the conditioning set."""
+    x = _discrete_scan_data("cells", seed=6)
+    real = ci.ChiSquare._counted_statistic_pvalue
+    xs, cond = [0, 2, 3, 4, 7, 8], [1, 5]
+
+    def run(ask, fails):
+        calls = [0]
+
+        def failing(self, *args):
+            calls[0] += 1
+            if fails and calls[0] == 4:
+                raise ValueError("a failed test")
+            return real(self, *args)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(ci.ChiSquare, "_counted_statistic_pvalue", failing)
+            with rows_tested() as counter, pytest.raises((ValueError, AssertionError)) as error:
+                ask()
+        return type(error.value), str(error.value), _counted(counter)
+
+    scanned, alone = make_indep_test("gsq", x), make_indep_test("gsq", x)
+    got = run(lambda: scanned.pvalues_given(6, xs, cond), fails=True)
+    assert got == run(lambda: [alone(6, y, cond) for y in xs], fails=True)
+    assert got[0] is ValueError and "a failed test" in got[1]
+    assert sum(got[2][0][i][1] for i in range(len(got[2][0]))) == 3  # three queries counted
+    scanned, alone = make_indep_test("gsq", x), make_indep_test("gsq", x)
+    got = run(lambda: scanned.pvalues_given(6, [0, 2, 5, 3], cond), fails=False)
+    assert got == run(lambda: [alone(6, y, cond) for y in [0, 2, 5, 3]], fails=False)
+    assert got[0] is AssertionError
+
+
+def test_a_chi_square_test_over_missing_values_checks_its_degrees_of_freedom_when_built():
+    """A scan builds no test over values, which would raise for a rule that does not exist, so the
+    wrapper raises the error of the test when it is built."""
+    x = _discrete_scan_data("cells", seed=7)
+    for name in ("chisq", "gsq"):
+        with pytest.raises(ValueError, match="degrees_of_freedom must be one of"):
+            make_indep_test(name, x, degrees_of_freedom="exact")
+        assert type(make_indep_test(name, x, degrees_of_freedom="nonempty")) is (
+            ci_missing.ChiSquareDeletion
+        )
+
+
 def _blanket_search_digest(fit, x, options):
     """The digest of ``fit(x, **options)``'s output, or the type and message of its error."""
     try:
@@ -430,6 +645,37 @@ def test_a_blanket_search_with_an_option_on_missing_values_is_the_search_asking_
     got = _blanket_search_digest(fit, x, options)
     with monkeypatch.context() as asking_alone:
         asking_alone.setattr(ci_missing.GaussianDeletion, "statistic_pvalues_given", None)
+        assert _blanket_search_digest(fit, x, options) == got
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {},
+        {"target": [1, 6]},
+        {"degrees_of_freedom": "nonempty"},
+        {"max_depth": 2},
+        {"possibly_separable": "ambiguous"},
+        {"knowledge": andrey.Knowledge(required=[(0, 5)], forbidden=[(2, 3), (3, 2)])},
+    ],
+    ids=["graph", "targets", "nonempty", "max_depth", "ambiguous", "knowledge"],
+)
+@pytest.mark.parametrize("indep_test", ["chisq", "gsq"])
+@pytest.mark.parametrize("fit", [andrey.iamb, andrey.inter_iamb], ids=["iamb", "inter_iamb"])
+@pytest.mark.parametrize("kind", ["cells", "rare", "few", "apart"])
+def test_a_chi_square_blanket_search_on_missing_values_is_the_search_asking_one_query_at_a_time(
+    kind, fit, indep_test, options, monkeypatch
+):
+    """``iamb`` and ``inter_iamb`` with ``chisq`` or ``gsq`` on data with gaps return the blanket,
+    the separating sets, the rows counted, and every metadata value of the search that asks each
+    candidate alone, or raise its error."""
+    x = _discrete_scan_data(kind, seed=3, d=9, **({"n": 40} if kind == "few" else {"n": 400}))
+    options = {"indep_test": indep_test, **options}
+    got = _blanket_search_digest(fit, x, options)
+    assert blanket._dependence_scan(make_indep_test(indep_test, x)) is not None
+    with monkeypatch.context() as asking_alone:
+        asking_alone.setattr(ci_missing.ChiSquareDeletion, "pvalues_given", None)
+        assert blanket._dependence_scan(make_indep_test(indep_test, x)) is None
         assert _blanket_search_digest(fit, x, options) == got
 
 

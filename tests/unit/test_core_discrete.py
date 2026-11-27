@@ -178,6 +178,28 @@ def test_the_degrees_of_freedom_reach_the_categorical_tests_alone():
         ChiSquare(x, degrees_of_freedom="cells")
 
 
+@pytest.mark.parametrize("degrees_of_freedom", ["mean", "nonempty"])
+@pytest.mark.parametrize("g_square", [False, True])
+def test_a_test_over_encoded_data_answers_as_the_test_over_the_values(g_square, degrees_of_freedom):
+    """``from_codes`` of the codes ``categorical.encode`` gives is the test the constructor builds:
+    every query path answers the same bits."""
+    x = _codes(seed=3, n=300)
+    options = {"g_square": g_square, "degrees_of_freedom": degrees_of_freedom}
+    want = ChiSquare(x, **options)
+    codes, cardinalities = categorical.encode(x)
+    got = ChiSquare.from_codes(codes, cardinalities, **options)
+    assert type(got) is ChiSquare
+    queries = [(0, 1, ()), (1, 0, (2,)), (0, 3, (1, 2)), (2, 3, ())]
+    for a, b, cond in queries:
+        assert got(a, b, cond) == want(a, b, cond)
+    assert (
+        got.pvalues_given(0, [1, 3], (2,)).tolist() == want.pvalues_given(0, [1, 3], (2,)).tolist()
+    )
+    assert got.marginal_pvalues().tolist() == want.marginal_pvalues().tolist()
+    with pytest.raises(ValueError, match="degrees_of_freedom must be one of"):
+        ChiSquare.from_codes(codes, cardinalities, degrees_of_freedom="cells")
+
+
 def test_dependence_and_independence_are_told_apart():
     x = _codes(n=2000)
     test = ChiSquare(x)
