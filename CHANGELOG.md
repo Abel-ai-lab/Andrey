@@ -78,6 +78,23 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
+  searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
+  targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
+  in `/dev/shm` instead of a copy each, and starting them no longer holds a copy per worker in the
+  caller. The copy has no name in `/dev/shm`, so its memory goes back when the last worker exits,
+  even when a fit is killed. Where `/dev/shm` cannot hold the matrix, each worker gets its own copy
+  as before. The results are the same bit for bit. For contributors, the benchmark harness's `poll`
+  route caps on the process tree's Pss, which counts a shared page once, once the tree's RSS sum
+  passes the cap, and records it as `tree_peak_pss_mb`; the tree's sums leave out a child started by
+  `vfork` that has not yet called exec. ([#1276])
+- Methods that check their data for copied columns, those with a partial-correlation test or the
+  linear-Gaussian BIC among them, return the same results while the check holds less memory on data
+  with many columns. It reads the correlation matrix in blocks of rows instead of making three
+  temporary copies of it, and the BIC's check keeps the whole correlation matrix only when the data
+  have more rows than columns, for its eigenvalue test. On 4,000 variables and 300 rows, the BIC's
+  check peaks at about 17 MB instead of 488 MB, and an `hc` fit at about 537 MB instead of 637 MB.
+  ([#1275])
 - The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
   reads the p-values of a scan as one array where the test answers a scan at once, so with
   `fisherz`, `student_t`, or `normal_scores` on complete data these searches run faster on hundreds
@@ -3064,6 +3081,8 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
+[#1276]: https://github.com/Abel-ai-lab/Andrey/pull/1276
 [#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
