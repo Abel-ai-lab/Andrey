@@ -484,7 +484,8 @@ def test_kci_grouped_pvalues_equal_its_queries_in_any_order(monkeypatch, size):
         for x, y in combinations(range(6), 2)
         for cond in combinations(sorted(set(range(6)) - {x, y}), size)
     ]
-    want = [KCI(data)(*query) for query in queries]
+    with andrey.config(backend="numpy"):
+        want = [KCI(data)(*query) for query in queries]
     monkeypatch.setattr(ci_kernel, "_CACHE_BYTES", 0)  # one entry in each cache
     decompositions = []
     eigh = np.linalg.eigh
