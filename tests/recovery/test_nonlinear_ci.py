@@ -48,8 +48,9 @@ def test_partial_correlation_misses_the_nonmonotone_links():
 # RCoT is left out: at this case's 400 rows, below the 500 its warning names, a true independence
 # falls below 0.05 for some feature seeds, so the graph follows the seed; the many-graph test
 # below checks RCoT.
-# GPDC with the majority rule leaves the case's collider undirected: at its 400 rows the vote does
-# not separate the ends of the triple.
+# GPDC with the majority rule leaves the case's collider undirected: at its 400 rows both the empty
+# set and the middle node separate the ends of the triple, so exactly half of the separating subsets
+# contain it and the vote calls the triple ambiguous.
 RECOVERY = [
     pytest.param(
         name,
