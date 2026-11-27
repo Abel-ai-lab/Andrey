@@ -627,12 +627,15 @@ def _turning_best(
     best: tuple[int, int, set[int], bool] | None = None
     forbidden = None if constraints is None else constraints.forbidden
 
-    def offer(delta: float, key: tuple, move: tuple[int, int, set[int], bool]) -> None:
+    def offer(delta: float, move: tuple[int, int, set[int], bool]) -> None:
         nonlocal best_key, best
-        if found is not None and delta < -EPS_IMPROVE:
+        if not delta < -EPS_IMPROVE:
+            return
+        key = move_key(delta, n, move[0], move[1], move[2], ranks)
+        if found is not None:
             if not (excluded and (move[0], move[1], frozenset(move[2])) in excluded):
                 found.append((key, move))
-        if delta < -EPS_IMPROVE and (best_key is None or key < best_key):
+        if best_key is None or key < best_key:
             if excluded and (move[0], move[1], frozenset(move[2])) in excluded:
                 return
             best_key, best = key, move
@@ -657,7 +660,7 @@ def _turning_best(
                     - score.score(v, pa[v] | C)
                     - score.score(u, kept | {v})
                 )
-                offer(delta, move_key(delta, n, u, v, C, ranks), (u, v, C, False))
+                offer(delta, (u, v, C, False))
         for u in np.nonzero(adj[:, v] == ARROW)[0].tolist():  # an arrow v -> u
             if forbidden is not None and forbidden[u, v]:
                 continue
@@ -676,7 +679,7 @@ def _turning_best(
                     - score.score(v, pa[v] | C)
                     - score.score(u, pa[u])
                 )
-                offer(delta, move_key(delta, n, u, v, C, ranks), (u, v, C, True))
+                offer(delta, (u, v, C, True))
     return best
 
 

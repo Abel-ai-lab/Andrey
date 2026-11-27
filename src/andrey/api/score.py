@@ -1718,7 +1718,7 @@ def lges(
     **Limitations.** Not benchmarked yet. With ``schedule="lges0_released"`` and
     ``andrey.config(tie_break="position")`` it returned the CPDAG of its authors' code on every
     dataset of its paper's simulation. The paper proves that it recovers the true class as the rows
-    grow only under ``insertion="safe"``. Each addition step scores every pair of non-adjacent
+    grow only under ``insertion="safe"``. Each addition step checks every pair of non-adjacent
     variables in one process. The
     `0.19.0 release card <https://andrey.abel.ai/docs/benchmarks/0.19.0.html#lges>`__ has the
     comparison.
