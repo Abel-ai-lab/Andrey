@@ -3,7 +3,9 @@
 ``_GSTNode.trace`` takes the first branch allowed by the prefix. Branch order therefore determines
 the search path. The grow and shrink steps of the tree BOSS and GRaSP share break score ties by
 variable index; BOSS's order move takes the leftmost tied position. Each step requires an
-improvement larger than ``SCORE_EPS``.
+improvement larger than ``SCORE_EPS``. A node grows from its tree's candidates in their order,
+every other variable ascending by default, and the trees of a search share one tuple of the
+variables instead of each storing a list of every other variable.
 BOSS and GRaSP search the columns sorted by tie rank, so a variable's index, the seeded starting
 order, and the visiting order follow the columns' data, and reordering the columns relabels the
 graph.
@@ -11,6 +13,7 @@ graph.
 
 from __future__ import annotations
 
+import tracemalloc
 from functools import partial
 from types import SimpleNamespace
 
@@ -69,6 +72,84 @@ def test_boss_grows_best_scoring_branch_first() -> None:
     # Require two branches so `_descending` cannot pass vacuously.
     assert len(node.branches) >= 2, "fixture yields too few improving additions to order"
     assert _descending([b.grow_score for b in node.branches], boss_mod.SCORE_EPS)
+
+
+def _flat_score() -> SimpleNamespace:
+    """A local score of 0 for every parent set: enough to build a tree."""
+    return SimpleNamespace(score=lambda vertex, parents: 0.0)
+
+
+def _recording_tree(
+    vertex: int, d: int, add: int, grown: list[list[int]], **kwargs
+) -> boss_mod.GrowShrinkTree:
+    """A tree whose one improving move adds ``add`` to no parents; ``grown`` gets each grow list."""
+
+    def score_many_with_base(vertex, parents, moves, *, bounds):
+        bounds[:] = [0.0] * len(moves)
+        if moves[0][0] == "add":
+            grown.append([u for _, u in moves])
+        return [-1.0 if u == add and not parents else 0.0 for _, u in moves]
+
+    delta = SimpleNamespace(score_many_with_base=score_many_with_base)
+    return boss_mod.GrowShrinkTree(vertex, _flat_score(), delta, d, **kwargs)
+
+
+@pytest.mark.parametrize("shared", [False, True], ids=["default", "shared"])
+@pytest.mark.parametrize("d", [12, 300])
+def test_a_node_grows_from_every_other_variable_in_ascending_order(d, shared) -> None:
+    every = tuple(range(d))
+    for vertex in (0, d // 2, d - 1):
+        add, grown = (vertex + 1) % d, []
+        candidates = every if shared else None
+        tree = _recording_tree(vertex, d, add, grown, candidates=candidates)
+
+        tree.trace({add})
+
+        others = [u for u in range(d) if u != vertex]
+        assert grown == [others, [u for u in others if u != add]]
+
+
+def test_a_node_grows_from_the_candidates_in_their_order() -> None:
+    grown: list[list[int]] = []
+    tree = _recording_tree(3, 12, 2, grown, candidates=[9, 2, 7, 0])
+
+    tree.trace({2})
+
+    assert grown == [[9, 2, 7, 0], [9, 7, 0]]
+
+
+def test_the_trees_of_a_search_share_one_tuple_of_the_variables() -> None:
+    x = np.random.default_rng(0).standard_normal((30, 40))
+    _, _, trees, _ = boss_mod._search_state(x, "bic", 1.0, 0.0, 1.0, None, None, None)
+
+    assert len({id(tree.available) for tree in trees}) == 1
+    assert trees[0].available == tuple(range(40))
+
+
+def _search_state_bytes(d: int) -> int:
+    """The bytes that ``boss.py`` allocates and keeps for a new search over ``d`` variables."""
+    x = np.random.default_rng(d).standard_normal((30, d))
+    keep = boss_mod.__file__
+    started = not tracemalloc.is_tracing()
+    if started:
+        tracemalloc.start()
+    try:
+        before = tracemalloc.take_snapshot().filter_traces([tracemalloc.Filter(True, keep)])
+        state = boss_mod._search_state(x, "bic", 1.0, 0.0, 1.0, None, None, None)
+        after = tracemalloc.take_snapshot().filter_traces([tracemalloc.Filter(True, keep)])
+    finally:
+        if started:
+            tracemalloc.stop()
+    assert len(state[2]) == d
+    return sum(stat.size_diff for stat in after.compare_to(before, "filename"))
+
+
+def test_a_new_search_takes_memory_linear_in_the_variables() -> None:
+    small, large = _search_state_bytes(500), _search_state_bytes(1000)
+
+    # Trees that each hold a tuple of the other variables make these about 6.1e6 and 32.2e6 bytes.
+    assert large < 3 * small
+    assert large < 2_000 * 1000
 
 
 @pytest.mark.parametrize(

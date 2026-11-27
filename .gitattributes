@@ -1,3 +1,7 @@
+# Git stores text files with LF endings and checks them out with LF on every platform.
+
+* text=auto eol=lf
+
 # Lockfiles are generated — collapse in PR diffs, drop from GitHub language stats.
 uv.lock linguist-generated
 

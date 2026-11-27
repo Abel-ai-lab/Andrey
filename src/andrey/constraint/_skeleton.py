@@ -17,13 +17,23 @@ unshielded triples of a final skeleton by the conservative or majority collider 
 
 from __future__ import annotations
 
+import operator
 import sys
-from collections.abc import Callable, Collection, Hashable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import (
+    Callable,
+    Collection,
+    Hashable,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import nullcontext
 from functools import cache, partial
 from itertools import chain, combinations, groupby, islice
 from math import comb
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -38,6 +48,11 @@ if TYPE_CHECKING:
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
 Removal = tuple[int, int, tuple[int, ...], float | None]
+#: The separating set of each removed pair, keyed ``(x, y)``: a dict, or a :class:`MaskedMapping`
+#: that reads as one.
+SeparatingSets = MutableMapping[tuple[int, int], tuple[int, ...]]
+#: The p-value of each removed pair, keyed alike.
+PValues = MutableMapping[tuple[int, int], float]
 # A pair's subsets that one call evaluates: ``(the pair's position, x, y, subsets)``, ``x < y``,
 # the subsets the rows of an ``(N, size)`` int array.
 _Chunk = tuple[int, int, int, np.ndarray]
@@ -53,6 +68,18 @@ _VOTE_CHUNK = 64
 
 #: How the PC and FCI families and PCMCI+ decide an unshielded triple (:func:`vote_triples`).
 COLLIDER_RULES: tuple[str, ...] = ("sepsets", "conservative", "majority")
+
+# The most candidates whose membership in a skip set :func:`subset_rows` reads one by one in Python;
+# past it, ``np.isin`` on the whole array is faster.
+_SET_LOOKUP_LABELS = 300
+
+# The most entries of the ``(pairs, d)`` candidate mask that one block of the size-1 pass
+# (:func:`first_order_removals`) builds.
+_FIRST_ORDER_MASK_ENTRIES = 1 << 18
+
+# A block of the size-1 pass lists its candidates from the endpoints' neighbor lists, not from the
+# mask, when this many times the listed neighbors are fewer than the mask's entries.
+_LISTED_FACTOR = 8
 
 # The most bytes of correlation submatrices one stacked evaluation of scan_pairs holds: a stack of
 # B queries of conditioning size k takes 8 * B * (k + 2) ** 2 bytes, and holds at least one chunk.
@@ -145,14 +172,23 @@ def subset_rows(
     entirely inside ``skip_within`` when it is given and holds ``size`` members or more, as the
     rows of ``(N, size)`` int arrays of ``CHUNK`` rows each, the last one fewer and none empty.
 
-    The rows come from the cached position tables a block at a time (:func:`blocks`,
-    :func:`block_positions`), so no subset passes through a tuple.
+    The rows come from the cached position tables, so no subset passes through a tuple: all of a
+    size of two or more at once when they fit in one chunk, else a block at a time
+    (:func:`blocks`, :func:`block_positions`). Each yielded array is a copy; the tables are never
+    written.
     """
     labels = np.asarray(candidates, dtype=np.intp)
     n = len(labels)
     inside = None
     if skip_within is not None and len(skip_within) >= size:
-        inside = np.isin(labels, np.fromiter(skip_within, np.intp, len(skip_within)))
+        inside = _members(labels, skip_within)
+    if 1 < size <= n and comb(n, size) <= CHUNK:
+        rows = _combination_table(n, size)
+        if inside is not None:
+            rows = rows[~inside[rows].all(axis=1)]
+        if len(rows):
+            yield labels[rows]
+        return
     held: list[np.ndarray] = []
     count = 0
     for block in blocks(n, size, CHUNK):
@@ -169,6 +205,14 @@ def subset_rows(
             held, count = [rows[CHUNK:]], count - CHUNK
     if count:
         yield labels[np.concatenate(held)]
+
+
+def _members(labels: np.ndarray, members: set[int]) -> np.ndarray:
+    """Whether each of ``labels`` is in ``members``: a set lookup for up to
+    ``_SET_LOOKUP_LABELS`` labels, ``np.isin`` for more."""
+    if len(labels) > _SET_LOOKUP_LABELS:
+        return np.isin(labels, np.fromiter(members, np.intp, len(members)))
+    return np.fromiter((label in members for label in labels.tolist()), bool, len(labels))
 
 
 def kept_apart(
@@ -373,29 +417,161 @@ def prescreen_capable(test: CITest) -> bool:
 
 
 def marginal_removals(
-    test: CITest,
-    adjacent_upper: np.ndarray,
-    alpha: float,
-    trace: list[dict] | None = None,
-    record_pvalues: bool = True,
-) -> list[tuple[int, int, float | None]]:
-    """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y, p)``, ``x < y``.
+    test: CITest, adjacent_upper: np.ndarray, alpha: float, trace: list[dict] | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    """(size 0) The still-adjacent pairs the marginal test separates, and the marginal p-values.
 
     ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized
-    all-pairs evaluation flags every pair with marginal ``p > alpha``; the return is those in
-    row-major order (matching the serial loop's visitation), each with its p-value, or ``None``
-    when ``record_pvalues`` is false; each pair's separating set is empty. With ``trace`` given,
-    every adjacent pair's test is recorded.
+    all-pairs evaluation gives every pair's marginal p-value; the first return marks, in a boolean
+    matrix of the same shape, the adjacent pairs with ``p > alpha``, each separated by the empty
+    set. The second is the ``(d, d)`` p-value matrix, whose upper-triangle entry ``[x, y]`` is the
+    test's p-value for the pair. With ``trace`` given, every adjacent pair's test is recorded, in
+    row-major order.
     """
     pmat = test.marginal_pvalues()  # ty: ignore[unresolved-attribute]  # gated by prescreen_capable
-    separated = adjacent_upper & (pmat > alpha)
     if trace is not None:
         for x, y in zip(*np.nonzero(adjacent_upper)):
             record_tests(trace, 0, int(x), int(y), [()], [pmat[x, y]], alpha)
-    xs, ys = np.nonzero(separated)
-    if not record_pvalues:
-        return [(x, y, None) for x, y in zip(xs.tolist(), ys.tolist())]
-    return list(zip(xs.tolist(), ys.tolist(), pmat[xs, ys].tolist()))
+    return adjacent_upper & (pmat > alpha), pmat
+
+
+class MaskedMapping(MutableMapping):
+    """A dict whose entries at the set bits of a boolean ``mask`` are held as the mask, with every
+    other entry in a plain dict on top of it.
+
+    ``mask`` is a strictly upper-triangular ``(d, d)`` matrix, whose bit ``[x, y]`` marks the pair
+    key ``(x, y)``, or a ``(d,)`` vector, whose bit ``[x]`` marks the integer key ``x``. A marked
+    key maps to the empty tuple, or, with ``values``, to ``float(values[key])``. Most pairs of a
+    sparse graph are separated by the empty set, in the size-0 pass of the PC family and in MMPC's
+    forward phase: the mask holds each such entry in one byte, where a dict holds a key object and
+    a value object for it.
+
+    It behaves as the dict that holds the marked keys first, in row-major order, and then each key
+    set in it, in the order set: a key set over a marked one keeps its place and maps to the new
+    value, and a deleted key is gone. Iteration, ``len``, ``==`` with a dict, ``[]``, ``get``, and
+    ``in`` agree with that dict. A reversed or negative pair, a key outside the mask, and a key that
+    is neither an integer nor a pair of integers (read with :func:`operator.index`) are marked by
+    no bit. :meth:`copy` returns that dict, and :meth:`compact` returns it in place of the mapping
+    where a dict entry for each marked key takes fewer bytes than the mask and ``values``. Two
+    operations differ from the dict's: :func:`copy.copy` returns a mapping that shares the mask
+    and the dict on top with the original, and ``popitem`` removes the first entry, not the last.
+    A read-only ``mask`` is copied before a deletion or :meth:`mark` writes it, so two mappings may
+    share one.
+    """
+
+    def __init__(self, mask: np.ndarray, values: np.ndarray | None = None) -> None:
+        self._mask = mask
+        self._values = values
+        self._marked = int(np.count_nonzero(mask))
+        self._overlay: dict = {}
+
+    def _bit(self, key: Any) -> tuple[int, ...] | None:
+        """The mask index of ``key`` when its bit is set, ``None`` otherwise."""
+        mask = self._mask
+        try:
+            at = (operator.index(key),) if mask.ndim == 1 else tuple(operator.index(k) for k in key)
+        except TypeError:
+            return None
+        if mask.ndim == 1:
+            valid = len(at) == 1 and 0 <= at[0] < mask.shape[0]
+        else:
+            valid = len(at) == 2 and 0 <= at[0] < at[1] < mask.shape[0]
+        return at if valid and mask[at] else None
+
+    def _value(self, at: tuple[int, ...]) -> Any:
+        return () if self._values is None else float(self._values[at])
+
+    def __getitem__(self, key: Any) -> Any:
+        if key in self._overlay:
+            return self._overlay[key]
+        at = self._bit(key)
+        if at is None:
+            raise KeyError(key)
+        return self._value(at)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        if key in self._overlay:
+            return self._overlay[key]
+        at = self._bit(key)
+        return default if at is None else self._value(at)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._overlay or self._bit(key) is not None
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._overlay[key] = value
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        self._overlay.update(*args, **kwargs)
+
+    def __delitem__(self, key: Any) -> None:
+        at = self._bit(key)
+        if self._overlay.pop(key, _ABSENT) is _ABSENT and at is None:
+            raise KeyError(key)
+        if at is not None:
+            self._writable()[at] = False
+            self._marked -= 1
+
+    def mark(self, index: Any) -> None:
+        """Set the bits ``index`` of the mask, a NumPy index, of an empty mapping, so the keys
+        marked come first. Raises ``ValueError`` when the mapping holds an entry."""
+        if self._marked or self._overlay:
+            raise ValueError("only an empty MaskedMapping takes new marks")
+        mask = self._writable()
+        mask[index] = True
+        self._marked = int(np.count_nonzero(mask))
+
+    def _writable(self) -> np.ndarray:
+        """The mask, copied first when it is read-only."""
+        if not self._mask.flags.writeable:
+            self._mask = self._mask.copy()
+        return self._mask
+
+    def _marked_keys(self) -> Iterator:
+        if self._mask.ndim == 1:
+            yield from np.flatnonzero(self._mask).tolist()
+            return
+        for x in np.flatnonzero(self._mask.any(axis=1)).tolist():
+            for y in np.flatnonzero(self._mask[x]).tolist():
+                yield (x, y)
+
+    def __iter__(self) -> Iterator:
+        yield from self._marked_keys()
+        yield from (key for key in self._overlay if self._bit(key) is None)
+
+    def __len__(self) -> int:
+        return self._marked + sum(1 for key in self._overlay if self._bit(key) is None)
+
+    def copy(self) -> dict[Any, Any]:
+        """The plain dict with the same entries in the same order, built without a lookup per
+        marked key."""
+        found = np.nonzero(self._mask)
+        keys = (
+            found[0].tolist() if self._mask.ndim == 1 else zip(*(axis.tolist() for axis in found))
+        )
+        if self._values is None:
+            out = dict.fromkeys(keys, ())
+        else:
+            out = dict(zip(keys, self._values[found].tolist(), strict=True))
+        out.update(self._overlay)
+        return out
+
+    def compact(self) -> MaskedMapping | dict[Any, Any]:
+        """This mapping, or, when a dict entry for each marked key takes fewer bytes than the mask
+        and ``values`` together, the dict it reads as (:meth:`copy`)."""
+        held = self._mask.nbytes + (0 if self._values is None else self._values.nbytes)
+        return self if self._marked * _ENTRY_BYTES[self._mask.ndim] >= held else self.copy()
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.copy()!r})"
+
+
+_ABSENT = object()
+#: A floor on the bytes one dict entry takes, its key included, by the number of axes of the mask
+#: that marks it: an integer key, whose integer the search already holds, takes at least about 26
+#: bytes, and a pair key at least about 87 once the dict holds a few thousand entries (CPython 3.11
+#: and 3.14).
+_ENTRY_BYTES = {1: 24, 2: 80}
 
 
 def first_order_removals(
@@ -411,15 +587,24 @@ def first_order_removals(
     Each pair ``x < y`` is tested against its start-of-size snapshot conditioners: either
     endpoint's ``neighbors`` minus the pair, in PC and FCI alike. ``separating`` holds the
     conditioners whose test separates the pair, ascending (the separating-set key order), and ``p``
-    is the largest p-value among the pair's tests, or ``None`` when ``record_pvalues`` is false. A
-    FisherZ or StudentT test evaluates the queries of consecutive pairs in one stack
-    (:func:`_stacked_first_order`); another test evaluates each pair's candidates in one
-    ``first_order_pvalues`` call. The queries are built as they are evaluated, so the pass holds
-    one stack however many pairs and conditioners it tests. With ``trace`` given, every test is
-    recorded, pair by pair.
+    is the largest p-value among the pair's tests, or ``None`` when ``record_pvalues`` is false.
+
+    Without a ``trace``, a test that takes canonical query arrays (:func:`_canonical_route`) and
+    deletes no rows per test has its queries built from arrays (:func:`_array_first_order`): the
+    pass holds a ``(d, d)`` boolean adjacency matrix, a candidate mask of at most
+    ``_FIRST_ORDER_MASK_ENTRIES`` entries, and one stack, however many pairs and conditioners it
+    tests. Any other pass goes pair by pair, building the queries as it evaluates them, so it holds
+    one stack however many pairs and conditioners it tests: a FisherZ or StudentT test evaluates
+    the queries of consecutive pairs in one stack (:func:`_stacked_first_order`), another test
+    each pair's candidates in one ``first_order_pvalues`` call. With ``trace`` given, every test
+    is recorded, pair by pair.
     """
-    queries = _first_order_queries(pairs, neighbors, test if trace is None else None)
     canonical = _canonical_route(test)
+    if trace is None and canonical is not None and not isinstance(test, TestwiseDeletion):
+        found = _array_first_order(canonical, pairs, neighbors, alpha, record_pvalues)
+        if found is not None:
+            return found
+    queries = _first_order_queries(pairs, neighbors, test if trace is None else None)
     tested = (
         _stacked_first_order(canonical, queries)
         if canonical is not None
@@ -438,6 +623,101 @@ def first_order_removals(
             p = max(pvals[passing].tolist()) if record_pvalues else None
             removals.append((x, y, tuple(candidates[k] for k in passing.tolist()), p))
     return removals
+
+
+def _array_first_order(
+    pvalues: Callable[..., np.ndarray],
+    pairs: list[tuple[int, int]],
+    neighbors: list[np.ndarray],
+    alpha: float,
+    record_pvalues: bool,
+) -> list[Removal] | None:
+    """:func:`first_order_removals` from arrays, for ``pvalues`` that take canonical query arrays.
+
+    A block of pairs takes its queries from the candidates of both endpoints less the pair, pair
+    by pair and each pair's candidates ascending (:func:`_mask_candidates`, or
+    :func:`_listed_candidates` when the neighbor lists are short against the block's mask),
+    evaluates them in stacks of ``_STACK_BYTES`` of submatrices, and cuts each pair's separating
+    candidates and largest p-value from the results. Each p-value is the one
+    :func:`_stacked_first_order` gets, as the first-order closed form is elementwise, so the
+    removals are the same. ``None`` when an evaluation raises, so the caller's pair-by-pair pass
+    raises the error it raises.
+    """
+    d = len(neighbors)
+    adjacent = np.zeros((d, d), dtype=bool)
+    for i, nb in enumerate(neighbors):
+        adjacent[i, nb] = True
+    both = np.array(pairs, dtype=np.intp).reshape(-1, 2)
+    sizes = np.fromiter((nb.size for nb in neighbors), np.intp, d)
+    flat = np.concatenate(neighbors) if sizes.sum() else np.empty(0, dtype=np.intp)
+    offsets = np.concatenate(([0], np.cumsum(sizes)[:-1]))
+    step = max(1, _FIRST_ORDER_MASK_ENTRIES // max(d, 1))
+    limit = max(1, _STACK_BYTES // (8 * 3**2))
+    removals: list[Removal] = []
+    for start in range(0, len(both), step):
+        xs, ys = both[start : start + step, 0], both[start : start + step, 1]
+        listed = int(sizes[xs].sum() + sizes[ys].sum())
+        if _LISTED_FACTOR * listed < len(xs) * d:
+            which, zs = _listed_candidates(flat, offsets, sizes, xs, ys, d)
+        else:
+            which, zs = _mask_candidates(adjacent, xs, ys)
+        if not which.size:
+            continue
+        qx, qy = xs[which], ys[which]
+        values = np.empty(which.size, dtype=np.float64)
+        try:
+            for at in range(0, which.size, limit):
+                cut = slice(at, at + limit)
+                values[cut] = pvalues(qx[cut], qy[cut], zs[cut].reshape(-1, 1))
+        except Exception:
+            return None
+        passing = values > alpha
+        if not passing.any():
+            continue
+        which, zs, values = which[passing], zs[passing], values[passing]
+        starts = np.flatnonzero(np.diff(which, prepend=-1))
+        stops = np.append(starts[1:], which.size).tolist()
+        tops = np.maximum.reduceat(values, starts).tolist() if record_pvalues else None
+        members = zs.tolist()
+        for k, (i, a, b) in enumerate(zip(which[starts].tolist(), starts.tolist(), stops)):
+            x, y = pairs[start + i]
+            removals.append((x, y, tuple(members[a:b]), None if tops is None else tops[k]))
+    return removals
+
+
+def _mask_candidates(
+    adjacent: np.ndarray, xs: np.ndarray, ys: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """``(pair index, candidate)`` of each query of the pairs ``(xs[i], ys[i])``, in pair order and
+    candidates ascending: the rows of ``adjacent[xs] | adjacent[ys]`` less ``xs[i]`` and
+    ``ys[i]``."""
+    mask = adjacent[xs] | adjacent[ys]
+    rows = np.arange(len(xs))
+    mask[rows, xs] = False
+    mask[rows, ys] = False
+    which, zs = np.nonzero(mask)
+    return which, zs
+
+
+def _listed_candidates(
+    flat: np.ndarray, offsets: np.ndarray, sizes: np.ndarray, xs: np.ndarray, ys: np.ndarray, d: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """:func:`_mask_candidates` from the neighbor lists, concatenated in ``flat`` with the start of
+    column ``i``'s at ``offsets[i]`` and its length ``sizes[i]``: both endpoints' lists, less the
+    pair, sorted by ``pair * d + candidate`` and deduplicated, so a block of pairs in a wide, sparse
+    graph costs its listed neighbors, not ``len(xs) * d`` mask entries."""
+    ends = np.concatenate((xs, ys))
+    owner = np.concatenate((np.arange(len(xs)), np.arange(len(ys))))
+    lens = sizes[ends]
+    total = int(lens.sum())
+    if not total:
+        return np.empty(0, dtype=np.intp), np.empty(0, dtype=np.intp)
+    first = np.repeat(offsets[ends] - (np.cumsum(lens) - lens), lens) + np.arange(total)
+    zs = flat[first]
+    pair = np.repeat(owner, lens)
+    keep = (zs != xs[pair]) & (zs != ys[pair])
+    keys = np.unique(pair[keep] * d + zs[keep])
+    return keys // d, keys % d
 
 
 def _first_order_queries(
@@ -583,7 +863,11 @@ def _pair_chunks(
 ) -> Iterator[_Chunk]:
     """Yield ``(i, x, y, chunk)``, ``x < y``, for each chunk of subsets the per-pair scan of
     :func:`scan_pairs` evaluates in one call, in its order; ``i`` is the pair's position. With
-    ``test``, each side leaves out the candidates :func:`kept_apart` drops."""
+    ``test``, each side leaves out the candidates :func:`kept_apart` drops. Size 0 under test-wise
+    deletion reads them from arrays (:func:`_marginal_chunks`)."""
+    if size == 0 and isinstance(test, TestwiseDeletion):
+        yield from _marginal_chunks(pairs, test)
+        return
     for i, (a, b) in enumerate(pairs):
         x, y = min(a, b), max(a, b)
         for side_a, side_b, candidates, seen in _sides(neighbors, a, b, size):
@@ -594,6 +878,33 @@ def _pair_chunks(
                 [(candidates, seen)] = kept
             for chunk in subset_rows(candidates, size, seen):
                 yield i, x, y, chunk
+
+
+# The one set of size 0, as the rows of an ``(N, 0)`` int array; never written.
+_NO_SET = np.empty((1, 0), dtype=np.intp)
+_NO_SET.flags.writeable = False
+
+
+def _marginal_chunks(pairs: list[tuple[int, int]], test: TestwiseDeletion) -> Iterator[_Chunk]:
+    """:func:`_pair_chunks` at size 0 under test-wise deletion, from the matrix ``test.together()``
+    that is read once.
+
+    A pair some row observes together yields the empty set as its one chunk: the first endpoint
+    tests it, and the second skips what the first tested. Any other pair is counted as one query
+    not tested, as :func:`kept_apart` counts it, when the scan reaches it, so the counts and the
+    chunks interleave as the per-pair scan's do.
+    """
+    if not pairs:
+        return
+    together = test.together()
+    flat = np.fromiter(chain.from_iterable(pairs), np.intp, 2 * len(pairs))
+    a, b = flat[0::2], flat[1::2]
+    observed = (together[a, a] & together[b, a] & together[a, b] & together[b, b]).tolist()
+    for i, ((x, y), seen) in enumerate(zip(pairs, observed)):
+        if seen:
+            yield (i, x, y, _NO_SET) if x < y else (i, y, x, _NO_SET)
+        else:
+            test.count_not_tested(x, y, 1, [[]])
 
 
 def _stacks(
@@ -937,7 +1248,7 @@ def vote_triples(
     marks: np.ndarray,
     test: Callable[..., float],
     alpha: float,
-    sepsets: dict[tuple[int, int], tuple[int, ...]],
+    sepsets: SeparatingSets,
     rule: str,
     *,
     max_depth: int | None = None,

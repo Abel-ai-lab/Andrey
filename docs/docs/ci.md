@@ -38,7 +38,7 @@ not fail the gate; the release checklist reviews every flag.
 | Platform | What is tested |
 |---|---|
 | Linux x86_64 | everything above |
-| macOS arm64 | on demand: install, import, the command line, PC and GES fits, worker processes, and the unit tests with PyTorch on the CPU |
+| macOS arm64 | on demand: install, import, the command line, PC and GES fits, worker processes, and the unit tests with PyTorch on the CPU, without the `release`-marked checks unless a manual run asks for them |
 | Windows x86_64 | on demand: install, import, the command line, PC and GES fits, and worker processes, on the CPU |
 
 ## GPUs

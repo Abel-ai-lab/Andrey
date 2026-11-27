@@ -50,6 +50,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
 
+from andrey.core._symmetric import exp_symmetric, gram_is_symmetric
 from andrey.core.units import unit_factors
 from andrey.fcm.pruning import prune_order
 from andrey.fcm.score_matching import leaf_order
@@ -70,6 +71,10 @@ FOLDS = 5
 def cross_predict(kernel: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Predict ``y`` at every row by kernel ridge regression fit on the other folds.
 
+    The folds are blocks of consecutive rows, so each fit's system is assembled from four slices of
+    the kernel, and each fold's held-out rows from two. Neither input is checked for non-finite
+    values.
+
     Parameters
     ----------
     kernel : np.ndarray
@@ -84,26 +89,46 @@ def cross_predict(kernel: np.ndarray, y: np.ndarray) -> np.ndarray:
     """
     n = y.shape[0]
     predicted = np.empty(n)
-    held_out = np.zeros(n, dtype=bool)
     for fold in np.array_split(np.arange(n), FOLDS):
-        held_out[:] = False
-        held_out[fold] = True
-        train = np.flatnonzero(~held_out)
-        system = kernel[np.ix_(train, train)]
-        system[np.diag_indices(train.size)] += RIDGE
-        weights = cho_solve(cho_factor(system, lower=True, overwrite_a=True), y[train])
-        predicted[fold] = kernel[np.ix_(fold, train)] @ weights
+        if fold.size == 0:
+            continue
+        start, stop = int(fold[0]), int(fold[-1]) + 1
+        train = n - (stop - start)
+        system = np.empty((train, train), dtype=kernel.dtype)
+        system[:start, :start] = kernel[:start, :start]
+        system[:start, start:] = kernel[:start, stop:]
+        system[start:, :start] = kernel[stop:, :start]
+        system[start:, start:] = kernel[stop:, stop:]
+        system[np.diag_indices(train)] += RIDGE
+        factor = cho_factor(system, lower=True, overwrite_a=True, check_finite=False)
+        weights = cho_solve(factor, np.concatenate([y[:start], y[stop:]]), check_finite=False)
+        held_out = np.empty((stop - start, train), dtype=kernel.dtype)
+        held_out[:, :start] = kernel[start:stop, :start]
+        held_out[:, start:] = kernel[start:stop, stop:]
+        predicted[start:stop] = held_out @ weights
     return predicted
 
 
 def residuals(unit: np.ndarray) -> np.ndarray:
-    """Each column's residual from its cross-validated regression on all the other columns."""
+    """Each column's residual from its cross-validated regression on all the other columns.
+
+    ``unit`` must be finite: the regressions do not check it.
+    """
     total = squared_distances(unit)
+    symmetric = gram_is_symmetric(unit)
     out = np.empty_like(unit)
     for j in range(unit.shape[1]):
         column = unit[:, j]
-        others = np.maximum(total - (column[:, None] - column[None, :]) ** 2, 0.0)
-        out[:, j] = column - cross_predict(np.exp(-GAMMA * others), column)
+        exponent = np.subtract(column[:, None], column[None, :])
+        np.square(exponent, out=exponent)
+        np.subtract(total, exponent, out=exponent)
+        np.maximum(exponent, 0.0, out=exponent)
+        np.multiply(-GAMMA, exponent, out=exponent)
+        if symmetric:  # the exponent is exactly symmetric where the squared distances are
+            exp_symmetric(exponent, out=exponent)
+        else:
+            np.exp(exponent, out=exponent)
+        out[:, j] = column - cross_predict(exponent, column)
     return out
 
 
@@ -114,8 +139,11 @@ def prediction_errors(unit: np.ndarray) -> np.ndarray:
     errors = np.empty(unit.shape[1])
     for j in range(unit.shape[1]):
         r = residual[:, j]
-        kernel = np.exp(-GAMMA * (r[:, None] - r[None, :]) ** 2)
-        errors[j] = np.mean((estimate[:, j] - cross_predict(kernel, estimate[:, j])) ** 2)
+        exponent = np.subtract(r[:, None], r[None, :])
+        np.square(exponent, out=exponent)
+        np.multiply(-GAMMA, exponent, out=exponent)
+        exp_symmetric(exponent, out=exponent)
+        errors[j] = np.mean((estimate[:, j] - cross_predict(exponent, estimate[:, j])) ** 2)
     return errors
 
 

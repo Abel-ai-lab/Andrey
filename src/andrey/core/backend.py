@@ -427,6 +427,8 @@ def select(
         # checks liveness first so the *decision* to stay on numpy never imports anything.
         if b in ("cuda", "mps") and not amortized and not _is_live(b):
             continue
+        if b == "cuda" and "torch" not in sys.modules and _torch_is_cpu_build():
+            continue  # a CPU build has no CUDA device, so the answer needs no torch import
         if not _is_available(b):
             continue
         return _record_dispatch(op, b)
@@ -600,7 +602,8 @@ def worker_count(n_jobs: int | None = None) -> int:
 
 
 @lru_cache(maxsize=1)
-def _thread_pools():
+def _thread_pools(imported: frozenset[str]):
+    """The thread pools of the libraries loaded when the modules named in ``imported`` were."""
     from threadpoolctl import ThreadpoolController
 
     return ThreadpoolController()
@@ -609,9 +612,10 @@ def _thread_pools():
 def one_blas_thread() -> contextlib.AbstractContextManager:
     """Limit the loaded BLAS and OpenMP thread pools to one thread inside a ``with`` block.
 
-    The libraries are found once per process; one loaded after the first call is not limited.
+    The libraries are found again whenever the set of imported module names changes, so one loaded
+    later, such as torch's, is limited too, even when other modules were removed meanwhile.
     """
-    return _thread_pools().limit(limits=1)
+    return _thread_pools(frozenset(sys.modules)).limit(limits=1)
 
 
 # ---- tensor transfer (torch backends) -----------------------------------------------------------
@@ -702,6 +706,16 @@ def _torch_gpu_build() -> bool:
     except Exception:  # noqa: BLE001 - an unknown build is checked by importing torch
         return True
     return getattr(module, "cuda", True) is not None or getattr(module, "hip", True) is not None
+
+
+@lru_cache(maxsize=1)
+def _torch_is_cpu_build() -> bool:
+    """Whether torch is installed and was built for neither CUDA nor ROCm, read once per process.
+
+    Reads the answer from ``torch/version.py`` without importing torch, so the automatic choice
+    of a device can rule out CUDA on a CPU build before any import.
+    """
+    return _installed("torch") and not _torch_gpu_build()
 
 
 def describe() -> Backend:

@@ -510,11 +510,12 @@ class GrowShrinkTree:
     ``prefix`` (writing the set into the caller's list), one per distinct parent set (``leaves``).
     Repeated traces reuse the grow/shrink work cached in the shared node tree.
 
-    ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
-    ``required`` parents are in every parent set: the root scores them, grow adds to them, and
-    shrink never removes them. The caller keeps each required parent in ``prefix``.
-    ``max_parents`` caps every parent set, required parents included: a node whose set holds that
-    many members grows no branches (``None``: no cap).
+    ``candidates`` limits the parents the tree grows from (``None``: every other variable); a tuple
+    is kept as given, so the trees of a search can share one, and it may hold ``vertex``, which
+    :meth:`trace` excludes. ``required`` parents are in every parent set: the root scores them,
+    grow adds to them, and shrink never removes them. The caller keeps each required parent in
+    ``prefix``. ``max_parents`` caps every parent set, required parents included: a node whose set
+    holds that many members grows no branches (``None``: no cap).
     """
 
     __slots__ = (
@@ -536,17 +537,15 @@ class GrowShrinkTree:
         delta: DeltaBICScore | FullScoreDelta,
         n_features: int,
         *,
-        candidates: list[int] | None = None,
+        candidates: Sequence[int] | None = None,
         required: list[int] | None = None,
         max_parents: int | None = None,
     ) -> None:
         self.vertex = vertex
         self.score = score
         self.delta = delta
-        # Every variable that may parent `vertex` -- all others, or the `candidates`.
-        self.available = tuple(
-            [i for i in range(n_features) if i != vertex] if candidates is None else candidates
-        )
+        # The variables a node may grow from, `vertex` aside: every variable, or the `candidates`.
+        self.available = tuple(range(n_features)) if candidates is None else tuple(candidates)
         self.required = [] if required is None else required
         self.max_parents = max_parents
         self.empty_score = -score.score(vertex, self.required)
@@ -561,7 +560,7 @@ class GrowShrinkTree:
         if parents is None:
             parents = []
         parents.extend(self.required)
-        return self.root.trace(set(), parents, prefix)
+        return self.root.trace({self.vertex}, parents, prefix)
 
 
 def _sweep(
@@ -814,7 +813,12 @@ def _search_state(
     delta = make_delta(score)
     p = X.shape[1]
     if constraints is None:
-        gsts = [GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
+        # The trees share one tuple of the variables instead of holding one each.
+        every = tuple(range(p))
+        gsts = [
+            GrowShrinkTree(v, score, delta, p, candidates=every, max_parents=max_parents)
+            for v in range(p)
+        ]
         return score, ranks, gsts, None
     ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
     gsts = []

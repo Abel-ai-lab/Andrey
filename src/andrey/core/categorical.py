@@ -11,17 +11,21 @@ parent sets at once.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
 
 
-def encode(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def encode(data: np.ndarray, *, order: Literal["C", "F"] = "C") -> tuple[np.ndarray, np.ndarray]:
     """Return each column's category codes and the number of categories per column.
 
     Parameters
     ----------
     data : ndarray, shape (n_samples, n_features)
         Finite values; each distinct value of a column is one category.
+    order : {"C", "F"}, default="C"
+        The memory layout of ``codes``; ``"F"`` stores each column contiguously, the layout
+        :func:`table_counts` reads fastest.
 
     Returns
     -------
@@ -31,7 +35,7 @@ def encode(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         ``k_j``, the number of distinct values in column ``j``.
     """
     arr = np.asarray(data)
-    codes = np.empty(arr.shape, dtype=np.int64)
+    codes = np.empty(arr.shape, dtype=np.int64, order=order)
     for j in range(arr.shape[1]):
         codes[:, j] = np.unique(arr[:, j], return_inverse=True)[1].reshape(-1)
     cardinalities = codes.max(axis=0) + 1 if arr.shape[0] else np.zeros(arr.shape[1], np.int64)
@@ -98,12 +102,16 @@ def table_counts(
     ``j``-th occurring configuration of the parents, in mixed-radix order with the first parent the
     most significant, where ``node`` takes category ``k``. A parent set whose table fits within a
     few cells per row is counted over every possible configuration, several sets in one bincount,
-    and its empty configurations dropped; a larger one is numbered by :func:`configurations`.
+    and its empty configurations dropped; a larger one is numbered by :func:`configurations`. A
+    set that starts with the previous counted set's first parents reuses their code, up to as many
+    parents as ``BATCH_CELLS`` rows hold, so sets in lexicographic order do the least work; the
+    tables do not depend on the order of the sets.
 
     Parameters
     ----------
     codes : ndarray of int64, shape (n_samples, n_features)
-        Category codes from :func:`encode`.
+        Category codes from :func:`encode`; each column is read on its own, so a column-major array
+        reads fastest.
     cardinalities : ndarray of int64, shape (n_features,)
         Categories per column, from :func:`encode`.
     node : int
@@ -123,6 +131,7 @@ def table_counts(
     out: list[np.ndarray] = [np.empty((0, r), dtype=np.int64)] * len(parent_sets)
     dense: list[tuple[int, int]] = []
     limit = max(DENSE_ROWS * n, DENSE_MIN)
+    keep = max(1, BATCH_CELLS // max(n, 1))
     for i, parents in enumerate(parent_sets):
         q = 1
         for p in parents:
@@ -143,13 +152,36 @@ def table_counts(
         part = dense[start:stop]
         flat = np.empty((len(part), n), dtype=np.int64)
         offset = 0
+        # The mixed-radix code of the previous set's first parents, at most ``keep`` of them so the
+        # codes held stay within BATCH_CELLS entries; a set's later parents go into its own row.
+        prefix: list[np.ndarray] = []
+        last: Sequence[int] = ()
         for b, (i, q) in enumerate(part):
             row = flat[b]
-            row[:] = 0
-            for p in parent_sets[i]:
-                row *= int(cardinalities[p])
-                row += codes[:, p]
-            row *= r
+            parents = parent_sets[i]
+            shared = 0
+            for a, c in zip(last, parents, strict=False):
+                if a != c:
+                    break
+                shared += 1
+            del prefix[shared:]
+            for p in parents[len(prefix) : keep]:
+                if prefix:
+                    prefix.append(prefix[-1] * int(cardinalities[p]) + codes[:, p])
+                else:
+                    prefix.append(codes[:, p])
+            last = parents
+            rest = parents[len(prefix) :]
+            if rest:
+                row[:] = prefix[-1]
+                for p in rest:
+                    row *= int(cardinalities[p])
+                    row += codes[:, p]
+                row *= r
+            elif prefix:
+                np.multiply(prefix[-1], r, out=row)
+            else:
+                row[:] = 0
             row += target + offset
             offset += q * r
         counts = np.bincount(flat.ravel(), minlength=offset)

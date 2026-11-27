@@ -158,6 +158,7 @@ def test_direct_lingam_batches_reach_the_gpu_under_auto(monkeypatch):
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "numpy"))
+    monkeypatch.setattr(backend, "_torch_is_cpu_build", lambda: False)
     monkeypatch.setattr(stats, "_entropy_torch", lambda U, dev: stats._entropy_numpy(U))
     from andrey.lingam.pwling import score_candidates
 

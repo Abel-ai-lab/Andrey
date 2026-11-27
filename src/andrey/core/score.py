@@ -55,13 +55,14 @@ from __future__ import annotations
 
 import copy
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from functools import lru_cache
 from typing import Protocol, Self, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 from scipy.linalg import get_lapack_funcs
+from scipy.sparse import csr_array
 from scipy.sparse.csgraph import connected_components
 from scipy.special import gammaln
 
@@ -215,21 +216,81 @@ def copy_groups(corr: np.ndarray, n: int) -> tuple[tuple[int, ...], ...]:
     Parameters
     ----------
     corr : ndarray, shape (d, d)
-        Correlation matrix of the data's columns.
+        Correlation matrix of the data's columns. It is read in blocks of whole rows of at most
+        ``COPY_BLOCK_ENTRIES`` entries, so beyond it the check holds about one such block and the
+        copies found in it.
     n : int
         Sample count.
     """
-    if n <= 2 or corr.shape[0] < 2:
+    d = corr.shape[0]
+    if n <= 2 or d < 2:
         return ()
-    alike = np.abs(corr)
-    np.fill_diagonal(alike, 0.0)
-    copies = 1.0 - alike**2 <= ZERO_RESIDUAL
+    first = np.arange(d)
+    for rows in _row_blocks(d):
+        first = _join_copies(first, _copy_mask(corr[rows], rows), rows.start)
+    return _groups_by_first(first)
+
+
+#: Correlation entries the copy check holds at once, 8 MB of float64.
+COPY_BLOCK_ENTRIES = 1 << 20
+
+
+def _row_blocks(d: int) -> Iterator[slice]:
+    """The rows ``0, ..., d - 1`` in order, in blocks of at most ``COPY_BLOCK_ENTRIES`` entries."""
+    step = max(1, COPY_BLOCK_ENTRIES // d)
+    return (slice(start, min(start + step, d)) for start in range(0, d, step))
+
+
+def _copy_mask(block: np.ndarray, rows: slice) -> np.ndarray:
+    """``True`` where ``block``, correlation rows ``rows``, marks a copy off the diagonal.
+
+    The entries are taken in floating point, in the precision of ``block`` when it is floating.
+    """
+    alike = np.abs(block, dtype=np.result_type(block, 1.0))
+    np.fill_diagonal(alike[:, rows.start :], 0.0)
+    np.square(alike, out=alike)
+    np.subtract(1.0, alike, out=alike)
+    return alike <= ZERO_RESIDUAL
+
+
+def _join_copies(first: np.ndarray, copies: np.ndarray, start: int) -> np.ndarray:
+    """Each column's smallest connected column, ``first``, updated with the copies ``copies``.
+
+    ``copies`` is the mask of :func:`_copy_mask` for the rows ``start, start + 1, ...``. The graph
+    holds one edge from each column to its ``first`` and the pairs the mask marks, so it stays
+    within a block's pairs plus one edge per column, however large a group of copies grows.
+    """
     if not copies.any():
+        return first
+    d = first.size
+    links = (np.ones(d), first.astype(np.int32), np.arange(d + 1, dtype=np.int32))
+    graph = _pairs_graph(copies, start) + csr_array(links, shape=(d, d))
+    _, label = connected_components(graph, directed=False)
+    _, smallest = np.unique(label, return_index=True)
+    return smallest[label]
+
+
+def _pairs_graph(copies: np.ndarray, start: int) -> csr_array:
+    """The ``(d, d)`` graph of the pairs ``copies`` marks in the rows ``start, start + 1, ...``.
+
+    It is built from the mask row by row, with 32-bit indices, without listing the pairs' positions
+    first.
+    """
+    rows, d = copies.shape
+    indptr = np.zeros(d + 1, dtype=np.int32)
+    indptr[start + 1 : start + rows + 1] = np.cumsum(copies.sum(axis=1))
+    indptr[start + rows + 1 :] = indptr[start + rows]
+    columns = np.broadcast_to(np.arange(d, dtype=np.int32), copies.shape)[copies]
+    return csr_array((np.ones(columns.size), columns, indptr), shape=(d, d))
+
+
+def _groups_by_first(first: np.ndarray) -> tuple[tuple[int, ...], ...]:
+    """The groups of :func:`copy_groups` from each column's smallest connected column ``first``."""
+    if (first == np.arange(first.size)).all():
         return ()
-    _, component = connected_components(copies, directed=False)
     members: dict[int, list[int]] = {}
-    for j, label in enumerate(component.tolist()):
-        members.setdefault(label, []).append(j)
+    for column, kept in enumerate(first.tolist()):
+        members.setdefault(kept, []).append(column)
     return tuple(tuple(group) for group in members.values() if len(group) > 1)
 
 
@@ -307,11 +368,18 @@ def check_columns(cov: np.ndarray, n: int, name: Callable[[int], str] | None = N
     if d < 2 or n <= 2:
         return
     sd = np.sqrt(variance)
-    corr = cov / np.outer(sd, sd)
-    groups = copy_groups(corr, n)
+    corr = np.empty((d, d), dtype=np.result_type(cov, sd)) if n > d else None
+    first = np.arange(d)
+    for rows in _row_blocks(d):
+        block = np.outer(sd[rows], sd)
+        np.divide(cov[rows], block, out=block)
+        if corr is not None:
+            corr[rows] = block
+        first = _join_copies(first, _copy_mask(block, rows), rows.start)
+    groups = _groups_by_first(first)
     if groups:
         raise copies_error(groups)
-    if n <= d:
+    if corr is None:
         return
     if np.linalg.eigvalsh(corr)[0] > ZERO_RESIDUAL:
         return
@@ -513,8 +581,7 @@ class BICScore:
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
+        return self._score_key(int(node), tuple(sorted(map(int, parents))))
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the negative local BIC scores for many parent sets, in request order.
@@ -553,11 +620,12 @@ class BICScore:
 class _CountScore:
     """Memoized local scores computed from a node's counts in each configuration of its parents.
 
-    A subclass sets ``n``, ``_codes`` and ``_cardinalities`` (see
-    :func:`~andrey.core.categorical.encode`) and ``_memo``, and scores one table in :meth:`_local`.
-    :meth:`score_many` counts the tables of every parent set not yet memoized together
-    (:func:`~andrey.core.categorical.table_counts`); a score is the same whether it is computed
-    alone or in a batch.
+    A subclass sets ``n``, ``_codes`` (column-major, so each column is read contiguously) and
+    ``_cardinalities`` (see :func:`~andrey.core.categorical.encode`) and ``_memo``, and scores one
+    table in :meth:`_local`. :meth:`score_many` counts the tables of every parent set not yet
+    memoized together (:func:`~andrey.core.categorical.table_counts`) and scores them in
+    :meth:`_local_many`, which a subclass overrides to score a batch of tables at once; a score is
+    the same whether it is computed alone or in a batch.
     """
 
     n: int
@@ -568,13 +636,19 @@ class _CountScore:
     def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
         raise NotImplementedError
 
+    def _local_many(
+        self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
+    ) -> list[float]:
+        """Return the score of each parent set in ``keys`` from its table in ``tables``."""
+        return [self._local(node, key, counts) for key, counts in zip(keys, tables, strict=True)]
+
     def score(self, node: int, parents: Sequence[int]) -> float:
         """Return the memoized local score for ``node`` given ``parents``.
 
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = (int(node), tuple(sorted(int(p) for p in parents)))
+        key = (int(node), tuple(sorted(map(int, parents))))
         value = self._memo.get(key)
         if value is None:
             (counts,) = categorical.table_counts(self._codes, self._cardinalities, key[0], [key[1]])
@@ -590,9 +664,9 @@ class _CountScore:
         todo = [key for key, value in found.items() if value is None]
         if todo:
             tables = categorical.table_counts(self._codes, self._cardinalities, node, todo)
-            for key, counts in zip(todo, tables, strict=True):
-                found[key] = self._local(node, key, counts)
-                self._memo.put((node, key), found[key])
+            for key, value in zip(todo, self._local_many(node, todo, tables), strict=True):
+                found[key] = value
+                self._memo.put((node, key), value)
         return [found[key] for key in keys]
 
     def on_rows(self, rows: np.ndarray, cache_size: int | None = 1_000_000) -> Self:
@@ -601,7 +675,12 @@ class _CountScore:
         Every other setting is kept, the multinomial BIC's ``log(n)`` of all rows included.
         """
         out = copy.copy(self)
-        out._codes = self._codes[rows]
+        mask = np.asarray(rows)
+        if mask.dtype == np.bool_:
+            if mask.shape != (self.n,):
+                raise IndexError(f"rows marks {mask.size} rows of {self.n}")
+            mask = np.flatnonzero(mask)
+        out._codes = self._codes.T.take(mask, axis=1).T  # each column of the rows stays contiguous
         out.n = out._codes.shape[0]
         out._memo = _LRU(cache_size)
         return out
@@ -673,12 +752,69 @@ class BDeuScore(_CountScore):
         self.n: int = arr.shape[0]
         self.equivalent_sample_size = float(equivalent_sample_size)
         self.structure_prior = float(structure_prior)
-        self._codes, self._cardinalities = categorical.encode(arr)
+        self._codes, self._cardinalities = categorical.encode(arr, order="F")
         others = arr.shape[1] - 1
         p = self.structure_prior / others if others > 0 else 1.0
         # Per-parent and per-non-parent log prior, or none when p is not a probability below 1.
         self._prior = (float(np.log(p)), float(np.log1p(-p)), others) if p < 1.0 else None
         self._memo = _LRU(cache_size)
+
+    def _local_many(
+        self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
+    ) -> list[float]:
+        """Score the tables in chunks of at most ``BATCH_CELLS`` cells (a larger table alone), each
+        chunk with one ``gammaln`` call over its tables' ``N_ij`` and one over their ``N_ijk``, and
+        each table's terms summed over its own slice in the order of :meth:`_local`."""
+        out: list[float] = []
+        start = 0
+        while start < len(tables):
+            stop, cells = start + 1, tables[start].size
+            while stop < len(tables) and cells + tables[stop].size <= categorical.BATCH_CELLS:
+                cells += tables[stop].size
+                stop += 1
+            out += self._local_chunk(node, keys[start:stop], tables[start:stop])
+            start = stop
+        return out
+
+    def _local_chunk(
+        self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
+    ) -> list[float]:
+        if len(tables) < 2:
+            return super()._local_many(node, keys, tables)
+        r = tables[0].shape[1]
+        a_j = [
+            self.equivalent_sample_size
+            / float(np.prod([float(self._cardinalities[p]) for p in key]))
+            for key in keys
+        ]
+        a_jk = [a / r for a in a_j]
+        n_ij = [counts.sum(axis=1) for counts in tables]
+        n_ijk = [counts[counts > 0] for counts in tables]
+        rows = [x.size for x in n_ij]
+        cells = [x.size for x in n_ijk]
+        g_ij = gammaln(np.concatenate(n_ij) + np.repeat(a_j, rows))
+        g_ijk = gammaln(np.concatenate(n_ijk) + np.repeat(a_jk, cells))
+        g_a_j = gammaln(np.array(a_j)).tolist()
+        g_a_jk = gammaln(np.array(a_jk)).tolist()
+        out: list[float] = []
+        i = k = 0
+        for t, key in enumerate(keys):
+            log_likelihood = (
+                rows[t] * g_a_j[t]
+                - float(np.sum(g_ij[i : i + rows[t]]))
+                + float(np.sum(g_ijk[k : k + cells[t]]))
+                - cells[t] * g_a_jk[t]
+            )
+            i += rows[t]
+            k += cells[t]
+            out.append(-2.0 * (log_likelihood + self._log_prior(len(key))))
+        return out
+
+    def _log_prior(self, parents: int) -> float:
+        if self._prior is None:
+            return 0.0
+        log_p, log_not_p, others = self._prior
+        return parents * log_p + (others - parents) * log_not_p
 
     def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
         m, r = counts.shape
@@ -693,12 +829,7 @@ class BDeuScore(_CountScore):
             + float(np.sum(gammaln(n_ijk + a_jk)))
             - n_ijk.size * float(gammaln(a_jk))
         )
-        log_prior = 0.0
-        if self._prior is not None:
-            log_p, log_not_p, others = self._prior
-            k = len(parents)
-            log_prior = k * log_p + (others - k) * log_not_p
-        return -2.0 * (log_likelihood + log_prior)
+        return -2.0 * (log_likelihood + self._log_prior(len(parents)))
 
 
 class CategoricalBICScore(_CountScore):
@@ -757,7 +888,7 @@ class CategoricalBICScore(_CountScore):
         self.n: int = arr.shape[0]
         self.penalty_discount = penalty_weight(penalty_discount)
         self.log_n = float(np.log(self.n))
-        self._codes, self._cardinalities = categorical.encode(arr)
+        self._codes, self._cardinalities = categorical.encode(arr, order="F")
         self._memo = _LRU(cache_size)
 
     def _local(self, node: int, parents: tuple[int, ...], counts: np.ndarray) -> float:
@@ -883,8 +1014,7 @@ class DGScore:
         The cache is keyed by ``(node, sorted-parents-tuple)``, so parent-set order does not affect
         the lookup.
         """
-        key = tuple(sorted(int(p) for p in parents))
-        return self._score_key(int(node), key)
+        return self._score_key(int(node), tuple(sorted(map(int, parents))))
 
     def score_many(self, node: int, parent_sets: Sequence[Sequence[int]]) -> list[float]:
         """Return the negative local DG scores for many parent sets, in request order."""

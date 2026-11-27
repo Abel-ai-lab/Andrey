@@ -120,9 +120,10 @@ class _Tests:
 
     A residual depends only on its variable and regressors, and a test only on its two sides, so the
     search's repeated sweeps look up the log p-values of the tests they repeat; a test's value is
-    computed with its two sides in one order, so it does not depend on which step asks first. Each
-    variable's residual on its current candidates is kept, and the kernel matrices of the most
-    recently used sides of such residuals, as many as ``_GRAM_BYTES`` holds.
+    computed with its two sides in one order, so it does not depend on which step asks first. Every
+    residual is kept, so each variable is fitted on each set of regressors once. The kernel matrices
+    of the most recently used sides are kept, as many as ``_GRAM_BYTES`` holds; a sink test builds
+    its fresh residual's kernel matrix for that test alone.
     """
 
     def __init__(self, data: np.ndarray) -> None:
@@ -174,14 +175,14 @@ class _Tests:
     def log_p_fresh(self, child: int, regressors: set[int], y: Side) -> float:
         """The log HSIC p-value of ``child``'s residual on ``regressors`` against the side ``y``.
 
-        The residual is fitted for this test alone, so neither it nor its kernel is kept.
+        The residual is kept, so another test of the same variable and regressors does not fit it
+        again; its kernel matrix is read by this test alone and is not kept.
         """
         x: Side = ((child, tuple(sorted(regressors))),)
         key = (min(x, y), max(x, y))
         found = self._log_p.get(key)
         if found is None:
-            residual = self._residuals.get(x[0])
-            fresh = self._gram([self._fit(x[0]) if residual is None else residual])
+            fresh = self._gram([self._residual(x[0])])
             grams = {x: fresh, y: self._side_gram(y)}
             found = self._log_p[key] = hsic_log_p(*(grams[side] for side in key), "camuv")
         return found

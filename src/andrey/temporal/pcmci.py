@@ -164,9 +164,11 @@ class DesignTest:
             statistics[k], p_values[k] = statistic[0], p_value[0]
         return statistics, p_values
 
-    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+    def conditionable(
+        self, x: int, y: int, ordered: Iterable[int], limit: int | None = None
+    ) -> list[int]:
         """:func:`conditionable` of ``test``."""
-        return conditionable(self.test, x, y, ordered)
+        return conditionable(self.test, x, y, ordered, limit)
 
     def count_not_tested(self, x: int, y: int, queries: int) -> None:
         """:func:`count_not_tested` of ``test``."""
@@ -245,12 +247,14 @@ class RankedDesignTest:
         moved = np.sort(self._moved(conditions), axis=1)
         return self.test.statistic_pvalues(self._moved(x), self._moved(y), moved)
 
-    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+    def conditionable(
+        self, x: int, y: int, ordered: Iterable[int], limit: int | None = None
+    ) -> list[int]:
         """:func:`conditionable` of ``test``, asked and answered in data columns."""
         ordered = list(ordered)
         moved = self._moved(np.array([x, y, *ordered], dtype=np.intp)).tolist()
         back = dict(zip(moved[2:], ordered))
-        return [back[c] for c in conditionable(self.test, moved[0], moved[1], moved[2:])]
+        return [back[c] for c in conditionable(self.test, moved[0], moved[1], moved[2:], limit)]
 
     def count_not_tested(self, x: int, y: int, queries: int) -> None:
         """:func:`count_not_tested` of ``test``, asked in data columns."""
@@ -450,14 +454,19 @@ def count_not_tested(test: object, x: int, y: int, queries: int = 1) -> None:
         count_not_tested(inner, x, y, queries)
 
 
-def conditionable(test: object, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+def conditionable(
+    test: object, x: int, y: int, ordered: Iterable[int], limit: int | None = None
+) -> list[int]:
     """Columns from ``ordered``, strongest first, for conditioning ``x`` and ``y``: on missing data,
     those keeping the block testable
     (:meth:`~andrey.core.ci_missing.TestwiseDeletion.conditionable`), excluding columns never
     observed together; all on complete data. Wrappers use their own ``conditionable`` in their
-    columns."""
+    columns. With ``limit``, the first ``limit`` of those columns, found without scanning the rest
+    of ``ordered``; a wrapper's ``conditionable`` takes ``limit`` only when one is given."""
     method = getattr(test, "conditionable", None)
-    return list(ordered) if method is None else method(x, y, ordered)
+    if method is None:
+        return list(ordered)[:limit]
+    return method(x, y, ordered) if limit is None else method(x, y, ordered, limit)
 
 
 def _conditionable_others(
@@ -472,7 +481,7 @@ def _conditionable_others(
     listed = columns.tolist()
     for k, column in enumerate(listed):
         ordered = [c for c in listed if c != column]
-        kept = conditionable(test, column, target, ordered)[:p]
+        kept = conditionable(test, column, target, ordered, p)[:p]
         if kept != ordered[:p]:
             count_not_tested(test, column, target)
         if len(kept) < p:

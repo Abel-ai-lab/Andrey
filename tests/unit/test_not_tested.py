@@ -22,7 +22,7 @@ import andrey
 from andrey.api._method import _not_tested_notice
 from andrey.constraint.blanket import markov_blanket
 from andrey.core import ARROW, ci
-from andrey.core.ci_missing import NOT_TESTED
+from andrey.core.ci_missing import NOT_TESTED, not_tested
 from andrey.temporal.pcmci import pc1
 
 COHORT = 300
@@ -265,6 +265,22 @@ def test_a_tested_candidate_with_an_infinite_statistic_stays_a_parent():
     undecided: list = []
     parents = pc1(_InfiniteStatistic(), 2, 0, 1, 0.05, [0, 1], max_depth=0, undecided=undecided)
     assert parents == ((0, 1),) and undecided == [(1, 1)]
+
+
+@pytest.mark.parametrize("p", [float("nan"), float("inf"), -float("inf"), 0.0, -0.0, 1e-300, 0.5])
+def test_a_python_float_is_marked_not_tested_as_a_zero_dimensional_array_is(p):
+    """A p-value read one at a time, a Python float, is marked as the same value in an array is:
+    the same ``np.bool_``, true only for NaN, and the same for NumPy scalars, lists, and arrays."""
+    want = not_tested(np.array(p))
+    got = not_tested(p)
+    assert type(got) is type(want) is np.bool_
+    assert got == want == (p != p)
+    assert bool(got) is (p != p)
+    assert (~got) == (not got)
+    assert not_tested(np.float64(p)) == want
+    assert not_tested(np.float32(p)) == want
+    np.testing.assert_array_equal(not_tested([p, 0.25]), [want, False])
+    np.testing.assert_array_equal(not_tested(np.array([p, 0.25])), [want, False])
 
 
 def test_markov_check_rejects_a_nan_no_deletion_counted(monkeypatch):

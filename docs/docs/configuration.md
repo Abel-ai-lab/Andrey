@@ -92,6 +92,12 @@ start the forkserver with its socket in `/dev/shm`, or `/tmp`, and warn once; if
 the workers start with `fork` or `spawn`. The results do not change. Set `TMPDIR` to a directory on
 a local file system to silence the warning.
 
+On Linux, workers started from the forkserver read one shared copy of the covariance or correlation
+matrix in `/dev/shm`, where GES, the skeleton and possible-d-separation searches, or a list of
+targets need one, rather than a copy each. The copy has no name there, so its memory goes back when
+the last worker that reads it exits, even when the fit is killed. If `/dev/shm` cannot hold the
+matrix, each worker gets its own copy. The results do not change.
+
 ## Scan dispatch
 
 - `ANDREY_SHARED_SCAN_MIN_WORK`: with `fisherz`, `student_t`, or `normal_scores` on complete data, a

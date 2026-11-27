@@ -329,7 +329,10 @@ def _run_one_repeat(
                 proc.stdout.close()
                 proc.stderr.close()
 
-        observed = {"tree_peak_mem_mb": poller.peak_mb if poller is not None else None}
+        observed = {
+            "tree_peak_mem_mb": poller.peak_mb if poller is not None else None,
+            "tree_peak_pss_mb": poller.peak_pss_mb if poller is not None else None,
+        }
         if timed_out:
             return {
                 **common,
@@ -447,11 +450,12 @@ def run_task(
         Per-repeat wall cap, including imports, warmup, and fit. Exceeding it kills the group and
         returns ``status="timeout"`` with ``elapsed_at_kill_s``.
     cap_mem_mb, mem_route
-        Optional process-tree memory cap. ``"poll"`` (default with a cap) samples RSS and kills on
-        a breach; ``"slurm"`` uses ``srun --mem=`` for cgroup enforcement. OOM records include
-        ``oom_source``. With ``cap_mem_mb=None``, memory is uncapped and a bare ``SIGKILL`` is an
-        error. Only polling reports ``tree_peak_mem_mb``; successful Slurm fits report their own
-        ``peak_rss_mb`` because the step may run on another node.
+        Optional process-tree memory cap. ``"poll"`` (default with a cap) samples the tree's RSS
+        sum and, once that passes the cap, its Pss where Linux reports it, and kills on a breach;
+        ``"slurm"`` uses ``srun --mem=`` for cgroup enforcement. OOM records include ``oom_source``. With
+        ``cap_mem_mb=None``, memory is uncapped and a bare ``SIGKILL`` is an error. Only polling
+        reports ``tree_peak_mem_mb`` and ``tree_peak_pss_mb``; successful Slurm fits report their
+        own ``peak_rss_mb`` because the step may run on another node.
     repeats, warmup, threads
         Timed repeats, untimed warmups per repeat, and BLAS/numeric threads per child.
     n_jobs
@@ -464,9 +468,10 @@ def run_task(
     -------
     list[dict]
         One dict per repeat, including ``status``, caps, ``mem_route``, ``tree_peak_mem_mb``,
-        ``warmup``, ``dtype``, and :func:`resolved_env_fields`, even if the child dies. Successful
-        repeats include ``wall_s``, ``cpu_s``, ``warmup_s``, ``peak_rss_mb``, ``adj``,
-        ``output_hash``, and child-reported ``threads``, ``n_jobs``, and ``device_id``.
+        ``tree_peak_pss_mb``, ``warmup``, ``dtype``, and :func:`resolved_env_fields`, even if the
+        child dies. Successful repeats include ``wall_s``, ``cpu_s``, ``warmup_s``,
+        ``peak_rss_mb``, ``adj``, ``output_hash``, and child-reported ``threads``, ``n_jobs``, and
+        ``device_id``.
     """
     python = _bench_python(adapter)
     env = _child_env(threads, adapter, n_jobs=n_jobs, extra_env=extra_env)

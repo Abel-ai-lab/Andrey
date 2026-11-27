@@ -33,6 +33,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel, Kernel, WhiteKernel
 
+from andrey.core._symmetric import exp_symmetric
 from andrey.core.independence import hsic_statistic_log_p
 
 #: ``GaussianProcessRegressor``'s default ``alpha``, added to the kernel matrix's diagonal.
@@ -63,7 +64,8 @@ def _negative_log_marginal_likelihood(
     c, length, w = np.exp(theta[0]), np.exp(theta[1]), np.exp(theta[2])
     scaled = cause / length
     distances = cdist(scaled, scaled, metric="sqeuclidean")  # full and symmetric, zero diagonal
-    rbf = np.exp(-0.5 * distances)
+    rbf = np.multiply(distances, -0.5)
+    exp_symmetric(rbf, out=rbf)
     np.fill_diagonal(rbf, 1)
     K = c * rbf
     K[np.diag_indices_from(K)] += w

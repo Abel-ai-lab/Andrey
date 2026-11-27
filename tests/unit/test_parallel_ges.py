@@ -5,10 +5,16 @@ The tests also cover worker startup, work-based dispatch, and failure propagatio
 
 from __future__ import annotations
 
+import gc
+import math
+import tracemalloc
+from array import array
+
 import numpy as np
 import pytest
 from threadpoolctl import threadpool_limits
 
+from andrey.core import _bitset
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore
 from andrey.search import _parallel as par
@@ -447,14 +453,14 @@ def test_forward_scan_rescores_group_with_mixed_bounds():
     x = _gaussian_sem(0, 200, 4, 0.5)
     engine = DeltaBICScore(BICScore(x, penalty_discount=1.0))
     scan = pg._ForwardScan([0], engine, 4, None, range(4))
-    screening = {1: 1.0, 2: 2.0, 3: 3.0}  # not deltas, so a returned screening value shows
-    scan.groups[0] = {(): (0, 0b1110, frozenset({1, 2, 3}), screening, {1: 0.0, 2: 0.5, 3: 0.5})}
+    screening = array("d", [1.0, 2.0, 3.0])  # not deltas, so a returned screening value shows
+    scan.groups[0] = {(): (0, 0b1110, 0b1110, screening, array("d", [0.0, 0.5, 0.5]))}
     scan.exact[0] = {}
     scan.reach[(0, 0)] = 0b1001  # y = 0 reaches source 3
-    deltas, passing = scan._exact(0, ())
-    assert passing == 0b0110
+    passing, deltas, batch = scan._exact(0, ())
+    assert passing == batch == 0b0110
     expected = engine.delta_many_with_base(0, (), [("add", 1), ("add", 2)])
-    assert [deltas[1], deltas[2]] == expected
+    assert [deltas[pg._position(batch, 1)], deltas[pg._position(batch, 2)]] == expected
 
 
 def test_forward_scan_refreshes_a_reach_map_before_the_first_graph():
@@ -466,6 +472,77 @@ def test_forward_scan_refreshes_a_reach_map_before_the_first_graph():
     scan.reach[(0, 0)] = 0b1001
     scan._refresh(np.zeros((4, 4), dtype=np.int8))
     assert scan.reach == {(0, 0): 0b1001}
+
+
+def _check_groups(scan: pg._ForwardScan, engine: DeltaBICScore) -> int:
+    """Check that each group holds one batch's deltas and bounds and screens by them, and return
+    the number of groups whose batch holds sources beyond the group's."""
+    wider = 0
+    for y, groups in scan.groups.items():
+        screened: dict[tuple[int, ...], set[int]] = {}
+        for low, x, _t_index, _T, base in scan.screened[y]:
+            screened.setdefault(base, set()).add(x)
+            _clique, _sources, batch, deltas, bounds = groups[base]
+            i = pg._position(batch, x)
+            assert low == (-math.inf if bounds[i] == math.inf else deltas[i] - bounds[i])
+        for base, (_clique, sources, batch, deltas, bounds) in groups.items():
+            assert batch & sources == sources
+            wider += batch != sources
+            fresh: list[float] = []
+            moves = [("add", u) for u in _bitset.nodes(batch)]
+            scored = engine.delta_many_with_base(y, base, moves, bounds=fresh)
+            assert deltas.tobytes() == array("d", scored).tobytes()
+            assert bounds.tobytes() == array("d", fresh).tobytes()
+            at = {x: pg._position(batch, x) for x in _bitset.nodes(sources)}
+            low = {
+                x: -math.inf if bounds[i] == math.inf else deltas[i] - bounds[i]
+                for x, i in at.items()
+            }
+            assert screened.get(base, set()) == {x for x, v in low.items() if v < -pg.EPS_IMPROVE}
+    return wider
+
+
+def test_forward_scan_keeps_under_32_bytes_per_pair_after_the_first_pass():
+    """The first pass on the empty graph keeps under 32 bytes per ordered pair of variables.
+
+    Each group keeps its scored sources as a bitmask and their deltas and bounds as two arrays of
+    floats, 16 bytes per pair. The rest is the screened candidates and the kept graph. Each group
+    holds the deltas and bounds of one batch over its sources.
+    """
+    d = 300
+    x = _gaussian_sem(0, 300, d, 2.0 / (d - 1))
+    engine = DeltaBICScore(BICScore(x, penalty_discount=1.0))
+    scan = pg._ForwardScan(range(d), engine, d, None, range(d))
+    gc.collect()
+    tracemalloc.start()
+    try:
+        before = tracemalloc.get_traced_memory()[0]
+        scan.best(np.zeros((d, d), dtype=np.int8))
+        gc.collect()
+        kept = tracemalloc.get_traced_memory()[0] - before
+    finally:
+        tracemalloc.stop()
+    assert kept < 32 * d * (d - 1)
+    assert _check_groups(scan, engine) == 0
+
+
+def test_forward_scan_reads_a_kept_batch_at_each_source_position():
+    """A target enumerated again keeps a base's batch while it covers the base's sources, and
+    screens each source by the delta and bound at its position in that batch."""
+    d = 40
+    x = _gaussian_sem(0, 500, d, 0.1)
+    engine = DeltaBICScore(BICScore(x, penalty_discount=1.0))
+    scan = pg._ForwardScan(range(d), engine, d, None, range(d))
+    adj = np.zeros((d, d), dtype=np.int8)
+    wider = 0
+    for _ in range(12):
+        best = scan.best(adj)
+        wider += _check_groups(scan, engine)
+        if best is None:
+            break
+        _key, source, y, T = best
+        adj = ops.insert_cpdag(adj, source, y, T)
+    assert wider > 0
 
 
 def test_pool_created_once_spans_passes(monkeypatch):

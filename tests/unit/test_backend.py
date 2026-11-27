@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import subprocess
 import sys
+import types
 
 import numpy as np
 import pytest
@@ -248,6 +249,7 @@ def test_per_device_threshold_gates_by_chosen_device(monkeypatch):
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "numpy"))
+    monkeypatch.setattr(backend, "_torch_is_cpu_build", lambda: False)
     thr = {"cuda": 1000, "mps": 100_000}
     assert backend.resolve(100, thr, amortized=True) == "numpy"  # below cuda's cutoff
     assert backend.resolve(5000, thr, amortized=True) == "cuda"  # above cuda's cutoff
@@ -260,10 +262,11 @@ def test_per_device_threshold_gates_by_chosen_device(monkeypatch):
 
 @pytest.fixture
 def fake_cuda(monkeypatch):
-    """Expose a synthetic CUDA device without requiring GPU hardware."""
+    """Expose a synthetic CUDA device without GPU hardware, whatever torch build is installed."""
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "numpy"))
+    monkeypatch.setattr(backend, "_torch_is_cpu_build", lambda: False)
 
 
 def test_amortized_auto_crosses_at_the_element_cutoff(fake_cuda):
@@ -350,10 +353,52 @@ def test_ges_fit_under_auto_never_imports_torch():
     assert proc.stdout.strip() == "ok"
 
 
+@pytest.fixture
+def cpu_build_probe():
+    """The cached CPU-build answer cleared, before and after, so a fake never outlives its test."""
+    backend._torch_is_cpu_build.cache_clear()
+    yield
+    backend._torch_is_cpu_build.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("installed", "gpu_build", "cpu_build"),
+    [(True, False, True), (True, True, False), (False, False, False)],
+    ids=["cpu build", "gpu build", "not installed"],
+)
+def test_a_cpu_build_is_installed_torch_without_cuda_or_rocm(
+    monkeypatch, cpu_build_probe, installed, gpu_build, cpu_build
+):
+    monkeypatch.setattr(backend, "_installed", lambda name: installed)
+    monkeypatch.setattr(backend, "_torch_gpu_build", lambda: gpu_build)
+    assert backend._torch_is_cpu_build() is cpu_build
+
+
+def test_auto_asks_a_torch_that_is_already_imported(monkeypatch):
+    # With torch imported, even a CPU build's answer comes from torch, as for a CUDA build.
+    for name in ("ANDREY_BACKEND", "ANDREY_DEVICE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(backend, "_torch_is_cpu_build", lambda: True)
+    asked = []
+
+    def fake_torch():
+        asked.append("torch")
+        return types.SimpleNamespace(cuda=types.SimpleNamespace(is_available=lambda: True))
+
+    monkeypatch.setattr(backend, "torch", fake_torch)
+    monkeypatch.delitem(sys.modules, "torch", raising=False)
+    assert backend.resolve(10**9, {"cuda": 1, "mps": None}, amortized=True) == "numpy"
+    assert asked == []  # not imported: a CPU build rules CUDA out without torch
+    monkeypatch.setitem(sys.modules, "torch", types.ModuleType("torch"))
+    assert backend.resolve(10**9, {"cuda": 1, "mps": None}, amortized=True) == "cuda"
+    assert asked == ["torch"]
+
+
 def test_dispatch_counts_record_choices(monkeypatch):
     monkeypatch.delenv("ANDREY_BACKEND", raising=False)
     monkeypatch.delenv("ANDREY_DEVICE", raising=False)
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "numpy"))
+    monkeypatch.setattr(backend, "_torch_is_cpu_build", lambda: False)
     backend._dispatch_counts.clear()
     backend.resolve(10, 100, op="cov")
     backend.resolve(10, 100, op="cov")
@@ -424,6 +469,7 @@ def test_select_by_size_reads_the_op_cutoff_and_never_chooses_mps(monkeypatch, o
     for name in ("ANDREY_BACKEND", "ANDREY_DEVICE", setting.name):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(backend, "_is_available", lambda b: b in ("cuda", "mps", "numpy"))
+    monkeypatch.setattr(backend, "_torch_is_cpu_build", lambda: False)
 
     def choose(n):
         return backend.select_by_size(op, setting, n * n, amortized=True)

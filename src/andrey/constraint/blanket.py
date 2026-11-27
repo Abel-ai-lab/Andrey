@@ -41,25 +41,30 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from functools import partial
-from itertools import combinations, islice
-from typing import Literal
+from itertools import chain, combinations
+from typing import Literal, TypeVar
 
 import numpy as np
 
 from andrey.constraint._skeleton import (
     CHUNK,
+    MaskedMapping,
+    _runs,
     adjacent_pairs,
     flagged_triples,
     kept_apart,
     scan_conditioning_sets,
+    subset_rows,
 )
 from andrey.core import ARROW, NULL, TAIL, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
+    RowCounts,
     TestwiseDeletion,
     counts_its_tests,
     not_tested,
+    rows_tested,
     running_flags,
 )
 from andrey.core.knowledge import Constraints, orient
@@ -72,13 +77,22 @@ from andrey.core.ties import (
     tie_ranks,
 )
 
+_T = TypeVar("_T")
+
 # The sets of one size a collider test asks first; each later chunk is twice as large.
 _FIRST_CHUNK = 32
 # ``(p-value, key)`` of ``x`` against the target given a conditioning set; a lower key is a
 # stronger dependence.
 _Dependence = Callable[[int, int, Sequence[int]], tuple[float, float]]
+# The p-values of the candidates against one conditioning set, and a function from a candidate's
+# position to its key.
+_Scan = Callable[[int, Sequence[int], Sequence[int]], tuple[np.ndarray, Callable[[int], float]]]
 #: A separating set for each candidate a learner dropped, ascending, keyed by the candidate.
 Sepsets = dict[int, tuple[int, ...]]
+#: The :data:`Sepsets` one run of a learner records: a dict, or, for an MMPC run where that takes
+#: fewer bytes, a :class:`~andrey.constraint._skeleton.MaskedMapping` that holds the candidates the
+#: empty set separates as a mask and reads as the dict.
+RunSepsets = Sepsets | MaskedMapping
 
 
 def _tests_every_set(test: CITest) -> bool:
@@ -114,16 +128,18 @@ def _dependence(test: CITest, *, significant: bool = False) -> _Dependence:
     return by_pvalue
 
 
-def _dependences(
-    test: CITest, *, significant: bool = False
-) -> Callable[[int, Sequence[int], Sequence[int]], list[tuple[float, float]]]:
-    """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
+def _dependence_scan(test: CITest, *, significant: bool = False) -> _Scan | None:
+    """The p-values of every candidate in ``xs`` against one conditioning set, as one float64
+    array, with a function from a candidate's position to its strength key, as :func:`_dependence`
+    derives it; ``None`` for a test that answers one query at a time.
 
     A partial-correlation test on complete data (``statistic_pvalue`` and
     ``statistic_pvalues_given``) answers two or more candidates from one factor of the set's
-    correlation block, matching separate calls up to rounding. A test with ``pvalues_given`` but no
-    ``statistic_pvalue`` scans candidates together, giving the same p-values as separate calls and
-    the key :func:`_dependence` derives from them. Other tests answer one call at a time.
+    correlation block, matching separate calls up to rounding. The test-wise deletion test of
+    :class:`~andrey.core.ci_missing.GaussianDeletion` answers them in one call, with the bits of
+    separate calls. A test with ``pvalues_given`` but no ``statistic_pvalue`` scans candidates
+    together, giving the same p-values as separate calls and the key :func:`_dependence` derives
+    from them.
     """
     given = getattr(test, "statistic_pvalues_given", None)
     if given is not None and getattr(test, "statistic_pvalue", None) is not None:
@@ -131,14 +147,14 @@ def _dependences(
 
         def by_factor(
             target: int, xs: Sequence[int], cond: Sequence[int]
-        ) -> list[tuple[float, float]]:
+        ) -> tuple[np.ndarray, Callable[[int], float]]:
             if len(xs) < 2:
-                return [one(target, x, cond) for x in xs]
+                pairs = [one(target, x, cond) for x in xs]
+                keys = [key for _, key in pairs]
+                return np.array([p for p, _ in pairs], dtype=np.float64), lambda i: keys[i]
             r, p = given(target, xs, cond)
-            return [
-                (q, -round(abs(s), KEY_DP))
-                for s, q in zip(np.asarray(r).tolist(), np.asarray(p).tolist(), strict=True)
-            ]
+            statistics = np.asarray(r).tolist()
+            return np.asarray(p, dtype=np.float64), lambda i: -round(abs(statistics[i]), KEY_DP)
 
         return by_factor
     scan = getattr(test, "pvalues_given", None)
@@ -146,18 +162,13 @@ def _dependences(
 
         def by_scan(
             target: int, xs: Sequence[int], cond: Sequence[int]
-        ) -> list[tuple[float, float]]:
-            return [(p, _pvalue_key(p, significant)) for p in scan(target, xs, cond).tolist()]
+        ) -> tuple[np.ndarray, Callable[[int], float]]:
+            p = np.asarray(scan(target, xs, cond), dtype=np.float64)
+            pvalues = p.tolist()
+            return p, lambda i: _pvalue_key(pvalues[i], significant)
 
         return by_scan
-    dependence = _dependence(test, significant=significant)
-
-    def one_by_one(
-        target: int, xs: Sequence[int], cond: Sequence[int]
-    ) -> list[tuple[float, float]]:
-        return [dependence(target, x, cond) for x in xs]
-
-    return one_by_one
+    return None
 
 
 def _required(constraints: Constraints | None, target: int, ranks: Sequence[int]) -> list[int]:
@@ -179,7 +190,7 @@ def markov_blanket(
     interleaved: bool = False,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
-    sepsets: Sepsets | None = None,
+    sepsets: RunSepsets | None = None,
 ) -> list[int]:
     """Estimate ``target``'s Markov blanket with IAMB, or with Inter-IAMB when ``interleaved``.
 
@@ -210,7 +221,8 @@ def markov_blanket(
     ``target`` is set in it, in place, to the conditioning set of the last such test: the blanket
     of the grow step that left it out, or the other members when the shrink dropped it.
     """
-    dependences = _dependences(test, significant=True)
+    scan = _dependence_scan(test, significant=True)
+    one = _dependence(test, significant=True)
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
@@ -224,20 +236,34 @@ def markov_blanket(
         candidates = [x for x in range(d) if x != target and x not in blanket]
         given = tuple(sorted(blanket))
         missing = untested[frozenset(blanket)] = []
-        for x, (p, strength) in zip(
-            candidates, dependences(target, candidates, blanket), strict=True
-        ):
-            key = (strength, ranks[x])
-            if p <= alpha and (best_key is None or key < best_key):
-                best_key, best_x = key, x
-            if p > alpha:
-                separated.add(x)
-                if sepsets is not None:
-                    sepsets[x] = given
-            if not not_tested(p):
-                decided.add(x)
-            else:
-                missing.append(x)
+        if scan is None:
+            for x in candidates:
+                p, strength = one(target, x, blanket)
+                key = (strength, ranks[x])
+                if p <= alpha and (best_key is None or key < best_key):
+                    best_key, best_x = key, x
+                if p > alpha:
+                    separated.add(x)
+                    if sepsets is not None:
+                        sepsets[x] = given
+                if not not_tested(p):
+                    decided.add(x)
+                else:
+                    missing.append(x)
+        else:
+            pvalues, strength_of = scan(target, candidates, blanket)
+            dependent = np.flatnonzero(pvalues <= alpha).tolist()
+            if dependent:
+                best = min(dependent, key=lambda i: (strength_of(i), ranks[candidates[i]]))
+                best_x = candidates[best]
+            ids = np.asarray(candidates, dtype=np.intp)
+            independent = ids[pvalues > alpha].tolist()
+            separated.update(independent)
+            if sepsets is not None:
+                sepsets.update(dict.fromkeys(independent, given))
+            untested_here = np.isnan(pvalues)
+            decided.update(ids[~untested_here].tolist())
+            missing.extend(ids[untested_here].tolist())
         if best_x is None:
             capped = False
             break
@@ -298,7 +324,7 @@ def _shrink(
     alpha: float,
     blanket: list[int],
     keep: Sequence[int] = (),
-    sepsets: Sepsets | None = None,
+    sepsets: RunSepsets | None = None,
 ) -> list[int]:
     """Drop, in place and in joining order, each member independent of ``target`` given the rest;
     the members in ``keep`` are not tested. With ``sepsets``, a dropped member's entry is set to the
@@ -351,7 +377,7 @@ def _weakest(
     test: CITest,
     target: int,
     xs: list[int],
-    conds: list[tuple[int, ...]],
+    conds: list[tuple[int, ...]] | np.ndarray,
     sets: list[tuple[int, ...]] | None = None,
     ranks: Sequence[int] = (),
     alpha: float | None = None,
@@ -366,11 +392,17 @@ def _weakest(
     absolute partial correlation for a test with ``statistic_pvalues``, evaluated for every query
     of one conditioning-set size in one call, else the negated p-value from ``batched_call`` or the
     scalar test. With ``sets``, each candidate's set with the largest p-value is appended to it
-    (:func:`_largest_sets`, which reads ``ranks``).
+    (:func:`_largest_sets`, which reads ``ranks``). ``conds`` is a list of tuples or an ``(N, m)``
+    int array of the sets of one size; one candidate and an array go to the test as they are
+    (:func:`_weakest_rows`), and any other array is read as the tuples of its rows.
     """
     if not xs:
         return []
     batch = getattr(test, "statistic_pvalues", None)
+    if isinstance(conds, np.ndarray):
+        if batch is not None and len(xs) == 1 and sets is None and len(conds):
+            return [_weakest_rows(batch, target, xs[0], conds, alpha)]
+        conds = [tuple(row) for row in conds.tolist()]
     if batch is None:
         batched = getattr(test, "batched_call", None)
         out = []
@@ -415,6 +447,23 @@ def _weakest(
     return list(zip(pmax.tolist(), rmin.tolist(), strict=True))
 
 
+def _weakest_rows(
+    batch: Callable, target: int, x: int, rows: np.ndarray, alpha: float | None
+) -> tuple[float, float]:
+    """:func:`_weakest` of the one candidate ``x`` over the sets in the rows, at least one, of the
+    ``(N, m)`` int array ``rows``, by one call of ``batch``, the test's ``statistic_pvalues``."""
+    n = len(rows)
+    r, p = batch(np.full(n, target, dtype=np.intp), np.full(n, x, dtype=np.intp), rows)
+    p = np.asarray(p, dtype=np.float64)
+    pmax = float(np.fmax(-np.inf, np.fmax.reduce(p)))
+    rmin = float(np.fmin(np.inf, np.fmin.reduce(np.abs(np.asarray(r)))))
+    if math.isinf(pmax):
+        pmax = NOT_TESTED
+    if alpha is not None and not_tested(p).any() and not pmax > alpha:
+        pmax = NOT_TESTED
+    return pmax, rmin
+
+
 def _weaker(p: float, skipped: bool, alpha: float) -> float:
     """The largest tested p-value ``p``, or :data:`~andrey.core.ci_missing.NOT_TESTED` when a set
     was not tested (``skipped``) and ``p`` does not exceed ``alpha``: a tested separating set
@@ -449,7 +498,7 @@ def parents_children(
     ranks: Sequence[int],
     max_depth: int | None = None,
     constraints: Constraints | None = None,
-    sepsets: Sepsets | None = None,
+    sepsets: RunSepsets | None = None,
 ) -> list[int]:
     """Estimate ``target``'s parents and children with the forward and backward phases of MMPC.
 
@@ -493,7 +542,11 @@ def parents_children(
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
     undecided = [x for x, (p, _) in weakest.items() if not_tested(p)]
     if sepsets is not None:
-        sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
+        separated = [x for x, (p, _) in weakest.items() if p > alpha]
+        if isinstance(sepsets, MaskedMapping):
+            sepsets.mark(separated)
+        else:
+            sepsets.update({x: () for x in separated})
     members: list[int] = []
 
     def admit(new: int, pool: dict[int, tuple[float, float]]) -> None:
@@ -663,19 +716,27 @@ def prune_spouses(
 
 
 def _side_sets(sides: list[list[int]]) -> list[tuple[list[int], set[int] | None]]:
-    """The sides of :func:`_collider_sets` as :func:`~andrey.constraint._skeleton.kept_apart`
+    """The sides of :func:`_collider_rows` as :func:`~andrey.constraint._skeleton.kept_apart`
     reads them: each later side skips the subsets the first side holds."""
     return [(side, None if n == 0 else set(sides[0])) for n, side in enumerate(sides)]
 
 
-def _collider_sets(sides: list[list[int]], size: int, middle: int) -> Iterator[tuple[int, ...]]:
-    """The conditioning sets of a collider test, each once: ``middle`` with every size-``size``
-    subset of ``sides[0]``, then of the other side, less the subsets the first side holds."""
-    first = set(sides[0])
-    for n, side in enumerate(sides):
-        for rest in combinations(side, size):
-            if n == 0 or not first.issuperset(rest):
-                yield tuple(sorted((*rest, middle)))
+def _collider_rows(
+    kept: list[tuple[list[int], set[int] | None]], size: int, middle: int, first: int
+) -> Iterator[np.ndarray]:
+    """The conditioning sets of a collider test, each once, as the sorted rows of ``(N, size + 1)``
+    int arrays: ``middle`` with every size-``size`` subset of the first side of ``kept``, then of
+    each other side, in the order of :func:`itertools.combinations`, less the subsets the side's
+    skip set holds (:func:`_side_sets`, :func:`~andrey.constraint._skeleton.subset_rows`). The
+    arrays hold ``first`` rows, then twice as many each time, at most ``CHUNK``, and the last one
+    fewer."""
+    subsets = chain.from_iterable(subset_rows(side, size, skip) for side, skip in kept)
+    for rest in _runs([subsets], first, CHUNK):
+        rows = np.empty((len(rest), size + 1), dtype=np.intp)
+        rows[:, :size] = rest
+        rows[:, size] = middle
+        rows.sort(axis=1)
+        yield rows
 
 
 def blanket_colliders(
@@ -731,14 +792,16 @@ def blanket_colliders(
             p, strength = -np.inf, np.inf
             for size in range(top + 1):
                 kept, left = kept_apart(test, (a, c, b), _side_sets(sides), size)
-                conds = iter(()) if kept is None else _collider_sets([s for s, _ in kept], size, b)
-                width = CHUNK if every else min(_FIRST_CHUNK, CHUNK)
-                while (every or p <= alpha) and (chunk := list(islice(conds, width))):
+                chunks = (
+                    iter(())
+                    if kept is None
+                    else _collider_rows(kept, size, b, CHUNK if every else min(_FIRST_CHUNK, CHUNK))
+                )
+                while (every or p <= alpha) and (chunk := next(chunks, None)) is not None:
                     [(p_chunk, strength_chunk)] = _weakest(test, a, [c], chunk, alpha=alpha)
                     skipped = bool(not_tested([p, p_chunk]).any())
                     p = _weaker(float(np.fmax(p, p_chunk)), skipped, alpha)
                     strength = float(np.fmin(strength, strength_chunk))
-                    width = min(2 * width, CHUNK)
                 if left:  # a set left out keeps no rows: not tested
                     p = _weaker(p, True, alpha)
                 if p > alpha:
@@ -816,7 +879,7 @@ def _ranked_test(
 
 #: Runs one learner for one target of a :class:`LocalSearch` and returns the target's set in the
 #: order its members joined, adding to the :data:`Sepsets` each candidate a test dropped.
-Search = Callable[["LocalSearch", int, Sepsets], list[int]]
+Search = Callable[["LocalSearch", int, RunSepsets], list[int]]
 
 
 @dataclass(frozen=True)
@@ -840,7 +903,7 @@ class Learner:
             raise ValueError("a 'pc_spouses' learner names its 'pc' learner; another has a search")
 
 
-def _iamb(search: LocalSearch, target: int, sepsets: Sepsets, *, interleaved: bool) -> list[int]:
+def _iamb(search: LocalSearch, target: int, sepsets: RunSepsets, *, interleaved: bool) -> list[int]:
     return markov_blanket(
         search.test,
         target,
@@ -854,7 +917,7 @@ def _iamb(search: LocalSearch, target: int, sepsets: Sepsets, *, interleaved: bo
     )
 
 
-def _mmpc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+def _mmpc(search: LocalSearch, target: int, sepsets: RunSepsets) -> list[int]:
     return parents_children(
         search.test,
         target,
@@ -908,15 +971,19 @@ class LocalSearch:
         self.constraints = constraints
         self.levels = levels
         self.n = n
-        self._runs: dict[tuple[str, int], tuple[list[int], Sepsets]] = {}
+        self._runs: dict[tuple[str, int], tuple[list[int], RunSepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
+        # Each run's row counts, kept once :meth:`counted` has been called, and the runs the answer
+        # it is running has read, in the order it first read them.
+        self._run_rows: dict[tuple[str, int], RowCounts] | None = None
+        self._read: dict[tuple[str, int], None] | None = None
 
     def pinned(self) -> AbstractContextManager:
         """BLAS limited to one thread when the test needs it (:func:`~andrey.core.ci.pins_blas`),
         a block that does nothing otherwise."""
         return backend.one_blas_thread() if pins_blas(self.test) else nullcontext()
 
-    def run(self, method: str, target: int) -> tuple[list[int], Sepsets]:
+    def run(self, method: str, target: int) -> tuple[list[int], RunSepsets]:
         """``target``'s set by the ``"blanket"`` or ``"pc"`` learner ``method``, in joining order,
         and the separating set of each candidate its tests dropped.
 
@@ -928,9 +995,50 @@ class LocalSearch:
             search = LEARNERS[method].search
             if search is None:
                 raise ValueError(f"{method!r} has no search of its own; ask LocalSearch.local")
-            sepsets: Sepsets = {}
-            self._runs[key] = (search(self, target, sepsets), sepsets)
+            # MMPC marks the candidates the empty set separates in a mask of d bytes, kept where a
+            # dict entry for each takes more.
+            sepsets: RunSepsets = (
+                MaskedMapping(np.zeros(self.d, dtype=bool)) if search is _mmpc else {}
+            )
+            if self._run_rows is None:
+                members = search(self, target, sepsets)
+            else:
+                with rows_tested() as rows:
+                    members = search(self, target, sepsets)
+                self._run_rows[key] = rows
+            if isinstance(sepsets, MaskedMapping):
+                sepsets = sepsets.compact()
+            self._runs[key] = (members, sepsets)
+        if self._read is not None:
+            self._read.setdefault(key)
         return self._runs[key]
+
+    def counted(self, answer: Callable[[], _T]) -> tuple[_T, RowCounts]:
+        """``answer()`` and the rows its tests read (:func:`~andrey.core.ci_missing.rows_tested`).
+
+        Each run counts its own rows and keeps them with the run. The counter returned merges those
+        of the runs ``answer`` read, each once, in the order it first read them, and then the
+        tests ``answer`` made outside any run, as a new search that runs only ``answer`` counts
+        them. A search counts every run it makes after its first call, so a search that made a run
+        before it, which has no counter, raises ``ValueError``.
+        """
+        if self._run_rows is None:
+            if self._runs:
+                raise ValueError(
+                    "counted needs a search that has made no run before its first call"
+                )
+            self._run_rows = {}
+        self._read = {}
+        try:
+            with rows_tested() as own:
+                found = answer()
+            rows = RowCounts()
+            for key in self._read:
+                rows.merge(self._run_rows[key])
+            rows.merge(own)
+        finally:
+            self._read = None
+        return found, rows
 
     def parents_children(self, method: str, target: int) -> list[int]:
         """``target``'s parents and children by the ``"pc"`` learner ``method``: the members of its
@@ -954,11 +1062,11 @@ class LocalSearch:
         learner = LEARNERS[method]
         if learner.kind == "blanket":
             members, sepsets = self.run(method, target)
-            return None, list(members), dict(sepsets)
+            return None, list(members), sepsets.copy()
         name = method if learner.pc is None else learner.pc
         pc = self.parents_children(name, target)
         members, own = self.run(name, target)
-        sepsets = dict(own)
+        sepsets = own.copy()
         for x in members:
             if x not in pc:
                 sepsets[x] = self.run(name, x)[1][target]
