@@ -1,4 +1,4 @@
-"""AGES shares work across the penalties of its solution path, and returns what it returned before.
+"""AGES shares work across the penalties of its solution path and gives the unshared path's output.
 
 A backward phase of the solution path keeps three things that read no penalty: the inverses of the
 covariance blocks, the remove ratios, and each target's Delete candidates. This file pins, bit for
