@@ -478,14 +478,14 @@ class _GSTNode:
         Appends each taken grow variable to ``parents`` and, on reaching the leaf, removes the
         shrink variables, so ``parents`` ends as the traced parent set, the leaf's ``parents``.
         Adds every branch variable it passes to ``excluded``; a node grows from the tree's
-        candidates outside it (:meth:`GrowShrinkTree.addable`).
+        ``available`` variables outside it.
         """
         if self.branches is None:
             cap = self.tree.max_parents
             if cap is not None and len(parents) >= cap:
                 self.branches = []
             else:
-                self._grow(self.tree.addable(excluded), parents)
+                self._grow([u for u in self.tree.available if u not in excluded], parents)
         branches = self.branches or []
         for branch in branches:
             add = branch.add
@@ -510,21 +510,21 @@ class GrowShrinkTree:
     ``prefix`` (writing the set into the caller's list), one per distinct parent set (``leaves``).
     Repeated traces reuse the grow/shrink work cached in the shared node tree.
 
-    ``candidates`` limits the parents the tree grows from (``None``: every other variable), and
-    ``required`` parents are in every parent set: the root scores them, grow adds to them, and
-    shrink never removes them. The caller keeps each required parent in ``prefix``.
-    ``max_parents`` caps every parent set, required parents included: a node whose set holds that
-    many members grows no branches (``None``: no cap).
+    ``candidates`` limits the parents the tree grows from (``None``: every other variable); a tuple
+    is kept as given, so the trees of a search can share one, and it may hold ``vertex``, which
+    :meth:`trace` excludes. ``required`` parents are in every parent set: the root scores them,
+    grow adds to them, and shrink never removes them. The caller keeps each required parent in
+    ``prefix``. ``max_parents`` caps every parent set, required parents included: a node whose set
+    holds that many members grows no branches (``None``: no cap).
     """
 
     __slots__ = (
         "vertex",
-        "n_features",
         "score",
         "delta",
         "empty_score",
         "root",
-        "candidates",
+        "available",
         "required",
         "max_parents",
         "leaves",
@@ -537,31 +537,20 @@ class GrowShrinkTree:
         delta: DeltaBICScore | FullScoreDelta,
         n_features: int,
         *,
-        candidates: list[int] | None = None,
+        candidates: Sequence[int] | None = None,
         required: list[int] | None = None,
         max_parents: int | None = None,
     ) -> None:
         self.vertex = vertex
-        self.n_features = n_features
         self.score = score
         self.delta = delta
-        # `None` stores no list of the other variables; `addable` enumerates them per grow.
-        self.candidates = None if candidates is None else tuple(candidates)
+        # The variables a node may grow from, `vertex` aside: every variable, or the `candidates`.
+        self.available = tuple(range(n_features)) if candidates is None else tuple(candidates)
         self.required = [] if required is None else required
         self.max_parents = max_parents
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
         self.leaves: dict[tuple[int, ...], _Leaf] = {}
-
-    def addable(self, excluded: set[int]) -> list[int]:
-        """Return the parents a node may add: the candidates not in ``excluded``, in their order.
-
-        Without ``candidates``, the candidates are every variable other than ``vertex``, ascending.
-        """
-        if self.candidates is None:
-            vertex = self.vertex
-            return [u for u in range(self.n_features) if u != vertex and u not in excluded]
-        return [u for u in self.candidates if u not in excluded]
 
     def trace(self, prefix: set[int], parents: list[int] | None = None) -> _Leaf:
         """Return the leaf of ``vertex``'s best parents drawn from ``prefix``; fill ``parents``.
@@ -571,7 +560,7 @@ class GrowShrinkTree:
         if parents is None:
             parents = []
         parents.extend(self.required)
-        return self.root.trace(set(), parents, prefix)
+        return self.root.trace({self.vertex}, parents, prefix)
 
 
 def _sweep(
@@ -824,7 +813,12 @@ def _search_state(
     delta = make_delta(score)
     p = X.shape[1]
     if constraints is None:
-        gsts = [GrowShrinkTree(v, score, delta, p, max_parents=max_parents) for v in range(p)]
+        # The trees share one tuple of the variables instead of holding one each.
+        every = tuple(range(p))
+        gsts = [
+            GrowShrinkTree(v, score, delta, p, candidates=every, max_parents=max_parents)
+            for v in range(p)
+        ]
         return score, ranks, gsts, None
     ranked = constraints.permuted(np.argsort(ranks))  # score variable k is column by_rank[k]
     gsts = []
