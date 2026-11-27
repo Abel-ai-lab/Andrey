@@ -337,7 +337,7 @@ def _is_parent_of(marks: np.ndarray, a: int, b: int) -> bool:
 
 def _parents(marks: np.ndarray, b: int) -> set[int]:
     """The directed parents of ``b`` (nodes ``p`` with ``p -> b``)."""
-    return {p for p in range(marks.shape[0]) if _is_parent_of(marks, p, b)}
+    return set(np.flatnonzero((marks[b] == ARROW) & (marks[:, b] == TAIL)).tolist())
 
 
 def _neighbor_lists(marks: np.ndarray) -> list[list[int]]:
@@ -455,16 +455,19 @@ def _exists_possible_parent_path(
 
 
 def _possible_dsep(
-    marks: np.ndarray,
     x: int,
     y: int,
     neighbors: list[list[int]],
     reach: Callable[[int], int],
+    into: list[set[int]],
+    near: list[set[int]],
 ) -> list[int]:
     """Possible-d-separating nodes for the pair ``(x, y)`` (descending), from a reachability BFS.
 
     ``neighbors`` and ``reach`` are the :func:`_neighbor_lists` and :func:`_semidirected_reach` of
-    ``marks``.
+    the marks. ``into[b]`` is the set of nodes ``a`` with an arrowhead at ``b`` on edge ``a-b``
+    (:func:`_into`), and ``near[a]`` the set of ``neighbors[a]``. The search reads these sets, not
+    the marks.
 
     Grows a frontier of node pairs from ``x``, extending through definite colliders and adjacent
     triples, and collects every intermediate node reachable by a possible-parent path. The frontier
@@ -501,11 +504,13 @@ def _possible_dsep(
         a, b = t
         if _exists_possible_parent_path(previous, b, x, reach):
             dsep.add(b)
+        into_b, near_a = into[b], near[a]
+        a_arrow = a in into_b
         for c in neighbors[b]:
             if c in (a, x, y):
                 continue
             previous.setdefault(c, set()).add(b)
-            if _is_def_collider(marks, a, b, c) or _adjacent(marks, a, c):
+            if (a_arrow and c in into_b) or c in near_a:
                 u = (a, c)
                 if u in visited:
                     continue
@@ -543,13 +548,9 @@ def _iter_dsep_choices(
     subset of it outside both adjacencies and found each dependent.
     """
     within = (adj_a, adj_b, tested) if tested else (adj_a, adj_b)
+    groups = tuple(frozenset(nodes) for nodes in within)
     for size in range(1, _largest_size(len(dsep), max_depth) + 1):
-        yield from (c for c in combinations(dsep, size) if _outside(c, within))
-
-
-def _outside(values: tuple[int, ...], within: Iterable[Collection[int]]) -> bool:
-    """``values`` lie inside none of the sets ``within``."""
-    return not any(all(v in nodes for v in values) for nodes in within)
+        yield from (c for c in combinations(dsep, size) if not any(g.issuperset(c) for g in groups))
 
 
 # The fewest subsets, counted over every size a search tests, of a search a FisherZ, StudentT, or
@@ -901,21 +902,26 @@ def _remove_in_node_order(
     pool: SkeletonWorkerPool | None = None,
 ) -> None:
     """:func:`_remove_by_possible_dsep` in the order of the node indices."""
-    n = marks.shape[0]
-    edges = [_edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
-    # The lists and the reach read the marks, which only a removal changes.
+    rows, cols = np.nonzero(np.triu(marks != NULL, 1))
+    edges = [_edge_order(marks, i, j) for i, j in zip(rows.tolist(), cols.tolist())]
+    # The lists, the reach, and the sets read the marks, which only a removal changes.
     neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
+    into = [set(_into(marks, b, ARROW)) for b in range(marks.shape[0])]
+    near = [set(nodes) for nodes in neighbors]
     for na, nb in edges:
         if not _adjacent(marks, na, nb) or (keep is not None and keep[na, nb]):
             continue
         adj_a, adj_b = set(neighbors[na]), set(neighbors[nb])
         tested: set[int] = set()
         for a, b in ((na, nb), (nb, na)):
-            dsep = _possible_dsep(marks, a, b, neighbors, reach)
+            dsep = _possible_dsep(a, b, neighbors, reach, into, near)
             if _try_remove_by_dsep(
                 marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets, max_depth, pool, tested
             ):
                 neighbors, reach = _neighbor_lists(marks), _semidirected_reach(marks)
+                for u, v in ((na, nb), (nb, na)):
+                    into[u].discard(v)
+                    near[u].discard(v)
                 break
             tested = set(dsep)
 
@@ -1154,7 +1160,7 @@ def _rule_r4(
     """
     n = marks.shape[0]
     for b in range(n):
-        poss_a = [a for a in range(n) if marks[a, b] == ARROW]  # b *-> a
+        poss_a = np.flatnonzero(marks[:, b] == ARROW).tolist()  # b *-> a
         poss_c = _into(marks, b, CIRCLE)  # c *-o b
         for a in poss_a:
             for c in poss_c:
@@ -1334,14 +1340,26 @@ def _is_uncovered(marks: np.ndarray, path: list[int]) -> bool:
     return all(not _adjacent(marks, path[i], path[i + 2]) for i in range(len(path) - 2))
 
 
-def _circle_reaches(marks: np.ndarray, target: int, avoid: int) -> set[int]:
-    """Nodes joined to ``target`` by a circle walk (every edge ``o-o``) that avoids ``avoid``."""
+def _circle_lists(marks: np.ndarray) -> list[list[int]]:
+    """Each node's ascending list of the nodes it shares an ``o-o`` edge with."""
+    return [np.flatnonzero(row).tolist() for row in (marks == CIRCLE) & (marks.T == CIRCLE)]
+
+
+def _circle_reaches(
+    marks: np.ndarray, target: int, avoid: int, circles: list[list[int]] | None = None
+) -> set[int]:
+    """Nodes joined to ``target`` by a circle walk (every edge ``o-o``) that avoids ``avoid``.
+
+    ``circles`` is :func:`_circle_lists` of ``marks``, which the function builds when it is
+    ``None``.
+    """
+    circles = _circle_lists(marks) if circles is None else circles
     reachable = {target}
     queue = deque([target])
     while queue:
         node = queue.popleft()
-        for other in range(marks.shape[0]):
-            if other != avoid and other not in reachable and _traverse_circle(marks, node, other):
+        for other in circles[node]:
+            if other != avoid and other not in reachable:
                 reachable.add(other)
                 queue.append(other)
     return reachable
@@ -1352,27 +1370,27 @@ def _circle_walk_closes(
     a: int,
     b: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    circles: list[list[int]] | None = None,
 ) -> bool:
     """True when a circle walk ``a, c, ..., d, b`` meets every R5 condition except simplicity.
 
     The search runs over ``(previous, current)`` edges, so it takes polynomial time. Every
     uncovered circle path is such a walk, so ``False`` rules out an R5 cycle for ``a o-o b``.
+    ``circles`` is :func:`_circle_lists` of ``marks``, which the function builds when it is
+    ``None``.
     """
-    n = marks.shape[0]
+    circles = _circle_lists(marks) if circles is None else circles
     start = [
         (a, c)
-        for c in range(n)
-        if c != b
-        and _traverse_circle(marks, a, c)
-        and not _adjacent(marks, b, c)
-        and _triple(b, a, c) not in ambiguous
+        for c in circles[a]
+        if c != b and not _adjacent(marks, b, c) and _triple(b, a, c) not in ambiguous
     ]
     seen = set(start)
     queue = deque(start)
     while queue:
         previous, current = queue.popleft()
-        for node in range(n):
-            if node in (previous, a) or not _traverse_circle(marks, current, node):
+        for node in circles[current]:
+            if node in (previous, a):
                 continue
             if _adjacent(marks, previous, node) or _triple(previous, current, node) in ambiguous:
                 continue
@@ -1390,6 +1408,7 @@ def _uncovered_circle_cycle(
     a: int,
     b: int,
     ambiguous: frozenset[tuple[int, int, int]] = frozenset(),
+    circles: list[list[int]] | None = None,
 ) -> list[int] | None:
     """Inner nodes ``c, ..., d`` of an uncovered circle cycle ``a, c, ..., d, b, a``, or ``None``.
 
@@ -1401,22 +1420,23 @@ def _uncovered_circle_cycle(
 
     Finding such a simple path is NP-complete in general [1]_. A polynomial walk check
     (:func:`_circle_walk_closes`) rules out most pairs first; the path search then stops after
-    ``_R5_PARTIAL_PATHS`` partial paths and returns ``None``.
+    ``_R5_PARTIAL_PATHS`` partial paths and returns ``None``. ``circles`` is :func:`_circle_lists`
+    of ``marks``, which the function builds when it is ``None``.
 
     References
     ----------
     .. [1] Szeider, S. (2003). Finding paths in graphs avoiding forbidden transitions. Discrete
        Applied Mathematics 126(2-3), 261-273.
     """
-    if not _circle_walk_closes(marks, a, b, ambiguous):
+    circles = _circle_lists(marks) if circles is None else circles
+    if not _circle_walk_closes(marks, a, b, ambiguous, circles):
         return None
-    reachable = _circle_reaches(marks, b, a)
+    reachable = _circle_reaches(marks, b, a, circles)
     stack = [
         [a, c]
-        for c in range(marks.shape[0])
+        for c in circles[a]
         if c != b
         and c in reachable
-        and _traverse_circle(marks, a, c)
         and not _adjacent(marks, b, c)
         and _triple(b, a, c) not in ambiguous
     ]
@@ -1425,8 +1445,8 @@ def _uncovered_circle_cycle(
             return None
         path = stack.pop()
         last = path[-1]
-        for node in range(marks.shape[0]):
-            if node not in reachable or node in path or not _traverse_circle(marks, last, node):
+        for node in circles[last]:
+            if node not in reachable or node in path:
                 continue
             if _adjacent(marks, path[-2], node) or _triple(path[-2], last, node) in ambiguous:
                 continue
@@ -1452,15 +1472,18 @@ def _rule_r5(
     an uncovered route through the same node. A pair whose search reaches ``_R5_PARTIAL_PATHS``
     keeps its circles.
     """
-    n = marks.shape[0]
-    for a in range(n):
-        for b in range(a + 1, n):
-            if not _traverse_circle(marks, a, b):
-                continue
-            path = _uncovered_circle_cycle(marks, a, b, ambiguous)
-            if path is not None:
-                _orient_tails(marks if out is None else out, a, b, path)
-                change = True
+    # Circles only become tails, so the ``o-o`` pairs at the start hold every pair R5 can orient.
+    circles = _circle_lists(marks)
+    rows, cols = np.nonzero(np.triu((marks == CIRCLE) & (marks.T == CIRCLE), 1))
+    for a, b in zip(rows.tolist(), cols.tolist()):
+        if not _traverse_circle(marks, a, b):
+            continue
+        path = _uncovered_circle_cycle(marks, a, b, ambiguous, circles)
+        if path is not None:
+            _orient_tails(marks if out is None else out, a, b, path)
+            change = True
+            if out is None:
+                circles = _circle_lists(marks)
     return change
 
 
@@ -1480,9 +1503,8 @@ def _orient_tails(marks: np.ndarray | _Implied, a: int, b: int, path: list[int])
 def _rule_r6(marks: np.ndarray, change: bool, *, out: np.ndarray | _Implied | None = None) -> bool:
     """R6: ``a --- b o-* c``  =>  tail at ``b`` on edge ``b-c``."""
     out = marks if out is None else out
-    n = marks.shape[0]
-    for b in range(n):
-        if not any(marks[b, a] == TAIL and marks[a, b] == TAIL for a in range(n)):
+    for b in range(marks.shape[0]):
+        if not ((marks[b] == TAIL) & (marks[:, b] == TAIL)).any():
             continue
         for c in _into(marks, b, CIRCLE):
             out[b, c] = TAIL

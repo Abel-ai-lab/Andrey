@@ -14,7 +14,7 @@ import pytest
 
 import andrey
 from andrey.constraint.pc import adjacency_search
-from andrey.core import NULL, ci
+from andrey.core import ARROW, NULL, ci
 from andrey.core.ci import make_indep_test
 from andrey.data import sample_discrete, sample_mixed, sample_scm
 
@@ -73,7 +73,8 @@ def test_relabeled_categories_keep_the_order_free_pag(seed):
 
 
 def _rebuilt_per_call(marks, test, alpha, sepsets):
-    """``_remove_in_node_order`` with the lists and reach built for every possible-d-sep call."""
+    """``_remove_in_node_order`` with the lists, the reach, and the sets built for every
+    possible-d-sep call."""
     n = marks.shape[0]
     edges = [fci._edge_order(marks, i, j) for i in range(n) for j in range(i + 1, n) if marks[i, j]]
     for na, nb in edges:
@@ -81,9 +82,10 @@ def _rebuilt_per_call(marks, test, alpha, sepsets):
             continue
         adj_a, adj_b = (set(np.flatnonzero(marks[v]).tolist()) for v in (na, nb))
         for a, b in ((na, nb), (nb, na)):
-            dsep = fci._possible_dsep(
-                marks, a, b, fci._neighbor_lists(marks), fci._semidirected_reach(marks)
-            )
+            neighbors = fci._neighbor_lists(marks)
+            into = [set(fci._into(marks, v, ARROW)) for v in range(n)]
+            near = [set(nodes) for nodes in neighbors]
+            dsep = fci._possible_dsep(a, b, neighbors, fci._semidirected_reach(marks), into, near)
             if fci._try_remove_by_dsep(marks, na, nb, dsep, adj_a, adj_b, test, alpha, sepsets):
                 break
 
