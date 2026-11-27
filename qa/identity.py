@@ -930,6 +930,7 @@ CI_CLASSES = (
     ci_missing.TestwiseDeletion,
     ci_missing.PartialCorrelationDeletion,
     ci_missing.GaussianDeletion,
+    ci_missing.ChiSquareDeletion,
     ci_missing.BoundedDeletion,
 )
 #: The local scores' query methods and the score-delta functions, each with the parent sets one
