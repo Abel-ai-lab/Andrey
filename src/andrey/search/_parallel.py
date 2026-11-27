@@ -6,22 +6,28 @@ worker across passes, so its score caches survive. :func:`even_chunks` and
 :func:`balanced_chunks` split the work, :func:`reduce_best` picks the best move by a total-order
 key, :func:`collect` raises worker failures, :func:`pick_context` chooses the start method, and
 :func:`min_work` reads the crossover gate. Each learner supplies a picklable module-level worker
-initializer and task function.
+initializer and task function. :class:`PoolMatrix` gives a pool's workers one shared read-only copy
+of a matrix, which :func:`attach` opens in a worker, and :func:`digest` names a matrix for a run
+token.
 """
 
 from __future__ import annotations
 
 import functools
+import hashlib
 import multiprocessing as mp
 import os
 import socket
 import sys
 import tempfile
+import weakref
 from collections.abc import Callable, Generator, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from contextlib import contextmanager
-from typing import Any
+from dataclasses import dataclass
+from multiprocessing import shared_memory
+from typing import Any, Self
 
 import numpy as np
 
@@ -231,6 +237,110 @@ def min_work(setting: env.Setting[int], default: int) -> int:
     return default if value is None else value
 
 
+def digest(matrix: np.ndarray) -> str:
+    """A digest of ``matrix``'s shape, type, and bytes, read in place for a C-contiguous array."""
+    h = hashlib.blake2b(repr((matrix.shape, matrix.dtype.str)).encode(), digest_size=16)
+    h.update(np.ascontiguousarray(matrix).data)
+    return h.hexdigest()
+
+
+@dataclass(frozen=True)
+class SharedMatrix:
+    """The picklable handle a worker opens a shared matrix by: the segment's name, shape, and
+    type."""
+
+    name: str
+    shape: tuple[int, ...]
+    dtype: str
+
+
+def _shares(context: mp.context.BaseContext) -> bool:
+    """Whether a pool on ``context`` reads its matrix from shared memory: Linux, with workers
+    started from the forkserver."""
+    return sys.platform == "linux" and context.get_start_method() == "forkserver"
+
+
+def _unlink(segment: shared_memory.SharedMemory, owner: int) -> None:
+    """Remove ``segment``'s name, in the process that made it only; the workers' mappings stay
+    valid until they exit."""
+    if os.getpid() == owner:
+        try:
+            segment.unlink()
+        except FileNotFoundError:
+            pass
+
+
+class PoolMatrix:
+    """The matrix a pool's workers read, made once by the pool's owner.
+
+    On Linux with the forkserver, :attr:`payload` is a :class:`SharedMatrix`: one shared-memory
+    segment holds a copy of the matrix, and each worker maps it with :func:`attach`. The segment's
+    space is reserved before the copy, so a full ``/dev/shm`` shows here, not as a bus error in a
+    worker. The owner drops its own mapping once the copy is in, so the process tree holds the
+    owner's matrix and the segment. Otherwise, for a matrix that is not C-contiguous, or when the
+    segment cannot be made, :attr:`payload` is the matrix itself, which each worker's start
+    pickles. Either way the workers read the same bytes in the same layout.
+
+    :meth:`close` removes the segment's name; a worker that has mapped the segment keeps reading
+    it. Close the pool's workers first when one may still start, and the matrix after them. The
+    name is also removed when the object is collected or the process exits.
+    """
+
+    def __init__(self, matrix: np.ndarray, context: mp.context.BaseContext) -> None:
+        self.payload: np.ndarray | SharedMatrix = matrix
+        self._release: weakref.finalize | None = None
+        if not (_shares(context) and matrix.flags.c_contiguous and matrix.nbytes):
+            return
+        try:
+            segment = shared_memory.SharedMemory(create=True, size=matrix.nbytes)
+        except OSError:
+            return
+        try:
+            fd = segment._fd  # ty: ignore[unresolved-attribute]  # the segment's file on POSIX
+            os.posix_fallocate(fd, 0, matrix.nbytes)
+            np.ndarray(matrix.shape, matrix.dtype, buffer=segment.buf)[...] = matrix
+        except OSError:
+            segment.close()
+            segment.unlink()
+            return
+        segment.close()
+        self._release = weakref.finalize(self, _unlink, segment, os.getpid())
+        self.payload = SharedMatrix(segment.name, matrix.shape, matrix.dtype.str)
+
+    def close(self) -> None:
+        """Remove the segment's name, once; nothing on the pickled route."""
+        if self._release is not None:
+            self._release()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+
+# The segments this worker has mapped, kept open for its life so the views over them stay valid.
+_ATTACHED: list[shared_memory.SharedMemory] = []
+
+
+def attach(payload: np.ndarray | SharedMatrix) -> np.ndarray:
+    """Worker side of :class:`PoolMatrix`: the matrix ``payload`` stands for.
+
+    A :class:`SharedMatrix` maps its segment and returns a read-only view of it; a matrix is
+    returned as it is.
+    """
+    if isinstance(payload, np.ndarray):
+        return payload
+    # The owner tracks the segment; from Python 3.13 a worker opts out of tracking it again.
+    track = {"track": False} if sys.version_info >= (3, 13) else {}
+    segment = shared_memory.SharedMemory(name=payload.name, **track)
+    _ATTACHED.append(segment)
+    assert segment.buf is not None  # an open segment has its buffer
+    count = int(np.prod(payload.shape))
+    view = np.frombuffer(segment.buf.toreadonly(), dtype=payload.dtype, count=count)
+    return view.reshape(payload.shape)
+
+
 def _boot_task() -> None:
     """The no-op each fresh pool runs at construction, forcing its worker process into existence."""
 
@@ -243,10 +353,11 @@ class StableWorkerSet:
     has its own pool so :func:`collect` can detect its death through ``BrokenProcessPool``.
     The context selects the start method; the initializer applies any BLAS pinning.
 
-    Workers start concurrently during construction. The first ``ProcessPoolExecutor.submit`` can
-    block while writing pickled ``initargs``: a covariance of hundreds of KiB exceeds the 64 KiB
-    pipe buffer. One boot thread per pool overlaps those writes and worker startup, costing roughly
-    the slowest boot instead of their sum. Startup failures surface in the constructor.
+    Workers start concurrently during construction, and each has run ``initializer`` when the
+    constructor returns. The first ``ProcessPoolExecutor.submit`` can block while writing pickled
+    ``initargs``: a covariance of hundreds of KiB exceeds the 64 KiB pipe buffer. One boot thread
+    per pool overlaps those writes and worker startup, costing roughly the slowest boot instead of
+    their sum. Startup failures surface in the constructor.
     """
 
     def __init__(

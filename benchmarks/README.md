@@ -487,6 +487,14 @@ and results (`status`, `wall_s`, `process_s`, `cpu_s`, `warmup_s`, `setup_s`, `p
 or the link columns of [PCMCI+ and LPCMCI](comparisons/pcmciplus-lpcmci.md) for a
 window.
 
+`peak_rss_mb`, `child_peak_rss_mb`, and `tree_peak_mem_mb` add up each process's resident memory,
+so a page the processes share, such as a matrix the workers read from shared memory, counts once
+per process. Once the tree's sum passes the cap, `--mem-route poll` reads the tree's Pss, which
+counts such a page once, and caps on it where Linux reports it; `tree_peak_pss_mb` records the
+largest Pss read, and is null for a tree that stayed under the cap. Pss is read only then because
+reading it slows the fit. A child started by `vfork` reports its parent's memory until it calls
+exec, and no sum counts it.
+
 `device_id` records `cpu` or the CUDA device index and name. The backend determines the device, so a
 pin inside `fit` outranks `ANDREY_DEVICE`; the record keeps the request separately as `device`.
 `gpu_peak_alloc_mb` is null for CPU backends. For CUDA, it records peak tensor memory in PyTorch's

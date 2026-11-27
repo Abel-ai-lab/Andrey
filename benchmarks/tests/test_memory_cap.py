@@ -112,14 +112,28 @@ class StubSelfKillAdapter(_BaseStub):
         return _ADJ.copy()  # pragma: no cover - unreachable
 
 
+_BOTH_HOLD = None  # each pool worker's barrier, set by _meet
+
+
+def _meet(barrier) -> None:
+    """Pool-worker initializer: keep the barrier both workers' holds meet at."""
+    global _BOTH_HOLD
+    _BOTH_HOLD = barrier
+
+
 def _hold_in_worker(_) -> float:
-    """Pool-worker body (module-level so forkserver can import it): touch ~350 MB and hold it."""
+    """Pool-worker body (module-level so forkserver can import it): touch ~350 MB and hold it.
+
+    Both workers hold at once: each waits at the barrier with its pages resident, so the two tasks
+    cannot run one after the other on one worker.
+    """
     import time as _t
 
     import numpy as _np
 
     arr = _np.ones(_WORKER_MB * 1024 * 1024 // 8, dtype=_np.float64)
     arr += 1.0
+    _BOTH_HOLD.wait(timeout=30.0)
     _t.sleep(_HOLD_S)
     return float(arr[0])
 
@@ -139,7 +153,9 @@ class StubPoolAllocAdapter(_BaseStub):
 
         ctx = _mp.get_context("forkserver")
         ctx.set_forkserver_preload(["numpy"])
-        with _cf.ProcessPoolExecutor(max_workers=2, mp_context=ctx) as ex:
+        with _cf.ProcessPoolExecutor(
+            max_workers=2, mp_context=ctx, initializer=_meet, initargs=(ctx.Barrier(2),)
+        ) as ex:
             list(ex.map(_hold_in_worker, [0, 1]))
         return _ADJ.copy()
 
@@ -396,3 +412,120 @@ def test_the_tree_total_sums_a_descendant_this_process_did_not_allocate():
         child.wait()
 
     assert after - before > 250.0, (before, after)  # the descendant's pages are in the total
+
+
+#: A child that touches ``shared`` MiB, forks a grandchild that never calls exec and touches ``own``
+#: MiB of its own, and prints the grandchild's pid once both are resident.
+_FORKS = """\
+import os, time
+import numpy as np
+shared = np.ones({shared} * 131072); shared += 1.0
+r, w = os.pipe()
+pid = os.fork()
+if pid == 0:
+    own = np.ones({own} * 131072); own += 1.0
+    os.write(w, b"u"); time.sleep(30); os._exit(0)
+os.read(r, 1)
+print(pid, flush=True)
+time.sleep(30)
+"""
+
+
+class _Forks:
+    """The child of :data:`_FORKS` and its grandchild, both ended on exit."""
+
+    def __init__(self, shared: int = 1, own: int = 1) -> None:
+        import subprocess
+        import sys
+
+        self.child = subprocess.Popen(
+            [sys.executable, "-c", _FORKS.format(shared=shared, own=own)], stdout=subprocess.PIPE
+        )
+        self.grandchild = int(self.child.stdout.readline())
+
+    def __enter__(self) -> _Forks:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        for pid in (self.grandchild, self.child.pid):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        self.child.wait()
+        self.child.stdout.close()
+
+
+def test_a_process_shares_memory_with_its_own_threads_and_not_with_a_forked_child():
+    import threading
+
+    from andrey_bench import memcap
+
+    if not memcap.shares_memory(os.getpid(), os.getpid()):
+        pytest.skip("the kernel cannot compare address spaces here")
+    assert memcap.shares_memory(os.getpid(), threading.get_native_id())
+    with _Forks() as forks:
+        assert not memcap.shares_memory(forks.child.pid, forks.grandchild)
+        assert not memcap.shares_parent_memory(forks.grandchild)
+        assert not memcap.shares_parent_memory(forks.child.pid)
+
+
+def test_a_forked_child_that_never_calls_exec_still_counts():
+    """A fork-start pool worker never calls exec; its own pages are in both totals."""
+    from andrey_bench import memcap
+
+    with _Forks(own=300) as forks:
+        rss, pss = memcap.tree_memory_mb(forks.child.pid)
+        own = memcap.pss_kb(forks.grandchild)
+    assert rss > 300.0, rss
+    if pss is not None:
+        assert own is not None and own / 1024 > 250.0 and pss > 300.0, (rss, pss, own)
+
+
+def test_a_child_in_its_parents_address_space_is_left_out(monkeypatch):
+    """A vfork child reports its parent's memory until it calls exec: neither total counts it."""
+    from andrey_bench import memcap
+
+    with _Forks(own=300) as forks:
+        counted = memcap.tree_memory_mb(forks.child.pid)
+        monkeypatch.setattr(memcap, "shares_parent_memory", lambda pid: pid == forks.grandchild)
+        skipped = memcap.tree_memory_mb(forks.child.pid)
+    assert counted[0] - skipped[0] > 250.0, (counted, skipped)
+    if counted[1] is not None:
+        assert skipped[1] is not None and counted[1] - skipped[1] > 250.0, (counted, skipped)
+
+
+def test_the_tree_pss_is_at_most_its_rss_and_counts_shared_pages_once():
+    """A forked grandchild shares its parent's pages: RSS counts them twice, Pss once."""
+    from andrey_bench import memcap
+
+    with _Forks(shared=200) as forks:
+        rss, pss = memcap.tree_memory_mb(forks.child.pid)
+    if pss is None:
+        pytest.skip("Pss cannot be read here")
+    assert pss <= rss
+    assert rss - pss > 150.0, (rss, pss)
+
+
+def test_the_poller_reads_pss_only_over_the_cap_and_caps_on_it(monkeypatch):
+    """Pss is at most the RSS sum, so a tree under the cap by RSS never pays for the Pss read."""
+    from andrey_bench import memcap
+
+    state: dict[str, float | None] = {"rss": 400.0, "pss": 300.0}
+    reads: list[bool] = []
+
+    def tree(pid, *, pss=True):
+        reads.append(pss)
+        return state["rss"], state["pss"] if pss else None
+
+    monkeypatch.setattr(memcap, "tree_memory_mb", tree)
+    monkeypatch.setattr(memcap, "_kill_tree", lambda pid: pytest.fail("killed under the cap"))
+    poller = memcap.TreeMemoryPoller(os.getpid(), 500.0)
+    assert poller.sample() == 400.0 and reads == [False] and poller.peak_pss_mb is None
+    state.update(rss=900.0, pss=450.0)  # over the cap by RSS, under it by Pss
+    assert poller.sample() == 450.0 and not poller.breached
+    assert (poller.peak_mb, poller.peak_pss_mb) == (900.0, 450.0)
+    state.update(pss=None)  # no Pss here: the RSS sum decides
+    killed: list[int] = []
+    monkeypatch.setattr(memcap, "_kill_tree", killed.append)
+    assert poller.sample() == 900.0 and poller.breached and killed == [os.getpid()]

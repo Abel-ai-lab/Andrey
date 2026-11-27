@@ -522,14 +522,14 @@ class _ForwardScan:
 
 # ---- GES worker glue (module-level so forkserver/spawn can pickle it by name) --------------------
 #
-# Each worker is seeded with the read-only ``cov`` once (via the initializer) and owns a fixed
-# target partition; a pass then sends only the current ``adj`` snapshot (int8, d*d bytes). Workers
-# score through a private PURE Schur delta engine over the shared cov, so every process feeds
-# identical bytes into ``local_score_bic`` -- bit-identical to serial under one BLAS thread.
-# The task functions take their targets positionally, so ``StableWorkerSet.dispatch`` drives them
-# directly. A worker always receives the same targets, so it keeps their forward candidates in
-# one :class:`_ForwardScan` across the passes it runs. Background knowledge and the moves to skip
-# travel with each pass.
+# Each worker is seeded with the read-only ``cov`` once (via the initializer, from one shared copy
+# where :class:`~andrey.search._parallel.PoolMatrix` makes one) and owns a fixed target partition;
+# a pass then sends only the current ``adj`` snapshot (int8, d*d bytes). Workers score through a
+# private PURE Schur delta engine over the shared cov, so every process feeds identical bytes into
+# ``local_score_bic`` -- bit-identical to serial under one BLAS thread. The task functions take
+# their targets positionally, so ``StableWorkerSet.dispatch`` drives them directly. A worker always
+# receives the same targets, so it keeps their forward candidates in one :class:`_ForwardScan`
+# across the passes it runs. Background knowledge and the moves to skip travel with each pass.
 
 # Per-worker state installed once by ``_init_worker`` and reused across every task and pass, so the
 # delta engine's pure inv-cov cache persists across passes -- the cross-pass reuse lever.
@@ -544,7 +544,7 @@ _WORKER_SCAN: _ForwardScan | None = None  # this worker's forward scan, built on
 
 
 def _init_worker(
-    cov: np.ndarray,
+    cov: np.ndarray | par.SharedMatrix,
     n_samples: int,
     n_vars: int,
     penalty_discount: float,
@@ -556,17 +556,20 @@ def _init_worker(
 
     Runs once per worker process. Caps BLAS to one thread (a 128-worker pool would otherwise
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable) and builds the PURE
-    Schur delta engine over the parent's exact ``cov`` bytes. Its inv-cov cache is a pure function
-    of the parent set, so it persists across tasks and passes for free. ``n_samples`` is the
-    observation count the BIC penalty uses, ``penalty_discount`` and ``ebic_gamma`` its weights;
-    ``n_vars`` is the graph's node count; ``ranks`` holds each column's tie rank.
+    Schur delta engine over the parent's exact ``cov`` bytes, or the shared copy of them that
+    :func:`~andrey.search._parallel.attach` opens. Its inv-cov cache is a pure function of the
+    parent set, so it persists across tasks and passes for free. ``n_samples`` is the observation
+    count the BIC penalty uses, ``penalty_discount`` and ``ebic_gamma`` its weights; ``n_vars`` is
+    the graph's node count; ``ranks`` holds each column's tie rank.
     """
     global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS, _WORKER_RANKS
     from threadpoolctl import threadpool_limits
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
     _WORKER_DELTA = DeltaBICScore(
-        BICScore.from_cov(cov, n_samples, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma)
+        BICScore.from_cov(
+            par.attach(cov), n_samples, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
+        )
     )
     _WORKER_N = n_vars
     _WORKER_TOKEN = run_token
@@ -694,14 +697,20 @@ def _create_pool(
     workers: int,
     ranks: list[int],
 ) -> par.StableWorkerSet:
-    """Build the persistent stable-assignment worker set -- the seam tests spy on (created once)."""
-    return par.StableWorkerSet(
-        n_vars,
-        workers,
-        _init_worker,
-        (cov, n_samples, n_vars, penalty_discount, ebic_gamma, run_token, ranks),
-        context=par.pick_context(),
-    )
+    """Build the persistent stable-assignment worker set -- the seam tests spy on (created once).
+
+    Every worker has mapped the shared ``cov`` when the set is built, so its segment's name is
+    removed then.
+    """
+    context = par.pick_context()
+    with par.PoolMatrix(cov, context) as shared:
+        return par.StableWorkerSet(
+            n_vars,
+            workers,
+            _init_worker,
+            (shared.payload, n_samples, n_vars, penalty_discount, ebic_gamma, run_token, ranks),
+            context=context,
+        )
 
 
 class _LazyWorkerSet:
@@ -726,7 +735,7 @@ class _LazyWorkerSet:
         if self._wset is None:
             score = self._score
             self.token = hash(
-                (score.cov.tobytes(), score.n, score.penalty_discount, score.ebic_gamma)
+                (par.digest(score.cov), score.n, score.penalty_discount, score.ebic_gamma)
             )
             self._wset = _create_pool(
                 score.cov,
