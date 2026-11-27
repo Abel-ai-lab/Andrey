@@ -658,16 +658,17 @@ def fges(
         Observed data, one row per sample. Coerced to ``float64``. A DataFrame's column names
         become the structure's ``labels``.
     score_func : str or None, default=None
-        Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data. ``"bdeu"``
-        is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial BIC [7]_, for categorical data
-        coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) [4]_ and ``"cond_gauss"``
-        (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous and categorical
-        columns. ``None`` picks from the declared column types: ``"bdeu"`` when every column is
-        categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is declared
-        categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text type,
-        never by its values. See Notes.
-        ``metadata["score_func"]`` names the score the fit used: the one picked from the
-        declared column types when this is ``None``.
+        Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data.
+        ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
+        continuous data that are Gaussian only after an unknown increasing transformation of each
+        column. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial BIC [7]_,
+        for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) [4]_
+        and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous
+        and categorical columns. ``None`` picks from the declared column types: ``"bdeu"`` when
+        every column is categorical, ``"cond_gauss"`` when some are, else ``"bic"``. A column is
+        declared categorical by ``categorical`` or by a DataFrame's ``category``, ``bool``, or text
+        type, never by its values. See Notes. ``metadata["score_func"]`` names the score the fit
+        used: the one picked from the declared column types when this is ``None``.
     penalty_discount : float, default=1.0
         Multiplier on the BIC penalty of ``log(n_samples)`` per parameter: per parent for the
         linear-Gaussian BIC. Larger values give sparser graphs; ``1.0`` with ``ebic_gamma=0.0`` is
@@ -677,7 +678,8 @@ def fges(
         Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
-        standard BIC. Must be finite and non-negative. The other scores ignore it. See Notes.
+        standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
+        with another score raises ``ValueError``. See Notes.
     equivalent_sample_size : float, default=1.0
         The equivalent sample size of the BDeu score: how many rows the uniform prior over each
         variable's conditional distributions is worth. A larger value weighs the prior more
@@ -749,24 +751,18 @@ def fges(
         On the first call in a process: the method is not supported (see Limitations), and its
         API may change without deprecation.
 
-    See Also
-    --------
-    andrey.ges : The same search without the one-edge screen.
-    andrey.fci : Allows unmeasured common causes and selection bias.
-
     Notes
     -----
     **When to use.** FGES suits data with no unmeasured common causes, as GES does, and takes
     its scores, penalties, ``max_parents``, and background knowledge (see :func:`~andrey.ges` for
     the scores and how to choose ``penalty_discount``). It is for runs where the number of
     variables makes GES's first forward passes the cost, and for readers who want the algorithm of
-    [2]_ by name. It returns the equivalence class.
-
-    **When not to.** When variables can be linked by canceling paths, so that a pair is
-    independent in the data while its edge improves the score once other variables are in the
-    graph, FGES adds that edge only if the pair ends a path of two edges that is not a collider in
-    the graph the first pass returned; GES can add it anywhere. Use :func:`~andrey.ges` there.
-    When unmeasured common causes are plausible, use :func:`~andrey.fci`.
+    [2]_ by name. It returns the equivalence class. When variables can be linked by canceling
+    paths, so that a pair is independent in the data while its edge improves the score once other
+    variables are in the graph, FGES adds that edge only if the pair ends a path of two edges that
+    is not a collider in the graph the first pass returned; GES can add it anywhere, so use
+    :func:`~andrey.ges` there. When unmeasured common causes are plausible, use
+    :func:`~andrey.fci`.
 
     **How it works.** FGES scores the one-edge graph of every pair against the empty graph under
     the plain BIC (the likelihood and the ``penalty_discount`` penalty, without the extended-BIC
