@@ -65,6 +65,8 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
 
+from andrey.core._symmetric import exp_symmetric, gram_is_symmetric, median_exact, strict_upper
+
 #: Ridge term of both regressions.
 ETA = 0.001
 
@@ -95,13 +97,14 @@ def _kernel(X: np.ndarray, eta: float, method: str) -> _Kernel:
     """Build the Gaussian kernel of the rows of ``X`` at the median bandwidth and factor it."""
     n = X.shape[0]
     dist = squared_distances(X)
-    bandwidth = float(np.sqrt(np.median(dist[np.triu_indices(n, 1)])))
+    bandwidth = float(np.sqrt(median_exact(strict_upper(dist))))
     if not bandwidth > 0:
         raise ValueError(
             f"{method}: the median distance between the rows of data is 0, so the Gaussian kernel "
             "of the score estimate has no bandwidth; more than half of the row pairs are equal"
         )
-    matrix = np.exp(dist / (-2.0 * bandwidth**2))
+    scaled = dist / (-2.0 * bandwidth**2)
+    matrix = exp_symmetric(scaled, out=scaled) if gram_is_symmetric(X) else np.exp(scaled)
     ridged = matrix.copy()
     ridged[np.diag_indices(n)] += eta
     return _Kernel(matrix, bandwidth, cho_factor(ridged, lower=True, overwrite_a=True))

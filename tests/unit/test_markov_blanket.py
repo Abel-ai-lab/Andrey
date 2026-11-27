@@ -33,6 +33,7 @@ from andrey.constraint.blanket import (
 )
 from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
 from andrey.core.ci_missing import rows_tested
+from andrey.core.knowledge import Constraints
 from andrey.core.orient import dag2cpdag
 from andrey.core.ties import KEY_DP, tie_ranks
 from andrey.search.calm import moral_graph
@@ -505,6 +506,12 @@ def test_the_recorded_set_is_the_tested_separator_beside_a_set_not_tested():
     assert blanket._largest_sets(pvalues, conds, [0, 1, 2, 3]) == [(2,), (1,)]
 
 
+def _scanned(scan, target, xs, cond):
+    """The ``(p-value, key)`` rows of a grow scan, one per candidate."""
+    pvalues, key = scan(target, xs, cond)
+    return np.array([(pvalues[i], key(i)) for i in range(len(xs))]).reshape(len(xs), 2)
+
+
 @pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
 def test_a_large_grow_scan_is_answered_from_one_factor(kind):
     """A grow scan of enough candidates given two or more variables goes to the test's one-factor
@@ -515,17 +522,184 @@ def test_a_large_grow_scan_is_answered_from_one_factor(kind):
     factored = []
     factor = test._schur_partial_correlations
     test._schur_partial_correlations = lambda *args: factored.append(1) or factor(*args)
-    scan = blanket._dependences(test, significant=True)
+    scan = blanket._dependence_scan(test, significant=True)
     one = blanket._dependence(test, significant=True)
     cond = [2, 9, 17]
     xs = [v for v in range(40) if v != 4 and v not in cond]
-    got = np.array(scan(4, xs, cond))
+    got = _scanned(scan, 4, xs, cond)
     assert factored == [1]
     want = np.array([one(4, v, cond) for v in xs])
     np.testing.assert_allclose(got[:, 0], want[:, 0], rtol=1e-9, atol=1e-300)
     assert ((got[:, 0] <= 0.05) == (want[:, 0] <= 0.05)).all()
     np.testing.assert_allclose(got[:, 1], want[:, 1], rtol=0.0, atol=10.0**-KEY_DP)
-    assert scan(4, xs[:1], cond) == [one(4, xs[0], cond)]
+    assert _scanned(scan, 4, xs[:1], cond).tolist() == [list(one(4, xs[0], cond))]
+
+
+class _Recorded:
+    """A test that records every query it answers, in order, and the scans it answers at once."""
+
+    def __init__(self) -> None:
+        self.queries: list[tuple[int, int, tuple[int, ...]]] = []
+        self.scans = 0
+
+    def _answer(self, target: int, x: int, cond: tuple[int, ...]) -> tuple[float, float]:
+        """The statistic and p-value: coarse, so that many candidates tie on both exactly or after
+        ``KEY_DP`` digits, and NaN for a fixed rule of queries, and for every query of variable 7,
+        which a test that does not test some queries answers."""
+        if getattr(self, "blank", False) and (x == 7 or (3 * x + len(cond)) % 7 == 2):
+            return float("nan"), float("nan")
+        statistic = ((7 * x + 3 * len(cond)) % 4 + 1) / 10 - x * 1e-13
+        pvalue = (0.001, 0.02, 0.05 + x * 1e-13, 0.3, 0.9)[(3 * x + 2 * len(cond) + sum(cond)) % 5]
+        return statistic, pvalue
+
+
+class _FactorTest(_Recorded):
+    """A test with ``statistic_pvalue`` and ``statistic_pvalues_given`` over :meth:`_answer`."""
+
+    def __init__(self, blank: bool) -> None:
+        super().__init__()
+        self.blank = blank
+
+    def __call__(self, target, x, cond=()):
+        return self.statistic_pvalue(target, x, cond)[1]
+
+    def statistic_pvalue(self, target, x, cond=()):
+        cond = tuple(sorted(cond))
+        self.queries.append((target, x, cond))
+        return self._answer(target, x, cond)
+
+    def statistic_pvalues_given(self, target, xs, cond):
+        self.scans += 1
+        cond = tuple(sorted(cond))
+        self.queries.extend((target, x, cond) for x in xs)
+        pairs = [self._answer(target, x, cond) for x in xs]
+        return np.array([r for r, _ in pairs]), np.array([p for _, p in pairs])
+
+
+class _FactorOneByOne(_FactorTest):
+    """The same answers without ``statistic_pvalues_given``: one query at a time."""
+
+    statistic_pvalues_given = None  # ty: ignore[invalid-assignment]
+
+
+class _ScanTest(_Recorded):
+    """A test with ``pvalues_given`` over :meth:`_answer`, and no ``statistic_pvalue``."""
+
+    def __init__(self, blank: bool) -> None:
+        super().__init__()
+        self.blank = blank
+
+    def __call__(self, target, x, cond=()):
+        cond = tuple(sorted(cond))
+        self.queries.append((target, x, cond))
+        return self._answer(target, x, cond)[1]
+
+    def pvalues_given(self, target, xs, cond=()):
+        self.scans += 1
+        cond = tuple(sorted(cond))
+        self.queries.extend((target, x, cond) for x in xs)
+        return np.array([self._answer(target, x, cond)[1] for x in xs], dtype=np.float64)
+
+
+class _ScanOneByOne(_ScanTest):
+    """The same answers without ``pvalues_given``: one query at a time."""
+
+    pvalues_given = None  # ty: ignore[invalid-assignment]
+
+
+def _blankets(test, d, alpha, interleaved, ranks=None, **options):
+    """Every target's blanket and its recorded separating sets in the order they were set."""
+    ranks = list(range(d))[::-1] if ranks is None else ranks
+    runs = []
+    for target in range(d):
+        sepsets: dict[int, tuple[int, ...]] = {}
+        found = markov_blanket(
+            test, target, d, alpha, ranks, interleaved=interleaved, sepsets=sepsets, **options
+        )
+        runs.append((found, list(sepsets.items())))
+    return runs
+
+
+@pytest.mark.parametrize("blank", [False, True], ids=["tested", "some_not_tested"])
+@pytest.mark.parametrize("interleaved", [False, True], ids=["iamb", "inter_iamb"])
+@pytest.mark.parametrize(
+    ("d", "alpha", "max_depth", "required"),
+    [
+        (12, 0.05, None, ()),
+        (12, 0.02, None, ()),
+        (12, 0.3, None, ()),
+        (12, 0.5, None, ()),
+        (12, 0.5, 3, ()),
+        (12, 0.05, None, ((0, 1), (2, 3))),
+        (12, 0.5, 2, ((4, 5),)),
+        (3, 0.5, None, ()),
+    ],
+)
+@pytest.mark.parametrize(
+    ("scanned", "one_by_one"),
+    [(_FactorTest, _FactorOneByOne), (_ScanTest, _ScanOneByOne)],
+    ids=["statistic_pvalues_given", "pvalues_given"],
+)
+def test_a_grow_scan_read_as_arrays_is_the_per_candidate_loop_bit_for_bit(
+    scanned, one_by_one, d, alpha, max_depth, required, interleaved, blank
+):
+    """A grow step that takes the p-values of a scan as one array gives every target the blanket,
+    the order the members joined in, the separating sets in the order they were set, and the
+    queries of the loop that asks one candidate at a time: with keys that tie exactly, so the rank
+    decides, queries not tested, required members, a depth cap, and scans of two, one, or no
+    candidates."""
+    constraints = None
+    if required:
+        edges = np.zeros((d, d), dtype=bool)
+        for i, j in required:
+            edges[i, j] = True
+        constraints = Constraints(np.zeros((d, d), dtype=bool), edges, np.full(d, -1))
+    options = {"max_depth": max_depth, "constraints": constraints}
+    array_test, loop_test = scanned(blank), one_by_one(blank)
+    assert blanket._dependence_scan(array_test) is not None
+    assert blanket._dependence_scan(loop_test) is None
+    got = _blankets(array_test, d, alpha, interleaved, **options)
+    want = _blankets(loop_test, d, alpha, interleaved, **options)
+    assert got == want
+    assert array_test.queries == loop_test.queries
+    assert array_test.scans > 0
+    assert loop_test.scans == 0
+
+
+class _OneByOne:
+    """A test that answers only through ``__call__`` and the ``statistic_pvalue`` of the test it
+    wraps, if it has one, so a grow scan asks one candidate at a time."""
+
+    def __init__(self, test) -> None:
+        self._test = test
+        if hasattr(test, "statistic_pvalue"):
+            self.statistic_pvalue = test.statistic_pvalue
+
+    def __call__(self, x, y, cond=()):
+        return self._test(x, y, cond)
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores", "chisq", "gsq"])
+@pytest.mark.parametrize("interleaved", [False, True], ids=["iamb", "inter_iamb"])
+def test_a_grow_scan_of_a_registered_test_is_the_per_candidate_loop_bit_for_bit(
+    kind, interleaved, monkeypatch
+):
+    """With the scans of a partial-correlation test answered by its stacked queries, which match
+    each query asked alone bit for bit, and with the scans of a table test, which do too, every
+    target's blanket and separating sets equal those of the loop over the test's own queries."""
+    monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", "1000000000")
+    if kind in ("chisq", "gsq"):
+        x = data.sample_discrete(d=8, n=1500, seed=2, density=2.0).data
+    else:
+        x = data.sample_scm(graph="erdos_renyi", d=14, n=300, seed=2, density=3.0).data
+    test = make_indep_test(kind, x)
+    assert blanket._dependence_scan(test) is not None
+    assert blanket._dependence_scan(_OneByOne(test)) is None
+    ranks = tie_ranks(x).tolist()
+    for alpha in (0.05, 0.3):
+        got = _blankets(test, x.shape[1], alpha, interleaved, ranks)
+        want = _blankets(_OneByOne(test), x.shape[1], alpha, interleaved, ranks)
+        assert got == want
 
 
 @pytest.mark.parametrize("interleaved", [False, True])
@@ -551,11 +725,12 @@ def test_a_small_grow_scan_keeps_the_per_query_bits(kind):
     the p-value and key of that candidate asked alone, bit for bit."""
     x = data.sample_scm(graph="erdos_renyi", d=12, n=400, seed=3, density=3.0).data
     test = make_indep_test(kind, x)
-    scan = blanket._dependences(test, significant=True)
+    scan = blanket._dependence_scan(test, significant=True)
     one = blanket._dependence(test, significant=True)
     for cond in [[], [7], [2, 9], [0, 3, 8]]:
         xs = [v for v in range(12) if v != 4 and v not in cond]
         for some in (xs, xs[:3]):
             if len(cond) >= 2 and len(some) * (len(cond) + 2) >= 128:
                 continue
-            assert scan(4, some, cond) == [one(4, v, cond) for v in some], (cond, some)
+            got = _scanned(scan, 4, some, cond).tolist()
+            assert got == [list(one(4, v, cond)) for v in some], (cond, some)

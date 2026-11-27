@@ -136,6 +136,7 @@ def assemble_record(
         cap_mem_mb=measures.get("cap_mem_mb"),
         mem_route=measures.get("mem_route"),
         tree_peak_mem_mb=measures.get("tree_peak_mem_mb"),
+        tree_peak_pss_mb=measures.get("tree_peak_pss_mb"),
         scheduler=measures.get("scheduler", ""),
         oom_source=measures.get("oom_source"),
         error_text=(measures.get("error_text") or measures.get("stderr")),

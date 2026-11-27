@@ -6,12 +6,16 @@ worker across passes, so its score caches survive. :func:`even_chunks` and
 :func:`balanced_chunks` split the work, :func:`reduce_best` picks the best move by a total-order
 key, :func:`collect` raises worker failures, :func:`pick_context` chooses the start method, and
 :func:`min_work` reads the crossover gate. Each learner supplies a picklable module-level worker
-initializer and task function.
+initializer and task function. :class:`PoolMatrix` gives a pool's workers one shared read-only copy
+of a matrix, a :class:`SharedMatrix` that each worker maps, and :func:`digest` names a matrix for a
+run token.
 """
 
 from __future__ import annotations
 
 import functools
+import hashlib
+import mmap
 import multiprocessing as mp
 import os
 import socket
@@ -21,7 +25,8 @@ from collections.abc import Callable, Generator, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from contextlib import contextmanager
-from typing import Any
+from multiprocessing import reduction
+from typing import IO, Any, Self
 
 import numpy as np
 
@@ -231,6 +236,120 @@ def min_work(setting: env.Setting[int], default: int) -> int:
     return default if value is None else value
 
 
+def digest(matrix: np.ndarray) -> str:
+    """A digest of ``matrix``'s shape, type, and bytes, read in place for a C-contiguous array."""
+    h = hashlib.blake2b(repr((matrix.shape, matrix.dtype.str)).encode(), digest_size=16)
+    h.update(np.ascontiguousarray(matrix).data)
+    return h.hexdigest()
+
+
+def _shares(context: mp.context.BaseContext) -> bool:
+    """Whether a pool on ``context`` reads its matrix from shared memory: Linux, with workers
+    started from the forkserver."""
+    return sys.platform == "linux" and context.get_start_method() == "forkserver"
+
+
+def _matrix_file(matrix: np.ndarray) -> IO[bytes]:
+    """An open file in ``/dev/shm`` that holds the bytes of the C-contiguous ``matrix`` and has no
+    name; a failed write closes it."""
+    file = tempfile.TemporaryFile(dir="/dev/shm")
+    try:
+        file.write(matrix.data.cast("B"))
+        file.flush()
+    except BaseException:
+        file.close()
+        raise
+    return file
+
+
+def _map_matrix(fd: Any, shape: tuple[int, ...], dtype: str) -> np.ndarray:
+    """Worker side of :class:`SharedMatrix`: a read-only array that maps the file ``fd`` hands
+    over (multiprocessing's ``DupFd``), whose size must be the matrix's."""
+    fd = fd.detach()
+    nbytes = int(np.prod(shape)) * np.dtype(dtype).itemsize
+    try:
+        size = os.fstat(fd).st_size
+        if size != nbytes:
+            raise ValueError(f"the shared matrix's file holds {size} bytes, not {nbytes}")
+        mapped = mmap.mmap(fd, nbytes, access=mmap.ACCESS_READ)
+    finally:
+        os.close(fd)  # the mapping keeps the file
+    return np.frombuffer(mapped, dtype=dtype).reshape(shape)
+
+
+class SharedMatrix:
+    """A matrix in one shared file that each of a pool's workers maps instead of unpickling a copy.
+
+    The file is in ``/dev/shm`` and has no name, so the kernel frees it once no process holds it
+    open or maps it, however the processes end. The handle travels in a worker's start arguments:
+    pickled while the worker starts, it hands the worker a descriptor of the file, and unpickles
+    there as a read-only array that maps the file. Pickling it at any other time, or once
+    :meth:`close` has run, raises, so a worker never maps a descriptor number the owner has
+    reused.
+    """
+
+    def __init__(self, file: IO[bytes], shape: tuple[int, ...], dtype: str) -> None:
+        self._file = file
+        self.shape = shape
+        self.dtype = dtype
+
+    @property
+    def closed(self) -> bool:
+        """Whether :meth:`close` has run."""
+        return self._file.closed
+
+    def fileno(self) -> int:
+        """The owner's descriptor of the file."""
+        return self._file.fileno()
+
+    def close(self) -> None:
+        """Close the owner's descriptor of the file; workers that map it keep reading it."""
+        self._file.close()
+
+    def __reduce__(self) -> tuple:
+        mp.context.assert_spawning(self)
+        if self.closed:
+            raise ValueError("a closed shared matrix cannot start a worker")
+        return _map_matrix, (reduction.DupFd(self.fileno()), self.shape, self.dtype)
+
+
+class PoolMatrix:
+    """The matrix a pool's workers read, made once by the pool's owner.
+
+    On Linux with the forkserver, :attr:`payload` is a :class:`SharedMatrix`: one file holds a copy
+    of the matrix, and each worker maps it. The owner writes the copy through the file's descriptor
+    and does not map it, so a page of the file shows in a process's resident memory only once a
+    worker has read it. Otherwise, for a matrix that is not C-contiguous, or when ``/dev/shm``
+    cannot hold the copy, :attr:`payload` is the matrix itself, which each worker's start pickles.
+    Either way the workers read the same bytes in the same layout.
+
+    :meth:`close` closes the owner's descriptor; a worker that has mapped the file keeps reading
+    it, and the file's memory is freed when the last such worker exits. Close the pool's workers
+    first when one may still start, and the matrix after them.
+    """
+
+    def __init__(self, matrix: np.ndarray, context: mp.context.BaseContext) -> None:
+        self.payload: np.ndarray | SharedMatrix = matrix
+        if not (_shares(context) and matrix.flags.c_contiguous and matrix.nbytes):
+            return
+        try:
+            file = _matrix_file(matrix)
+        except OSError:
+            return
+        self.payload = SharedMatrix(file, matrix.shape, matrix.dtype.str)
+
+    def close(self) -> None:
+        """Close the owner's descriptor of the shared file; nothing on the pickled route."""
+        if isinstance(self.payload, SharedMatrix):
+            self.payload.close()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+
 def _boot_task() -> None:
     """The no-op each fresh pool runs at construction, forcing its worker process into existence."""
 
@@ -243,10 +362,11 @@ class StableWorkerSet:
     has its own pool so :func:`collect` can detect its death through ``BrokenProcessPool``.
     The context selects the start method; the initializer applies any BLAS pinning.
 
-    Workers start concurrently during construction. The first ``ProcessPoolExecutor.submit`` can
-    block while writing pickled ``initargs``: a covariance of hundreds of KiB exceeds the 64 KiB
-    pipe buffer. One boot thread per pool overlaps those writes and worker startup, costing roughly
-    the slowest boot instead of their sum. Startup failures surface in the constructor.
+    Workers start concurrently during construction, and each has run ``initializer`` when the
+    constructor returns. The first ``ProcessPoolExecutor.submit`` can block while writing pickled
+    ``initargs``: a covariance of hundreds of KiB exceeds the 64 KiB pipe buffer. One boot thread
+    per pool overlaps those writes and worker startup, costing roughly the slowest boot instead of
+    their sum. Startup failures surface in the constructor.
     """
 
     def __init__(

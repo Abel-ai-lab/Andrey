@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import heapq
 import math
+from array import array
 from collections.abc import Callable, Iterable, Sequence
 from typing import Protocol
 
@@ -276,11 +277,31 @@ def backward_chunk_best(
 # A candidate kept for selection: ``(lowest exact delta, x, t_index, T, base)``.
 _Screened = tuple[float, int, int, tuple[int, ...], tuple[int, ...]]
 
-# A base's group at one target: ``(clique, sources, batch, deltas, bounds)``. ``clique`` and
-# ``sources`` are bitmasks of NA u T and of the group's sources; ``deltas`` and ``bounds`` map each
-# source of ``batch``, a set of sources scored in one call that covers the group's, to its
-# screening delta and bound.
-_Group = tuple[int, int, frozenset[int], dict[int, float], dict[int, float]]
+# A base's group at one target: ``(clique, sources, batch, deltas, bounds)``. ``clique``,
+# ``sources``, and ``batch`` are bitmasks of NA u T, of the group's sources, and of the sources
+# scored in one call that covers the group's. ``deltas`` and ``bounds`` hold the screening delta
+# and bound of each source of ``batch`` in ascending source order, at its :func:`_position`.
+_Group = tuple[int, int, int, "array[float]", "array[float]"]
+# A base's exact deltas at one target: ``(passing, deltas, batch)``. ``deltas`` holds the delta of
+# each source of ``batch``, a bitmask of sources scored in one call, in ascending source order; it
+# serves while the sources of the bitmask ``passing`` pass.
+_Exact = tuple[int, "array[float]", int]
+
+
+def _position(batch: int, x: int) -> int:
+    """The index of source ``x`` among the ascending sources of the bitmask ``batch``."""
+    return (batch & ((1 << x) - 1)).bit_count()
+
+
+def _drop(values: array[float], at: list[int]) -> array[float]:
+    """``values`` without the entries at the ascending positions ``at``."""
+    out = array("d")
+    start = 0
+    for i in at:
+        out += values[start:i]
+        start = i + 1
+    out += values[start:]
+    return out
 
 
 def _touched(before: np.ndarray | None, after: np.ndarray) -> np.ndarray:
@@ -360,11 +381,10 @@ class _ForwardScan:
         self.into = None if forbidden is None else _bitset.row_masks(forbidden.T)
         self.adj: np.ndarray | None = None  # the graph the kept candidates were enumerated on
         # Per target: each base's group; the candidates that can improve, sorted by lowest exact
-        # delta; and each base's last exact deltas with a mask of the passing sources they were
-        # scored for.
+        # delta; and each base's last exact deltas.
         self.groups: dict[int, dict[tuple[int, ...], _Group]] = {}
         self.screened: dict[int, list[_Screened]] = {}
-        self.exact: dict[int, dict[tuple[int, ...], tuple[int, dict[int, float]]]] = {}
+        self.exact: dict[int, dict[tuple[int, ...], _Exact]] = {}
         # Each (target, clique mask)'s semi-directed reach set on the kept graph, and the graph's
         # semi-directed successor masks, those of the empty graph before the first pass.
         self.reach: dict[tuple[int, int], int] = {}
@@ -375,7 +395,7 @@ class _ForwardScan:
         self._refresh(adj)
         heap = [(moves[0][0], y, 0) for y, moves in self.screened.items() if moves]
         heapq.heapify(heap)
-        scored: dict[tuple[int, tuple[int, ...]], tuple[dict[int, float], int]] = {}
+        scored: dict[tuple[int, tuple[int, ...]], _Exact] = {}
         best: ForwardResult = None
         limit = -EPS_IMPROVE  # no candidate whose exact delta exceeds this can be selected
         while heap and heap[0][0] <= limit:
@@ -387,10 +407,12 @@ class _ForwardScan:
             exact = scored.get((y, base))  # this pass's exact deltas and passing sources
             if exact is None:
                 exact = scored[(y, base)] = self._exact(y, base)
-            deltas, passing = exact
-            if not (passing >> x) & 1 or not deltas[x] < -EPS_IMPROVE:
-                continue  # a y ~> x path misses the clique, or the Insert does not improve
-            delta = deltas[x]
+            passing, deltas, batch = exact
+            if not (passing >> x) & 1:
+                continue  # a y ~> x path misses the clique
+            delta = deltas[_position(batch, x)]
+            if not delta < -EPS_IMPROVE:
+                continue  # the Insert does not improve
             key = move_key(delta, self.n, x, y, T, self.ranks)
             if best is None or key < best[0]:
                 if excluded and key[1:] in excluded:
@@ -470,28 +492,32 @@ class _ForwardScan:
             cands.sort()  # ascending sources
             sources = [x for x, _, _ in cands]
             kept = previous.get(base)
-            if kept is not None and kept[2].issuperset(sources):
+            scored: Iterable[tuple[float, float]]  # each candidate's screening delta and bound
+            if kept is not None and kept[2] & mask == mask:
                 batch, deltas, bounds = kept[2:]
+                if batch == mask:
+                    scored = zip(deltas, bounds)
+                else:  # leave out the batch's sources that the group no longer has
+                    at = [_position(batch, x) for x in _bitset.nodes(batch & ~mask)]
+                    scored = zip(_drop(deltas, at), _drop(bounds, at))
             else:
                 bound_list: list[float] = []
                 delta_list = self.delta_engine.delta_many_with_base(
                     y, base, [("add", x) for x in sources], bounds=bound_list
                 )
-                batch = frozenset(sources)
-                deltas = dict(zip(sources, delta_list, strict=True))
-                bounds = dict(zip(sources, bound_list, strict=True))
+                batch, deltas, bounds = mask, array("d", delta_list), array("d", bound_list)
+                scored = zip(delta_list, bound_list)
             groups[base] = (_bitset.bitmask(set(base) - pa_set), mask, batch, deltas, bounds)
             if base in exact:
                 self.exact[y][base] = exact[base]
-            for x, t_index, T in cands:
-                bound = bounds[x]
-                low = -math.inf if bound == math.inf else deltas[x] - bound
+            for (x, t_index, T), (delta, bound) in zip(cands, scored, strict=True):
+                low = -math.inf if bound == math.inf else delta - bound
                 if low < -EPS_IMPROVE:
                     screened.append((low, x, t_index, T, base))
         screened.sort(key=lambda move: move[:3])
 
-    def _exact(self, y: int, base: tuple[int, ...]) -> tuple[dict[int, float], int]:
-        """Exact deltas of ``base``'s group at ``y`` by source, and a mask of its passing sources.
+    def _exact(self, y: int, base: tuple[int, ...]) -> _Exact:
+        """The exact deltas of ``base``'s group at ``y`` and a mask of its passing sources.
 
         A source passes when no semi-directed ``y ~> x`` path avoids the group's clique. The
         passing sources are scored in one batch. The group's batch serves when it holds exactly the
@@ -503,33 +529,31 @@ class _ForwardScan:
         if reach is None:
             reach = self.reach[(y, clique)] = _bitset.semidirected_reach_set(self.succ, y, clique)
         passing = sources & ~reach
-        if passing.bit_count() == len(batch):
-            return deltas, passing
+        if passing.bit_count() == batch.bit_count():
+            return passing, deltas, batch
         last = self.exact[y].get(base)
         if last is not None and last[0] == passing:
-            return last[1], passing
+            return last
         valid = _bitset.nodes(passing)
-        if all(bounds[x] == 0.0 for x in valid):
-            self.exact[y][base] = (passing, deltas)
-            return deltas, passing
+        if not any(bounds) or all(bounds[_position(batch, x)] == 0.0 for x in valid):
+            self.exact[y][base] = (passing, deltas, batch)
+            return passing, deltas, batch
         moves = [("add", x) for x in valid]
-        exact = dict(
-            zip(valid, self.delta_engine.delta_many_with_base(y, base, moves), strict=True)
-        )
-        self.exact[y][base] = (passing, exact)
-        return exact, passing
+        exact = array("d", self.delta_engine.delta_many_with_base(y, base, moves))
+        self.exact[y][base] = (passing, exact, passing)
+        return passing, exact, passing
 
 
 # ---- GES worker glue (module-level so forkserver/spawn can pickle it by name) --------------------
 #
-# Each worker is seeded with the read-only ``cov`` once (via the initializer) and owns a fixed
-# target partition; a pass then sends only the current ``adj`` snapshot (int8, d*d bytes). Workers
-# score through a private PURE Schur delta engine over the shared cov, so every process feeds
-# identical bytes into ``local_score_bic`` -- bit-identical to serial under one BLAS thread.
-# The task functions take their targets positionally, so ``StableWorkerSet.dispatch`` drives them
-# directly. A worker always receives the same targets, so it keeps their forward candidates in
-# one :class:`_ForwardScan` across the passes it runs. Background knowledge and the moves to skip
-# travel with each pass.
+# Each worker is seeded with the read-only ``cov`` once (via the initializer, from one shared copy
+# where :class:`~andrey.search._parallel.PoolMatrix` makes one) and owns a fixed target partition;
+# a pass then sends only the current ``adj`` snapshot (int8, d*d bytes). Workers score through a
+# private PURE Schur delta engine over the shared cov, so every process feeds identical bytes into
+# ``local_score_bic`` -- bit-identical to serial under one BLAS thread. The task functions take
+# their targets positionally, so ``StableWorkerSet.dispatch`` drives them directly. A worker always
+# receives the same targets, so it keeps their forward candidates in one :class:`_ForwardScan`
+# across the passes it runs. Background knowledge and the moves to skip travel with each pass.
 
 # Per-worker state installed once by ``_init_worker`` and reused across every task and pass, so the
 # delta engine's pure inv-cov cache persists across passes -- the cross-pass reuse lever.
@@ -556,10 +580,11 @@ def _init_worker(
 
     Runs once per worker process. Caps BLAS to one thread (a 128-worker pool would otherwise
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable) and builds the PURE
-    Schur delta engine over the parent's exact ``cov`` bytes. Its inv-cov cache is a pure function
-    of the parent set, so it persists across tasks and passes for free. ``n_samples`` is the
-    observation count the BIC penalty uses, ``penalty_discount`` and ``ebic_gamma`` its weights;
-    ``n_vars`` is the graph's node count; ``ranks`` holds each column's tie rank.
+    Schur delta engine over the parent's exact ``cov`` bytes, a read-only map of the shared copy
+    where there is one. Its inv-cov cache is a pure function of the parent set, so it persists
+    across tasks and passes for free. ``n_samples`` is the observation count the BIC penalty uses,
+    ``penalty_discount`` and ``ebic_gamma`` its weights; ``n_vars`` is the graph's node count;
+    ``ranks`` holds each column's tie rank.
     """
     global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS, _WORKER_RANKS
     from threadpoolctl import threadpool_limits
@@ -694,14 +719,20 @@ def _create_pool(
     workers: int,
     ranks: list[int],
 ) -> par.StableWorkerSet:
-    """Build the persistent stable-assignment worker set -- the seam tests spy on (created once)."""
-    return par.StableWorkerSet(
-        n_vars,
-        workers,
-        _init_worker,
-        (cov, n_samples, n_vars, penalty_discount, ebic_gamma, run_token, ranks),
-        context=par.pick_context(),
-    )
+    """Build the persistent stable-assignment worker set -- the seam tests spy on (created once).
+
+    Every worker has mapped the shared ``cov`` when the set is built, so the caller's descriptor of
+    it is closed then.
+    """
+    context = par.pick_context()
+    with par.PoolMatrix(cov, context) as shared:
+        return par.StableWorkerSet(
+            n_vars,
+            workers,
+            _init_worker,
+            (shared.payload, n_samples, n_vars, penalty_discount, ebic_gamma, run_token, ranks),
+            context=context,
+        )
 
 
 class _LazyWorkerSet:
@@ -726,7 +757,7 @@ class _LazyWorkerSet:
         if self._wset is None:
             score = self._score
             self.token = hash(
-                (score.cov.tobytes(), score.n, score.penalty_discount, score.ebic_gamma)
+                (par.digest(score.cov), score.n, score.penalty_discount, score.ebic_gamma)
             )
             self._wset = _create_pool(
                 score.cov,
