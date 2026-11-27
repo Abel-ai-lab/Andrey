@@ -212,6 +212,10 @@ names its pull request.
   column when any column's mean is not. Every measure residualizes the columns that remain after
   each pick with the picked column's variance taken once per step, which is what `compute_residual`
   computes column by column. ([#1331])
+- The `gcm` test and the `pcm` test with `regression="boosting"` tune their boosted trees faster:
+  each cross-validation fold grows only through the round where its early stop cuts it, and the
+  repeated input checks of the many small fits are skipped, so the methods that take them as
+  `indep_test` run faster, with the same output bit for bit. ([#1309])
 
 ### Fixed
 
@@ -3187,6 +3191,7 @@ First alpha release.
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
+[#1309]: https://github.com/Abel-ai-lab/Andrey/pull/1309
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
 [#1314]: https://github.com/Abel-ai-lab/Andrey/pull/1314
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
