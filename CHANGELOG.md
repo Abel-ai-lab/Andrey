@@ -153,6 +153,8 @@ names its pull request.
   neighbors, and `fci`, `fci_jci`, and `gfci` search possible-d-sep sets over sets of each node's
   arrowheads and neighbors, so they run faster on many variables, with the same output bit for bit.
   ([#1303])
+- `camuv` keeps each residual its sink tests fit, so it fits each variable on each set of
+  regressors once, with the same output bit for bit. ([#1306])
 
 ### Fixed
 
@@ -3126,3 +3128,4 @@ First alpha release.
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
 [#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
+[#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
