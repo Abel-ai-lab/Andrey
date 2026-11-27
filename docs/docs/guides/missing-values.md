@@ -278,8 +278,9 @@ its search, a simpler method than structural EM, at two settings of the sample s
 counts. `boss` and `grasp` were better than the empty graph in 102 and 103 of 108 settings. We
 measured `xges`, `exact_search`, and `dagma` against the same search as the M-step of MissDAG's EM
 (Gao et al., 2022). `calm` has no such reference: its search is too slow to run inside another
-structural EM loop. The [0.20.0 release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data) reports these four beside test-wise deletion,
-dropping rows, and mean imputation. What to expect from a fit:
+structural EM loop. The
+[0.20.0 release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data) reports
+these four beside test-wise deletion, dropping rows, and mean imputation. What to expect from a fit:
 
 - EM costs time. With 10 rounds a fit runs the search 10 times and the E-step 56 times. In `ges`,
   `hc`, `tabu`, `boss`, `grasp`, and `notears`, from 10 to 50 variables and 100 to 2,000 rows, a
