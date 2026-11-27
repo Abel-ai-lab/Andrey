@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
+from typing import NamedTuple
 
 import numpy as np
 import pytest
 
 import andrey
 from andrey.core import ARROW, CIRCLE
+from andrey.core.independence import hsic_log_p
 from andrey.core.ties import tie_ranks
 from andrey.data import sample_scm
+from andrey.fcm import camuv as camuv_engine
 from andrey.fcm.camuv import drop_cycles
 
 N = 600
@@ -47,9 +51,15 @@ def test_a_larger_alpha_marks_more_pairs(fork_fit):
     assert _edges(andrey.camuv(_fork(), alpha=0.3), "circle") > _edges(fork_fit, "circle")
 
 
-def _additive(seed: int = 0) -> np.ndarray:
+def _additive(seed: int = 0, *, d: int = 6, n: int = 400, latents: int = 0) -> np.ndarray:
     case = sample_scm(
-        functional="additive_noise", d=6, n=400, seed=seed, density=2, scale="rescale"
+        functional="additive_noise",
+        d=d,
+        n=n,
+        seed=seed,
+        density=2,
+        scale="rescale",
+        latents=latents,
     )
     return np.asarray(case.data, dtype=float)
 
@@ -205,3 +215,95 @@ def test_a_balanced_grid_of_independent_columns_fits():
     out = andrey.camuv(X)
     assert out.structure.n_nodes == 2
     assert out.structure.oriented_edges() == []
+
+
+class _Refitting(camuv_engine._Tests):
+    """The reference: a sink test's fresh residual is fitted for that test and not kept."""
+
+    def log_p_fresh(self, child, regressors, y):
+        x = ((child, tuple(sorted(regressors))),)
+        key = (min(x, y), max(x, y))
+        found = self._log_p.get(key)
+        if found is None:
+            residual = self._residuals.get(x[0])
+            fresh = self._gram([self._fit(x[0]) if residual is None else residual])
+            grams = {x: fresh, y: self._side_gram(y)}
+            found = self._log_p[key] = hsic_log_p(*(grams[side] for side in key), "camuv")
+        return found
+
+
+class _Fit(NamedTuple):
+    result: camuv_engine.CAMUVResult
+    #: Every test's key and log p-value as float hex, in the order the tests ran.
+    log_p: list
+    #: The number of times each (variable, regressors) pair was fitted.
+    fitted: Counter
+
+
+def _engine_fit(X: np.ndarray, tests, *, gram_bytes: int | None = None, **options) -> _Fit:
+    """Fit the engine with ``tests`` as its test class, and record what its tests computed."""
+    made = []
+    fitted: Counter = Counter()
+
+    class Recording(tests):
+        def __init__(self, data):
+            super().__init__(data)
+            made.append(self)
+
+        def _fit(self, term):
+            fitted[term] += 1
+            return super()._fit(term)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(camuv_engine, "_Tests", Recording)
+        if gram_bytes is not None:
+            patch.setattr(camuv_engine, "_GRAM_BYTES", gram_bytes)
+        result = camuv_engine.camuv(X, **options)
+    (engine,) = made
+    return _Fit(result, [(k, float(v).hex()) for k, v in engine._log_p.items()], fitted)
+
+
+def _marks(d: int, pairs: list[tuple[int, int]]) -> np.ndarray:
+    out = np.zeros((d, d), dtype=bool)
+    for i, j in pairs:
+        out[i, j] = True
+    return out
+
+
+def _same_fit(kept: _Fit, reference: _Fit) -> None:
+    assert kept.log_p == reference.log_p
+    for name in ("edges", "pairs", "cycle_edges"):
+        assert np.array_equal(getattr(kept.result, name), getattr(reference.result, name)), name
+
+
+@pytest.mark.parametrize(
+    ("seed", "latents", "options"),
+    [
+        (0, 0, {}),
+        (1, 0, {}),
+        (2, 0, {"alpha": 0.05}),
+        (0, 0, {"max_depth": 1}),
+        (0, 2, {}),
+        (1, 0, {"required": _marks(8, [(0, 1)]), "forbidden": _marks(8, [(3, 2), (5, 4)])}),
+    ],
+)
+def test_a_kept_fresh_residual_changes_no_bit(seed, latents, options):
+    """The tests' log p-values, in the order they ran, and the fit's marks equal the reference's,
+    which fits a fresh residual again for each test."""
+    X = _additive(seed, d=8, n=300, latents=latents)
+    kept = _engine_fit(X, camuv_engine._Tests, **options)
+    _same_fit(kept, _engine_fit(X, _Refitting, **options))
+
+
+@pytest.mark.parametrize("grams", [0, 1, 2])
+def test_each_residual_is_fitted_once(grams):
+    """A residual is fitted once however few kernel matrices the fit keeps, and the same pairs are
+    fitted as in the reference, which repeats some."""
+    X = _additive(0, d=8, n=300)
+    gram_bytes = grams * 8 * X.shape[0] ** 2
+    kept = _engine_fit(X, camuv_engine._Tests, gram_bytes=gram_bytes)
+    reference = _engine_fit(X, _Refitting, gram_bytes=gram_bytes)
+    assert max(reference.fitted.values()) > 1
+    assert max(kept.fitted.values()) == 1
+    assert set(kept.fitted) == set(reference.fitted)
+    _same_fit(kept, reference)
