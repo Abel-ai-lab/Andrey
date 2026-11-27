@@ -102,6 +102,11 @@ names its pull request.
   build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
   the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
   output bit for bit and the same counts of the queries not tested. ([#1296])
+- `fci`, `fci_jci`, `gfci`, `boss_fci`, `grasp_fci`, and the PAG of `GraphStructure.to_pag` apply
+  FCI's orientation rules R4, R5, and R6 from column and row reads and lists of each node's `o-o`
+  neighbors, and `fci`, `fci_jci`, and `gfci` search possible-d-sep sets over sets of each node's
+  arrowheads and neighbors, so they run faster on many variables, with the same output bit for bit.
+  ([#1303])
 
 ### Fixed
 
@@ -3066,3 +3071,4 @@ First alpha release.
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
+[#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
