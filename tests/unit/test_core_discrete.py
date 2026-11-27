@@ -18,6 +18,7 @@ from scipy.special import chdtrc
 from scipy.stats import chi2, chi2_contingency, hypergeom
 
 from andrey.core import categorical, ci
+from andrey.core import score as score_module
 from andrey.core.ci import ChiSquare
 from andrey.core.score import BDeuScore, CategoricalBICScore, make_score
 
@@ -758,10 +759,15 @@ def test_a_score_is_the_same_alone_or_in_a_batch(make):
         assert _exact(scorer.score_many(node, sets)) == alone
 
 
+@pytest.mark.parametrize("cells", [1 << 22, 300, 1], ids=["one chunk", "chunks", "one table"])
 @pytest.mark.parametrize("dense_min", [1 << 16, 0], ids=["dense", "numbered"])
 @pytest.mark.parametrize("make", SCORES)
-def test_a_batch_scores_the_tables_of_the_configurations_numbering(monkeypatch, make, dense_min):
-    """A batch scores each set as :meth:`_local` scores the table :func:`configurations` numbers."""
+def test_a_batch_scores_the_tables_of_the_configurations_numbering(
+    monkeypatch, make, dense_min, cells
+):
+    """A batch scores each set as :meth:`_local` scores the table :func:`configurations` numbers,
+    whether the tables are scored together, in chunks, or one by one."""
+    monkeypatch.setattr(categorical, "BATCH_CELLS", cells)
     monkeypatch.setattr(categorical, "DENSE_MIN", dense_min)
     monkeypatch.setattr(categorical, "DENSE_ROWS", 4 if dense_min else 0)
     x = _mixed_tables()
@@ -773,6 +779,25 @@ def test_a_batch_scores_the_tables_of_the_configurations_numbering(monkeypatch, 
             scorer._local(node, s, _counts_by_configurations(codes, cards, node, s)) for s in sets
         ]
         assert _exact(make(x).score_many(node, sets)) == _exact(expected)
+
+
+def test_a_bdeu_batch_takes_the_log_gamma_of_at_most_batch_cells_at_a_time(monkeypatch):
+    """The ``gammaln`` calls of a batch hold the tables of a chunk, not of the whole batch, and a
+    table larger than the chunk is scored alone."""
+    sizes: list[int] = []
+    real = score_module.gammaln
+    monkeypatch.setattr(score_module, "gammaln", lambda v: (sizes.append(np.size(v)), real(v))[1])
+    monkeypatch.setattr(categorical, "BATCH_CELLS", 200)
+    x = _mixed_tables()
+    sets = _parent_sets(x.shape[1], 0)
+    scorer = BDeuScore(x)
+    codes, cards = categorical.encode(x)
+    largest = max(_counts_by_configurations(codes, cards, 0, s).size for s in sets)
+    got = scorer.score_many(0, sets)
+    assert len(sizes) > 4  # several chunks, each with its calls
+    assert max(sizes) <= max(200, largest)
+    monkeypatch.undo()
+    assert _exact(got) == _exact(BDeuScore(x).score_many(0, sets))
 
 
 @pytest.mark.parametrize("make", SCORES)

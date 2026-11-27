@@ -691,8 +691,23 @@ class BDeuScore(_CountScore):
     def _local_many(
         self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
     ) -> list[float]:
-        """Score a batch with one ``gammaln`` call over every table's ``N_ij`` and one over its
-        ``N_ijk``, each table's terms summed over its own slice in the order of :meth:`_local`."""
+        """Score the tables in chunks of at most ``BATCH_CELLS`` cells (a larger table alone), each
+        chunk with one ``gammaln`` call over its tables' ``N_ij`` and one over their ``N_ijk``, and
+        each table's terms summed over its own slice in the order of :meth:`_local`."""
+        out: list[float] = []
+        start = 0
+        while start < len(tables):
+            stop, cells = start + 1, tables[start].size
+            while stop < len(tables) and cells + tables[stop].size <= categorical.BATCH_CELLS:
+                cells += tables[stop].size
+                stop += 1
+            out += self._local_chunk(node, keys[start:stop], tables[start:stop])
+            start = stop
+        return out
+
+    def _local_chunk(
+        self, node: int, keys: Sequence[tuple[int, ...]], tables: Sequence[np.ndarray]
+    ) -> list[float]:
         if len(tables) < 2:
             return super()._local_many(node, keys, tables)
         r = tables[0].shape[1]
