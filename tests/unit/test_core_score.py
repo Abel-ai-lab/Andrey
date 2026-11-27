@@ -397,6 +397,7 @@ def test_the_copy_check_holds_a_few_blocks_beyond_its_input(check, blocks):
     matrix = np.corrcoef(x, rowvar=False) if check == "copy_groups" else np.cov(x, rowvar=False)
     tracemalloc.start()
     try:
+        tracemalloc.reset_peak()
         start = tracemalloc.get_traced_memory()[0]
         getattr(score_module, check)(matrix, n)
         peak = tracemalloc.get_traced_memory()[1] - start
