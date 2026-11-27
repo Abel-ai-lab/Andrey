@@ -79,9 +79,9 @@ names its pull request.
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
 - The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
-  reads the p-values of a scan as one array when the test answers a scan at once (`fisherz`,
-  `student_t`, `normal_scores`, `chisq`, and `gsq` on complete data), so the searches run faster on
-  hundreds of variables, with the same output bit for bit. ([#1289])
+  reads the p-values of a scan as one array where the test answers a scan at once, so with `fisherz`,
+  `student_t`, or `normal_scores` on complete data these searches run faster on hundreds of
+  variables, with the same output bit for bit. ([#1289])
 
 ### Fixed
 
