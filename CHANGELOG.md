@@ -168,6 +168,10 @@ names its pull request.
 - `pcmci` and `pcmciplus` on data with missing values stop the scan that picks each candidate's
   conditions once it has the ones the PC1 rounds keep, so they run faster on tens of variables,
   with the same output bit for bit. ([#1315])
+- `jpcmciplus` runs faster as the number of system variables grows, with the same output bit for
+  bit: its test over the stacked design keeps the node counts and the design columns each lagged
+  node adds to a conditioning set, and forms each conditioning set once per query, instead of
+  reading them again for every column of every query. ([#1322])
 
 ### Fixed
 
@@ -3145,3 +3149,4 @@ First alpha release.
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
 [#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
 [#1315]: https://github.com/Abel-ai-lab/Andrey/pull/1315
+[#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
