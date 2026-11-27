@@ -232,6 +232,9 @@ names its pull request.
   independent and asks the members after it again given the smaller blanket, so these searches run
   faster, with the same output bit for bit and the same queries. For contributors, `DEVELOPMENT.md`
   says that tests a speed change computes ahead and discards do not count. ([#1347])
+- `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
+  as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
+  longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
 
 ### Fixed
 
@@ -3227,4 +3230,5 @@ First alpha release.
 [#1336]: https://github.com/Abel-ai-lab/Andrey/pull/1336
 [#1339]: https://github.com/Abel-ai-lab/Andrey/pull/1339
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
+[#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
