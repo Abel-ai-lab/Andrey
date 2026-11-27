@@ -544,7 +544,7 @@ _WORKER_SCAN: _ForwardScan | None = None  # this worker's forward scan, built on
 
 
 def _init_worker(
-    cov: np.ndarray | par.SharedMatrix,
+    cov: np.ndarray,
     n_samples: int,
     n_vars: int,
     penalty_discount: float,
@@ -556,20 +556,18 @@ def _init_worker(
 
     Runs once per worker process. Caps BLAS to one thread (a 128-worker pool would otherwise
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable) and builds the PURE
-    Schur delta engine over the parent's exact ``cov`` bytes, or the shared copy of them that
-    :func:`~andrey.search._parallel.attach` opens. Its inv-cov cache is a pure function of the
-    parent set, so it persists across tasks and passes for free. ``n_samples`` is the observation
-    count the BIC penalty uses, ``penalty_discount`` and ``ebic_gamma`` its weights; ``n_vars`` is
-    the graph's node count; ``ranks`` holds each column's tie rank.
+    Schur delta engine over the parent's exact ``cov`` bytes, a read-only map of the shared copy
+    where there is one. Its inv-cov cache is a pure function of the parent set, so it persists
+    across tasks and passes for free. ``n_samples`` is the observation count the BIC penalty uses,
+    ``penalty_discount`` and ``ebic_gamma`` its weights; ``n_vars`` is the graph's node count;
+    ``ranks`` holds each column's tie rank.
     """
     global _WORKER_DELTA, _WORKER_N, _WORKER_TOKEN, _WORKER_BLAS, _WORKER_RANKS
     from threadpoolctl import threadpool_limits
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
     _WORKER_DELTA = DeltaBICScore(
-        BICScore.from_cov(
-            par.attach(cov), n_samples, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma
-        )
+        BICScore.from_cov(cov, n_samples, penalty_discount=penalty_discount, ebic_gamma=ebic_gamma)
     )
     _WORKER_N = n_vars
     _WORKER_TOKEN = run_token
@@ -699,8 +697,8 @@ def _create_pool(
 ) -> par.StableWorkerSet:
     """Build the persistent stable-assignment worker set -- the seam tests spy on (created once).
 
-    Every worker has mapped the shared ``cov`` when the set is built, so its segment's name is
-    removed then.
+    Every worker has mapped the shared ``cov`` when the set is built, so the caller's descriptor of
+    it is closed then.
     """
     context = par.pick_context()
     with par.PoolMatrix(cov, context) as shared:

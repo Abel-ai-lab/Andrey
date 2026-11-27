@@ -82,11 +82,12 @@ names its pull request.
   searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
   targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
   in `/dev/shm` instead of a copy each, and starting them no longer holds a copy per worker in the
-  caller. Where `/dev/shm` cannot hold the matrix, each worker gets its own copy as before. The
-  results are the same bit for bit. For contributors, the benchmark harness's `poll` route caps on
-  the process tree's Pss, which counts a shared page once, once the tree's RSS sum passes the cap,
-  and records it as `tree_peak_pss_mb`; the tree's sums leave out a child started by `vfork` that
-  has not yet called exec. ([#1276])
+  caller. The copy has no name in `/dev/shm`, so its memory goes back when the last worker exits,
+  even when a fit is killed. Where `/dev/shm` cannot hold the matrix, each worker gets its own copy
+  as before. The results are the same bit for bit. For contributors, the benchmark harness's `poll`
+  route caps on the process tree's Pss, which counts a shared page once, once the tree's RSS sum
+  passes the cap, and records it as `tree_peak_pss_mb`; the tree's sums leave out a child started by
+  `vfork` that has not yet called exec. ([#1276])
 
 ### Fixed
 

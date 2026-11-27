@@ -65,7 +65,7 @@ def _seed(search: LocalSearch, corr: np.ndarray | SharedMatrix) -> tuple:
 
 def _rebuild(
     test_class: type[PartialCorrelationTest],
-    corr: np.ndarray | SharedMatrix,
+    corr: np.ndarray,
     n_samples: int,
     copies: tuple[tuple[int, ...], ...] | None,
     ranks: Sequence[int],
@@ -75,11 +75,9 @@ def _rebuild(
     levels: np.ndarray | None,
     n: int,
 ) -> LocalSearch:
-    """The search :func:`_seed` describes, over the matrix ``corr`` stands for
-    (:func:`~andrey.search._parallel.attach`)."""
-    from andrey.search._parallel import attach
-
-    test = test_class.from_corr(attach(corr), n_samples)
+    """The search :func:`_seed` describes, over ``corr``, a read-only map of the shared copy in a
+    worker where there is one."""
+    test = test_class.from_corr(corr, n_samples)
     if copies is not None:
         test._copies = copies
     return LocalSearch(
@@ -139,8 +137,7 @@ def _pooled(
     targets: Sequence[int],
     workers: int,
 ) -> list[T]:
-    """:func:`answers` on ``workers`` processes; the shared matrix's name is removed once the pool
-    has closed."""
+    """:func:`answers` on ``workers`` processes; the shared matrix is closed once the pool has."""
     from andrey.search._parallel import PoolMatrix, collect, even_chunks, pick_context
 
     chunks = even_chunks(len(targets), workers * CHUNKS_PER_WORKER)

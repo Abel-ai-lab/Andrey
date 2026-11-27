@@ -15,9 +15,9 @@ Only the FisherZ, StudentT, and NormalScores tests run on the pool
 other pass scans in the caller's process. Workers are seeded once with the parent's exact
 correlation-matrix bytes, one shared copy where :class:`~andrey.search._parallel.PoolMatrix` makes
 one (via :meth:`~andrey.core.ci.PartialCorrelationTest.from_corr` of the parent's test class), and
-pin BLAS to one thread, so every process feeds identical float64 into the
-same closed forms and the skeleton is bit-identical to the serial oracle. A worker rebuilds the
-start-of-size neighborhood from the adjacency snapshot the task carries and delegates to the shared
+pin BLAS to one thread, so every process feeds identical float64 into the same closed forms and the
+skeleton is bit-identical to the serial oracle. A worker rebuilds the start-of-size neighborhood
+from the adjacency snapshot the task carries and delegates to the shared
 :func:`~andrey.constraint._skeleton.scan_pairs`.
 
 FCI's possible-d-sep step sends a search of at least :data:`MIN_POOL_DSEP_SUBSETS` subsets, or the
@@ -101,18 +101,14 @@ _WORKER_BLAS: object = (
 
 
 def _init_worker(
-    test_class: type[PartialCorrelationTest],
-    corr: np.ndarray | par.SharedMatrix,
-    n_samples: int,
-    run_token: object,
+    test_class: type[PartialCorrelationTest], corr: np.ndarray, n_samples: int, run_token: object
 ) -> None:
     """Seed a worker with the shared correlation matrix and pin its numeric environment.
 
     Runs once per worker process: caps BLAS to one thread (a large pool would otherwise
     oversubscribe, and multi-thread BLAS reduction order is not bit-stable on the larger
     conditioning submatrices), pins the numpy backend, and rebuilds the parent's test class over
-    the parent's exact correlation bytes, or the shared copy of them that
-    :func:`~andrey.search._parallel.attach` opens.
+    the parent's exact correlation bytes, a read-only map of the shared copy where there is one.
     """
     global _WORKER_TEST, _WORKER_TOKEN, _WORKER_BLAS
     from threadpoolctl import threadpool_limits
@@ -121,7 +117,7 @@ def _init_worker(
 
     _WORKER_BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime (never restored)
     _backend.config.backend = "numpy"
-    _WORKER_TEST = test_class.from_corr(par.attach(corr), n_samples)
+    _WORKER_TEST = test_class.from_corr(corr, n_samples)
     _WORKER_TOKEN = run_token
 
 
@@ -201,7 +197,13 @@ class SkeletonWorkerPool:
                 max_workers=self._workers,
                 mp_context=context,
                 initializer=_init_worker,
-                initargs=(self._test_class, self._shared.payload, self._n, self._token),
+                # A shared matrix unpickles in each worker as the read-only array it stands for.
+                initargs=(
+                    self._test_class,
+                    cast("np.ndarray", self._shared.payload),
+                    self._n,
+                    self._token,
+                ),
             )
         return self._pool, self._token
 
@@ -302,8 +304,8 @@ class SkeletonWorkerPool:
                 future.cancel()
 
     def close(self) -> None:
-        """Stop the workers, then remove the shared matrix's name: a worker may start until the
-        pool closes."""
+        """Stop the workers, then close the shared matrix: a worker may start until the pool
+        closes."""
         if self._pool is not None:
             self._pool.shutdown(wait=True, cancel_futures=True)
             self._pool = None

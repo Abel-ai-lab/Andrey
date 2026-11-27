@@ -1,20 +1,23 @@
-"""One shared read-only matrix per worker pool: the bytes workers read, the segment's life, and the
-pickled route.
+"""One shared read-only matrix per worker pool: the bytes workers read, the shared file's life,
+and the pickled route.
 
-On Linux with the forkserver, the GES, skeleton, and target-list pools give their workers one
-shared-memory copy of the covariance or correlation matrix (:class:`~andrey.search._parallel.
-PoolMatrix`); elsewhere, or when the segment cannot be made, each worker's start pickles the
-matrix. A worker must read the parent's exact bytes either way, hold no private copy on the shared
-route, and leave no segment behind once its pool closes, fails to start, or fails a task.
+On Linux with the forkserver, the GES, skeleton, and target-list pools give their workers one copy
+of the covariance or correlation matrix in an unnamed ``/dev/shm`` file (:class:`~andrey.search.
+_parallel.PoolMatrix`); elsewhere, or when the file cannot be made, each worker's start pickles the
+matrix. A worker must read the parent's exact bytes either way and hold no private copy on the
+shared route. The file never has a name, and no process of the pool holds it once its pool closes,
+fails to start, or fails a task.
 """
 
 from __future__ import annotations
 
 import os
 import pickle
+import tempfile
 import tracemalloc
+import types
+from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
-from multiprocessing import shared_memory
 
 import numpy as np
 import pytest
@@ -56,37 +59,88 @@ def shared_route() -> None:
 needs_shared = pytest.mark.usefixtures("shared_route")
 
 
+#: A file by its device and inode.
+File = tuple[int, int]
+
+
 @pytest.fixture
-def segments(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """The name of each shared segment a pool makes during the test."""
-    names: list[str] = []
+def files(monkeypatch: pytest.MonkeyPatch) -> list[tuple[File, par.SharedMatrix]]:
+    """Each shared file a pool makes during the test, with its handle; each has no name."""
+    made: list[tuple[File, par.SharedMatrix]] = []
     real = par.PoolMatrix
 
     class Spy(real):
         def __init__(self, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
             if isinstance(self.payload, par.SharedMatrix):
-                names.append(self.payload.name)
+                info = os.fstat(self.payload.fileno())
+                assert info.st_nlink == 0  # no name in /dev/shm, from the start
+                made.append(((info.st_dev, info.st_ino), self.payload))
 
     monkeypatch.setattr(par, "PoolMatrix", Spy)
-    return names
+    return made
 
 
 @pytest.fixture
-def no_segment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every segment fails to be made, as on a full ``/dev/shm``: pools take the pickled route."""
+def no_room(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every shared file fails to be made, as on a full ``/dev/shm``: pools take the pickled
+    route."""
 
-    def full(*args, **kwargs):
+    def full(matrix: np.ndarray) -> None:
         raise OSError(28, "No space left on device")
 
-    monkeypatch.setattr(par.shared_memory, "SharedMemory", full)
+    monkeypatch.setattr(par, "_matrix_file", full)
 
 
-def _exists(name: str) -> bool:
-    return os.path.exists(f"/dev/shm/{name}")
+def _descendants() -> list[int]:
+    """This process and every process below it."""
+    parents: dict[int, int] = {}
+    for name in os.listdir("/proc"):
+        if name.isdigit():
+            try:
+                with open(f"/proc/{name}/stat") as fh:
+                    parents[int(name)] = int(fh.read().rsplit(")", 1)[1].split()[1])
+            except (OSError, IndexError, ValueError):
+                pass
+    found = [os.getpid()]
+    for pid in found:
+        found.extend(child for child, parent in parents.items() if parent == pid)
+    return found
 
 
-def _mapped_file(address: int) -> str | None:
+def _holds(pid: int, file: File) -> bool:
+    """Whether process ``pid`` has ``file`` open or mapped."""
+    try:
+        fds = os.listdir(f"/proc/{pid}/fd")
+        with open(f"/proc/{pid}/maps") as fh:
+            maps = fh.readlines()
+    except OSError:
+        return False
+    for fd in fds:
+        try:
+            info = os.stat(f"/proc/{pid}/fd/{fd}")
+        except OSError:
+            continue
+        if (info.st_dev, info.st_ino) == file:
+            return True
+    return any(_mapping_file(line) == file for line in maps)
+
+
+def _holders(file: File) -> list[int]:
+    """The processes of this test's process tree that have ``file`` open or mapped."""
+    return [pid for pid in _descendants() if _holds(pid, file)]
+
+
+def _mapping_file(line: str) -> File | None:
+    """The file a ``/proc/<pid>/maps`` line maps, or ``None`` for an anonymous mapping."""
+    _, _, _, device, inode, *_ = line.split() + [""]
+    if not inode or inode == "0":
+        return None
+    major, minor = (int(part, 16) for part in device.split(":"))
+    return os.makedev(major, minor), int(inode)
+
+
+def _mapped_file(address: int) -> File | None:
     """The file this process maps at ``address`` (``/proc/self/maps``), or ``None``, also where
     there is no ``/proc``."""
     try:
@@ -95,31 +149,49 @@ def _mapped_file(address: int) -> str | None:
     except OSError:
         return None
     for line in lines:
-        span, *rest = line.split()
-        low, high = (int(v, 16) for v in span.split("-"))
+        low, high = (int(v, 16) for v in line.split()[0].split("-"))
         if low <= address < high:
-            return rest[4] if len(rest) > 4 else None
+            return _mapping_file(line)
     return None
 
 
-def _probe(matrix: np.ndarray) -> tuple[str, bool, str | None]:
-    """Worker side: the matrix's digest, whether it is writeable, and the file it is mapped from."""
+def _probe(matrix: np.ndarray) -> tuple[str, bool, File | None]:
+    """Worker side: the matrix's digest, whether it is read-only for good, and the file it is
+    mapped from."""
     address = matrix.__array_interface__["data"][0]
-    return par.digest(matrix), bool(matrix.flags.writeable), _mapped_file(address)
+    try:
+        matrix.flags.writeable = True
+        locked = False
+    except ValueError:
+        locked = True
+    return par.digest(matrix), locked, _mapped_file(address)
 
 
-def _ges_probe() -> tuple[str, bool, str | None]:
+def _ges_probe() -> tuple[str, bool, File | None]:
     assert pg._WORKER_DELTA is not None
     return _probe(pg._WORKER_DELTA.score_obj.cov)
 
 
-def _skeleton_probe() -> tuple[str, bool, str | None]:
+def _skeleton_probe() -> tuple[str, bool, File | None]:
     assert sk._WORKER_TEST is not None
     return _probe(sk._WORKER_TEST._corr)
 
 
-def _target_probe(search, t: int) -> tuple[str, bool, str | None]:
+def _target_probe(search, t: int) -> tuple[str, bool, File | None]:
     return _probe(search.test._corr)
+
+
+_KEPT: np.ndarray | None = None
+
+
+def _keep(matrix: np.ndarray) -> None:
+    global _KEPT
+    _KEPT = matrix
+
+
+def _kept_probe() -> tuple[str, bool, File | None]:
+    assert _KEPT is not None
+    return _probe(_KEPT)
 
 
 def _target_fails(search, t: int) -> None:
@@ -135,27 +207,37 @@ def _ges_pool(cov: np.ndarray, workers: int = 2, penalty: float = 1.0) -> par.St
 
 
 @needs_shared
-def test_a_pool_matrix_is_one_read_only_copy_until_closed():
+def test_a_pool_matrix_is_one_unnamed_read_only_file_only_a_starting_worker_gets():
     matrix = np.cov(_data(), rowvar=False)
-    shared = par.PoolMatrix(matrix, par.pick_context())
-    assert isinstance(shared.payload, par.SharedMatrix)
-    view = par.attach(shared.payload)
-    assert par.digest(view) == par.digest(matrix)
-    assert view.dtype == matrix.dtype and view.flags.c_contiguous
-    with pytest.raises(ValueError):
-        view.flags.writeable = True  # read-only for good, not only by flag
+    context = par.pick_context()
+    shared = par.PoolMatrix(matrix, context)
+    payload = shared.payload
+    assert isinstance(payload, par.SharedMatrix)
+    info = os.fstat(payload.fileno())
+    assert info.st_nlink == 0 and info.st_size == matrix.nbytes
+    with pytest.raises(RuntimeError, match="inheritance"):
+        pickle.dumps(payload)  # only a worker's start carries it
+    with ProcessPoolExecutor(2, mp_context=context, initializer=_keep, initargs=(payload,)) as pool:
+        probes = [pool.submit(_kept_probe).result() for _ in range(4)]
+    assert probes and all(
+        probe == (par.digest(matrix), True, (info.st_dev, info.st_ino)) for probe in probes
+    )
     shared.close()
     shared.close()  # closing twice is a no-op
-    assert not _exists(shared.payload.name)
-    assert np.array_equal(view, matrix)  # a mapping outlives the name
+    assert payload.closed and not _holders((info.st_dev, info.st_ino))
+    pool = ProcessPoolExecutor(1, mp_context=context, initializer=_keep, initargs=(payload,))
+    try:
+        with pytest.raises(ValueError, match="closed"):
+            pool.submit(int)  # a closed handle starts no worker
+    finally:
+        pool.shutdown()
 
 
-def test_the_pickled_route_carries_the_matrix_itself(no_segment):
+def test_the_pickled_route_carries_the_matrix_itself(no_room):
     matrix = np.cov(_data(), rowvar=False)
     for context in (par.pick_context(), par.mp.get_context("spawn")):
         with par.PoolMatrix(matrix, context) as shared:
             assert shared.payload is matrix
-            assert par.attach(shared.payload) is matrix
 
 
 @needs_shared
@@ -165,25 +247,54 @@ def test_a_matrix_that_is_not_c_contiguous_is_pickled():
         assert shared.payload is matrix
 
 
+class _FailingFile:
+    """A real unnamed ``/dev/shm`` file whose writes raise ``error``."""
+
+    def __init__(self, error: BaseException) -> None:
+        self.file = tempfile.TemporaryFile(dir="/dev/shm")
+        self.error = error
+
+    def write(self, data: object) -> int:
+        raise self.error
+
+    def flush(self) -> None:
+        self.file.flush()
+
+    def close(self) -> None:
+        self.file.close()
+
+
+def _open_descriptors() -> int:
+    return len(os.listdir("/proc/self/fd"))
+
+
 @needs_shared
-def test_a_full_dev_shm_leaves_no_segment(monkeypatch):
-    made: list[str] = []
-    real = shared_memory.SharedMemory
-
-    def recording(*args, **kwargs):
-        segment = real(*args, **kwargs)
-        made.append(segment.name)
-        return segment
-
-    def full(fd, offset, length):
-        raise OSError(28, "No space left on device")
-
-    monkeypatch.setattr(par.shared_memory, "SharedMemory", recording)
-    monkeypatch.setattr(par.os, "posix_fallocate", full)
+@pytest.mark.parametrize(
+    "error",
+    [OSError(28, "No space left on device"), KeyboardInterrupt()],
+    ids=["full", "interrupt"],
+)
+def test_a_failed_copy_closes_the_file(monkeypatch, error):
+    """A full ``/dev/shm`` takes the pickled route; an interrupt propagates. Either way the file
+    is closed."""
+    context = par.pick_context()
     matrix = np.cov(_data(), rowvar=False)
-    with par.PoolMatrix(matrix, par.pick_context()) as shared:
-        assert shared.payload is matrix
-    assert made and not any(_exists(name) for name in made)
+    made: list[_FailingFile] = []
+
+    def failing(**kwargs) -> _FailingFile:
+        made.append(_FailingFile(error))
+        return made[-1]
+
+    monkeypatch.setattr(par, "tempfile", types.SimpleNamespace(TemporaryFile=failing))
+    before = _open_descriptors()
+    if isinstance(error, OSError):
+        with par.PoolMatrix(matrix, context) as shared:
+            assert shared.payload is matrix
+    else:
+        with pytest.raises(KeyboardInterrupt):
+            par.PoolMatrix(matrix, context)
+    assert len(made) == 1 and made[0].file.closed
+    assert _open_descriptors() == before
 
 
 def test_a_digest_reads_shape_type_and_bytes():
@@ -200,51 +311,46 @@ def test_a_digest_reads_shape_type_and_bytes():
 
 
 @needs_shared
-def test_ges_workers_read_the_parents_bytes_from_the_segment(segments):
+def test_ges_workers_read_the_parents_bytes_from_the_shared_file(files):
     cov = BICScore(_data(d=40)).cov
     wset = _ges_pool(cov, workers=3)
     try:
+        assert len(files) == 1 and files[0][1].closed  # every worker has mapped it
         probes = [pool.submit(_ges_probe).result() for pool in wset._pools]
     finally:
         wset.close()
-    assert len(segments) == 1 and not _exists(segments[0])  # named only while the workers boot
-    for found, writeable, mapped in probes:
-        assert found == par.digest(cov)
-        assert not writeable
-        assert mapped == f"/dev/shm/{segments[0]}"
+    [(file, _)] = files
+    assert probes and all(probe == (par.digest(cov), True, file) for probe in probes)
+    assert not _holders(file)
 
 
 @needs_shared
-def test_skeleton_workers_read_the_parents_bytes_from_the_segment(segments):
+def test_skeleton_workers_read_the_parents_bytes_from_the_shared_file(files):
     test = make_indep_test("fisherz", _data(d=40))
     pool = sk.SkeletonWorkerPool(test, 2)
     try:
         executor, _ = pool._ensure()
         probes = [executor.submit(_skeleton_probe).result() for _ in range(4)]
-        assert _exists(segments[0])  # a worker may still start
+        assert not files[0][1].closed  # a worker may still start
     finally:
         pool.close()
-    assert len(segments) == 1 and not _exists(segments[0])
+    [(file, handle)] = files
     corr, _ = test.to_seed()
-    for found, writeable, mapped in probes:
-        assert found == par.digest(corr)
-        assert not writeable
-        assert mapped == f"/dev/shm/{segments[0]}"
+    assert probes and all(probe == (par.digest(corr), True, file) for probe in probes)
+    assert handle.closed and not _holders(file)
 
 
 @needs_shared
-def test_target_workers_read_the_parents_bytes_from_the_segment(segments):
+def test_target_workers_read_the_parents_bytes_from_the_shared_file(files):
     search = local_search(_data(d=40), alpha=0.05, indep_test="fisherz")
     probes = tg._pooled(search, _target_probe, list(range(8)), 2)
-    assert len(segments) == 1 and not _exists(segments[0])
+    [(file, handle)] = files
     corr, _ = search.test.to_seed()
-    for found, writeable, mapped in probes:
-        assert found == par.digest(corr)
-        assert not writeable
-        assert mapped == f"/dev/shm/{segments[0]}"
+    assert probes and all(probe == (par.digest(corr), True, file) for probe in probes)
+    assert handle.closed and not _holders(file)
 
 
-def test_workers_read_the_parents_bytes_on_the_pickled_route(no_segment):
+def test_workers_read_the_parents_bytes_on_the_pickled_route(no_room):
     x = _data(d=30)
     cov = BICScore(x).cov
     wset = _ges_pool(cov)
@@ -289,11 +395,11 @@ def test_a_target_worker_rebuilds_the_callers_search(name):
     same(rebuilt, search)
 
 
-# --- no segment outlives its pool -----------------------------------------------------------------
+# --- no shared file outlives its pool -------------------------------------------------------------
 
 
 @needs_shared
-def test_no_segment_outlives_a_failed_start(segments):
+def test_no_shared_file_outlives_a_failed_start(files):
     cov = BICScore(_data(d=20)).cov
     with pytest.raises(RuntimeError, match="failed to start"):
         _ges_pool(cov, penalty=-1.0)  # each worker's score rejects the penalty
@@ -310,11 +416,12 @@ def test_no_segment_outlives_a_failed_start(segments):
     search.test._n = "bad"
     with pytest.raises(RuntimeError, match="worker died"):
         tg._pooled(search, _target_probe, list(range(4)), 2)
-    assert len(segments) == 3 and not any(_exists(name) for name in segments)
+    assert len(files) == 3
+    assert all(handle.closed and not _holders(file) for file, handle in files)
 
 
 @needs_shared
-def test_no_segment_outlives_a_task_error(segments):
+def test_no_shared_file_outlives_a_task_error(files):
     test = make_indep_test("fisherz", _data(d=20))
     pool = sk.SkeletonWorkerPool(test, 2)
     try:
@@ -327,7 +434,8 @@ def test_no_segment_outlives_a_task_error(segments):
     search = local_search(_data(d=20), alpha=0.05, indep_test="fisherz")
     with pytest.raises(ValueError, match="fails"):
         tg._pooled(search, _target_fails, list(range(4)), 2)
-    assert len(segments) == 2 and not any(_exists(name) for name in segments)
+    assert len(files) == 2
+    assert all(handle.closed and not _holders(file) for file, handle in files)
 
 
 # --- the pool start holds no extra copy in the caller ---------------------------------------------
@@ -403,17 +511,18 @@ def pooled(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @needs_shared
-def test_the_shared_route_answers_as_one_process(pooled, segments):
+def test_the_shared_route_answers_as_one_process(pooled, files):
     x = _data(n=400, d=14, seed=3)
     serial = _fits(x, n_jobs=1)
-    assert not segments
+    assert not files
     assert _fits(x) == serial
-    assert len(segments) >= 3  # GES, the skeleton, and the targets each made one
+    assert len(files) >= 3  # GES, the skeleton, and the targets each made one
+    assert all(handle.closed and not _holders(file) for file, handle in files)
 
 
 @needs_shared
 def test_the_pickled_route_answers_as_the_shared_one(pooled, request):
     x = _data(n=400, d=14, seed=4)
     shared = _fits(x)
-    request.getfixturevalue("no_segment")
+    request.getfixturevalue("no_room")
     assert _fits(x) == shared
