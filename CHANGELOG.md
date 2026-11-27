@@ -136,6 +136,11 @@ names its pull request.
   build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
   the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
   output bit for bit and the same counts of the queries not tested. ([#1296])
+- `lges` runs faster, with the same output bit for bit: it keeps each target's SafeInsert verdicts
+  for the whole fit, builds the sets that extend the common neighbors of a source once for all the
+  sources that share them, reads one reachability search per clique, and scores each base once.
+  The turning scan of `gies` and `lges` builds the sort key of a turn only for a turn that improves
+  the score. ([#1302])
 - `nogam` runs faster: each fold of its cross-validated kernel regressions is assembled from slices
   of the kernel, the kernels are built in place, and the repeated non-finite checks of the Cholesky
   steps are skipped, with the same output bit for bit. ([#1298])
@@ -3119,4 +3124,5 @@ First alpha release.
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
 [#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
+[#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
