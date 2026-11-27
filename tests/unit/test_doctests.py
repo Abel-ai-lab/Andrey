@@ -14,6 +14,7 @@ import pkgutil
 
 import pytest
 
+import andrey
 import andrey.api
 
 _FLAGS = doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE
@@ -36,6 +37,7 @@ DOCUMENTED = [
     "andrey.data",
     "andrey.data.discrete",
     "andrey.data.interventions",
+    "andrey.data.measurement",
     "andrey.data.missingness",
     "andrey.data.mixed",
     "andrey.data.real",
@@ -62,4 +64,27 @@ def test_documented_examples_run(modname):
     assert results.attempted > 0, f"{modname}: no doctests found -- the module lost its Examples"
     assert results.failed == 0, (
         f"{modname}: {results.failed} of {results.attempted} doctests failed"
+    )
+
+
+def test_every_public_module_with_examples_is_covered():
+    covered = set(_facade_modules()) | set(DOCUMENTED)
+    missing = []
+    finder = doctest.DocTestFinder()
+    for info in pkgutil.walk_packages(andrey.__path__, "andrey.", onerror=lambda _: None):
+        if any(part.startswith("_") for part in info.name.split(".")):
+            continue
+        try:
+            module = importlib.import_module(info.name)
+        except ImportError:
+            # An optional dependency can make a public module unavailable in this environment.
+            continue
+        if (
+            any(test.name == info.name and test.examples for test in finder.find(module))
+            and info.name not in covered
+        ):
+            missing.append(info.name)
+    assert not missing, (
+        "public modules have module docstring examples but are in neither _facade_modules() nor "
+        f"DOCUMENTED: {sorted(missing)}"
     )
