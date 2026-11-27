@@ -17,13 +17,23 @@ unshielded triples of a final skeleton by the conservative or majority collider 
 
 from __future__ import annotations
 
+import operator
 import sys
-from collections.abc import Callable, Collection, Hashable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import (
+    Callable,
+    Collection,
+    Hashable,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import nullcontext
 from functools import cache, partial
 from itertools import chain, combinations, groupby, islice
 from math import comb
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -38,6 +48,11 @@ if TYPE_CHECKING:
 #: One removed pair: ``(x, y, separating set, the largest p-value among its separating sets)``; the
 #: p-value is ``None`` when the scan does not record it.
 Removal = tuple[int, int, tuple[int, ...], float | None]
+#: The separating set of each removed pair, keyed ``(x, y)``: a dict, or a :class:`MaskedMapping`
+#: that reads as one.
+SeparatingSets = MutableMapping[tuple[int, int], tuple[int, ...]]
+#: The p-value of each removed pair, keyed alike.
+PValues = MutableMapping[tuple[int, int], float]
 # A pair's subsets that one call evaluates: ``(the pair's position, x, y, subsets)``, ``x < y``,
 # the subsets the rows of an ``(N, size)`` int array.
 _Chunk = tuple[int, int, int, np.ndarray]
@@ -373,29 +388,146 @@ def prescreen_capable(test: CITest) -> bool:
 
 
 def marginal_removals(
-    test: CITest,
-    adjacent_upper: np.ndarray,
-    alpha: float,
-    trace: list[dict] | None = None,
-    record_pvalues: bool = True,
-) -> list[tuple[int, int, float | None]]:
-    """(size 0) The still-adjacent pairs the marginal test separates, as ``(x, y, p)``, ``x < y``.
+    test: CITest, adjacent_upper: np.ndarray, alpha: float, trace: list[dict] | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    """(size 0) The still-adjacent pairs the marginal test separates, and the marginal p-values.
 
     ``adjacent_upper`` is the strictly-upper-triangular boolean adjacency mask. One vectorized
-    all-pairs evaluation flags every pair with marginal ``p > alpha``; the return is those in
-    row-major order (matching the serial loop's visitation), each with its p-value, or ``None``
-    when ``record_pvalues`` is false; each pair's separating set is empty. With ``trace`` given,
-    every adjacent pair's test is recorded.
+    all-pairs evaluation gives every pair's marginal p-value; the first return marks, in a boolean
+    matrix of the same shape, the adjacent pairs with ``p > alpha``, each separated by the empty
+    set. The second is the ``(d, d)`` p-value matrix, whose upper-triangle entry ``[x, y]`` is the
+    test's p-value for the pair. With ``trace`` given, every adjacent pair's test is recorded, in
+    row-major order.
     """
     pmat = test.marginal_pvalues()  # ty: ignore[unresolved-attribute]  # gated by prescreen_capable
-    separated = adjacent_upper & (pmat > alpha)
     if trace is not None:
         for x, y in zip(*np.nonzero(adjacent_upper)):
             record_tests(trace, 0, int(x), int(y), [()], [pmat[x, y]], alpha)
-    xs, ys = np.nonzero(separated)
-    if not record_pvalues:
-        return [(x, y, None) for x, y in zip(xs.tolist(), ys.tolist())]
-    return list(zip(xs.tolist(), ys.tolist(), pmat[xs, ys].tolist()))
+    return adjacent_upper & (pmat > alpha), pmat
+
+
+class MaskedMapping(MutableMapping):
+    """A dict whose entries at the set bits of a boolean ``mask`` are held as the mask, with every
+    other entry in a plain dict on top of it.
+
+    ``mask`` is a strictly upper-triangular ``(d, d)`` matrix, whose bit ``[x, y]`` marks the pair
+    key ``(x, y)``, or a ``(d,)`` vector, whose bit ``[x]`` marks the integer key ``x``. A marked
+    key maps to the empty tuple, or, with ``values``, to ``float(values[key])``. Most pairs of a
+    sparse graph are separated by the empty set, in the size-0 pass of the PC family and in MMPC's
+    forward phase: the mask holds each such entry in one byte, where a dict holds a key object and
+    a value object for it.
+
+    It behaves as the dict that holds the marked keys first, in row-major order, and then each key
+    set in it, in the order set: a key set over a marked one keeps its place and maps to the new
+    value, and a deleted key is gone. Iteration, ``len``, ``==`` with a dict, ``[]``, ``get``, and
+    ``in`` agree with that dict. A reversed or negative pair, a key outside the mask, and a key that
+    is neither an integer nor a pair of integers (read with :func:`operator.index`) are marked by
+    no bit. :meth:`copy` returns that dict. A read-only ``mask`` is copied before a deletion or
+    :meth:`mark` writes it, so two mappings may share one.
+    """
+
+    def __init__(self, mask: np.ndarray, values: np.ndarray | None = None) -> None:
+        self._mask = mask
+        self._values = values
+        self._marked = int(np.count_nonzero(mask))
+        self._overlay: dict = {}
+
+    def _bit(self, key: Any) -> tuple[int, ...] | None:
+        """The mask index of ``key`` when its bit is set, ``None`` otherwise."""
+        mask = self._mask
+        try:
+            at = (operator.index(key),) if mask.ndim == 1 else tuple(operator.index(k) for k in key)
+        except TypeError:
+            return None
+        if mask.ndim == 1:
+            valid = len(at) == 1 and 0 <= at[0] < mask.shape[0]
+        else:
+            valid = len(at) == 2 and 0 <= at[0] < at[1] < mask.shape[0]
+        return at if valid and mask[at] else None
+
+    def _value(self, at: tuple[int, ...]) -> Any:
+        return () if self._values is None else float(self._values[at])
+
+    def __getitem__(self, key: Any) -> Any:
+        if key in self._overlay:
+            return self._overlay[key]
+        at = self._bit(key)
+        if at is None:
+            raise KeyError(key)
+        return self._value(at)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        if key in self._overlay:
+            return self._overlay[key]
+        at = self._bit(key)
+        return default if at is None else self._value(at)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._overlay or self._bit(key) is not None
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self._overlay[key] = value
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        self._overlay.update(*args, **kwargs)
+
+    def __delitem__(self, key: Any) -> None:
+        at = self._bit(key)
+        if self._overlay.pop(key, _ABSENT) is _ABSENT and at is None:
+            raise KeyError(key)
+        if at is not None:
+            self._writable()[at] = False
+            self._marked -= 1
+
+    def mark(self, index: Any) -> None:
+        """Set the bits ``index`` of the mask, a NumPy index, of an empty mapping, so the keys
+        marked come first. Raises ``ValueError`` when the mapping holds an entry."""
+        if self._marked or self._overlay:
+            raise ValueError("only an empty MaskedMapping takes new marks")
+        mask = self._writable()
+        mask[index] = True
+        self._marked = int(np.count_nonzero(mask))
+
+    def _writable(self) -> np.ndarray:
+        """The mask, copied first when it is read-only."""
+        if not self._mask.flags.writeable:
+            self._mask = self._mask.copy()
+        return self._mask
+
+    def _marked_keys(self) -> Iterator:
+        if self._mask.ndim == 1:
+            yield from np.flatnonzero(self._mask).tolist()
+            return
+        for x in np.flatnonzero(self._mask.any(axis=1)).tolist():
+            for y in np.flatnonzero(self._mask[x]).tolist():
+                yield (x, y)
+
+    def __iter__(self) -> Iterator:
+        yield from self._marked_keys()
+        yield from (key for key in self._overlay if self._bit(key) is None)
+
+    def __len__(self) -> int:
+        return self._marked + sum(1 for key in self._overlay if self._bit(key) is None)
+
+    def copy(self) -> dict[Any, Any]:
+        """The plain dict with the same entries in the same order, built without a lookup per
+        marked key."""
+        found = np.nonzero(self._mask)
+        keys = (
+            found[0].tolist() if self._mask.ndim == 1 else zip(*(axis.tolist() for axis in found))
+        )
+        if self._values is None:
+            out = dict.fromkeys(keys, ())
+        else:
+            out = dict(zip(keys, self._values[found].tolist(), strict=True))
+        out.update(self._overlay)
+        return out
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.copy()!r})"
+
+
+_ABSENT = object()
 
 
 def first_order_removals(
@@ -937,7 +1069,7 @@ def vote_triples(
     marks: np.ndarray,
     test: Callable[..., float],
     alpha: float,
-    sepsets: dict[tuple[int, int], tuple[int, ...]],
+    sepsets: SeparatingSets,
     rule: str,
     *,
     max_depth: int | None = None,

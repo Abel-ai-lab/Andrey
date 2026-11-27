@@ -48,6 +48,7 @@ import numpy as np
 
 from andrey.constraint._skeleton import (
     CHUNK,
+    MaskedMapping,
     adjacent_pairs,
     flagged_triples,
     kept_apart,
@@ -79,6 +80,10 @@ _FIRST_CHUNK = 32
 _Dependence = Callable[[int, int, Sequence[int]], tuple[float, float]]
 #: A separating set for each candidate a learner dropped, ascending, keyed by the candidate.
 Sepsets = dict[int, tuple[int, ...]]
+#: The :data:`Sepsets` one run of a learner records: a dict, or, for MMPC, a
+#: :class:`~andrey.constraint._skeleton.MaskedMapping` that holds the candidates the empty set
+#: separates as a mask and reads as the dict.
+RunSepsets = Sepsets | MaskedMapping
 
 
 def _tests_every_set(test: CITest) -> bool:
@@ -179,7 +184,7 @@ def markov_blanket(
     interleaved: bool = False,
     max_depth: int | None = None,
     constraints: Constraints | None = None,
-    sepsets: Sepsets | None = None,
+    sepsets: RunSepsets | None = None,
 ) -> list[int]:
     """Estimate ``target``'s Markov blanket with IAMB, or with Inter-IAMB when ``interleaved``.
 
@@ -298,7 +303,7 @@ def _shrink(
     alpha: float,
     blanket: list[int],
     keep: Sequence[int] = (),
-    sepsets: Sepsets | None = None,
+    sepsets: RunSepsets | None = None,
 ) -> list[int]:
     """Drop, in place and in joining order, each member independent of ``target`` given the rest;
     the members in ``keep`` are not tested. With ``sepsets``, a dropped member's entry is set to the
@@ -449,7 +454,7 @@ def parents_children(
     ranks: Sequence[int],
     max_depth: int | None = None,
     constraints: Constraints | None = None,
-    sepsets: Sepsets | None = None,
+    sepsets: RunSepsets | None = None,
 ) -> list[int]:
     """Estimate ``target``'s parents and children with the forward and backward phases of MMPC.
 
@@ -493,7 +498,11 @@ def parents_children(
     weakest = dict(zip(others, _weakest(test, target, others, [()]), strict=True))
     undecided = [x for x, (p, _) in weakest.items() if not_tested(p)]
     if sepsets is not None:
-        sepsets.update({x: () for x, (p, _) in weakest.items() if p > alpha})
+        separated = [x for x, (p, _) in weakest.items() if p > alpha]
+        if isinstance(sepsets, MaskedMapping):
+            sepsets.mark(separated)
+        else:
+            sepsets.update({x: () for x in separated})
     members: list[int] = []
 
     def admit(new: int, pool: dict[int, tuple[float, float]]) -> None:
@@ -816,7 +825,7 @@ def _ranked_test(
 
 #: Runs one learner for one target of a :class:`LocalSearch` and returns the target's set in the
 #: order its members joined, adding to the :data:`Sepsets` each candidate a test dropped.
-Search = Callable[["LocalSearch", int, Sepsets], list[int]]
+Search = Callable[["LocalSearch", int, RunSepsets], list[int]]
 
 
 @dataclass(frozen=True)
@@ -840,7 +849,7 @@ class Learner:
             raise ValueError("a 'pc_spouses' learner names its 'pc' learner; another has a search")
 
 
-def _iamb(search: LocalSearch, target: int, sepsets: Sepsets, *, interleaved: bool) -> list[int]:
+def _iamb(search: LocalSearch, target: int, sepsets: RunSepsets, *, interleaved: bool) -> list[int]:
     return markov_blanket(
         search.test,
         target,
@@ -854,7 +863,7 @@ def _iamb(search: LocalSearch, target: int, sepsets: Sepsets, *, interleaved: bo
     )
 
 
-def _mmpc(search: LocalSearch, target: int, sepsets: Sepsets) -> list[int]:
+def _mmpc(search: LocalSearch, target: int, sepsets: RunSepsets) -> list[int]:
     return parents_children(
         search.test,
         target,
@@ -908,7 +917,7 @@ class LocalSearch:
         self.constraints = constraints
         self.levels = levels
         self.n = n
-        self._runs: dict[tuple[str, int], tuple[list[int], Sepsets]] = {}
+        self._runs: dict[tuple[str, int], tuple[list[int], RunSepsets]] = {}
         self._spouses: dict[tuple[str, int], list[int]] = {}
 
     def pinned(self) -> AbstractContextManager:
@@ -916,7 +925,7 @@ class LocalSearch:
         a block that does nothing otherwise."""
         return backend.one_blas_thread() if pins_blas(self.test) else nullcontext()
 
-    def run(self, method: str, target: int) -> tuple[list[int], Sepsets]:
+    def run(self, method: str, target: int) -> tuple[list[int], RunSepsets]:
         """``target``'s set by the ``"blanket"`` or ``"pc"`` learner ``method``, in joining order,
         and the separating set of each candidate its tests dropped.
 
@@ -928,7 +937,10 @@ class LocalSearch:
             search = LEARNERS[method].search
             if search is None:
                 raise ValueError(f"{method!r} has no search of its own; ask LocalSearch.local")
-            sepsets: Sepsets = {}
+            # MMPC marks the candidates the empty set separates in a mask of d bytes.
+            sepsets: RunSepsets = (
+                MaskedMapping(np.zeros(self.d, dtype=bool)) if search is _mmpc else {}
+            )
             self._runs[key] = (search(self, target, sepsets), sepsets)
         return self._runs[key]
 
@@ -954,11 +966,11 @@ class LocalSearch:
         learner = LEARNERS[method]
         if learner.kind == "blanket":
             members, sepsets = self.run(method, target)
-            return None, list(members), dict(sepsets)
+            return None, list(members), sepsets.copy()
         name = method if learner.pc is None else learner.pc
         pc = self.parents_children(name, target)
         members, own = self.run(name, target)
-        sepsets = dict(own)
+        sepsets = own.copy()
         for x in members:
             if x not in pc:
                 sepsets[x] = self.run(name, x)[1][target]
