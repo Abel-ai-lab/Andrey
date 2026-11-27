@@ -67,6 +67,9 @@ names its pull request.
   the other selects the rows on the effect, so their direction is evidence under values missing
   completely at random. `markov_check` says that `rows_per_test` counts the rows each test draws
   before deletion, and gives the condition under which test-wise deletion is valid. ([#1256])
+- On the website, the AI statement that ends each blog post and release card has its own container:
+  a left rule in the accent color on a faint accent tint, with its label in small uppercase above
+  the text. The label underlines under the pointer and under keyboard focus. ([#1267])
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
@@ -3026,3 +3029,4 @@ First alpha release.
 [#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
 [#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
+[#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
