@@ -225,6 +225,13 @@ names its pull request.
   singular-correlation error. The partial correlations and p-values differ from the inverse's in
   their last digits, with no decision of the identity corpus or the quality gate changed, and a
   query has the same answer on every call path. ([#1346])
+- `dagma`, and `notears` with `robust=True`, take each Adam step from the gradient of the loss and
+  of the penalty alone, without computing their values, and `dagma` forms `s * I` once per stage.
+  `notears`, with and without `robust=True`, and `dynotears` compute the matrix exponential of the
+  acyclicity constraint through SciPy's own kernels on SciPy 1.15 and later, after a check at import
+  that they return the bytes of `scipy.linalg.expm`, which computes it for any other SciPy, for a
+  diagonal or triangular matrix, and for any error. These fits run faster, with the same output bit
+  for bit. ([#1339])
 
 ### Fixed
 
@@ -3217,5 +3224,6 @@ First alpha release.
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
+[#1339]: https://github.com/Abel-ai-lab/Andrey/pull/1339
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1346]: https://github.com/Abel-ai-lab/Andrey/pull/1346
