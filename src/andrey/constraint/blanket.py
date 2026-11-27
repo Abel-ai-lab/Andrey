@@ -78,6 +78,9 @@ _FIRST_CHUNK = 32
 # ``(p-value, key)`` of ``x`` against the target given a conditioning set; a lower key is a
 # stronger dependence.
 _Dependence = Callable[[int, int, Sequence[int]], tuple[float, float]]
+# The p-values of the candidates against one conditioning set, and a function from a candidate's
+# position to its key.
+_Scan = Callable[[int, Sequence[int], Sequence[int]], tuple[np.ndarray, Callable[[int], float]]]
 #: A separating set for each candidate a learner dropped, ascending, keyed by the candidate.
 Sepsets = dict[int, tuple[int, ...]]
 #: The :data:`Sepsets` one run of a learner records: a dict, or, for an MMPC run where that takes
@@ -119,16 +122,16 @@ def _dependence(test: CITest, *, significant: bool = False) -> _Dependence:
     return by_pvalue
 
 
-def _dependences(
-    test: CITest, *, significant: bool = False
-) -> Callable[[int, Sequence[int], Sequence[int]], list[tuple[float, float]]]:
-    """:func:`_dependence` of every candidate in ``xs`` against one conditioning set.
+def _dependence_scan(test: CITest, *, significant: bool = False) -> _Scan | None:
+    """The p-values of every candidate in ``xs`` against one conditioning set, as one float64
+    array, with a function from a candidate's position to its strength key, as :func:`_dependence`
+    derives it; ``None`` for a test that answers one query at a time.
 
     A partial-correlation test on complete data (``statistic_pvalue`` and
     ``statistic_pvalues_given``) answers two or more candidates from one factor of the set's
     correlation block, matching separate calls up to rounding. A test with ``pvalues_given`` but no
     ``statistic_pvalue`` scans candidates together, giving the same p-values as separate calls and
-    the key :func:`_dependence` derives from them. Other tests answer one call at a time.
+    the key :func:`_dependence` derives from them.
     """
     given = getattr(test, "statistic_pvalues_given", None)
     if given is not None and getattr(test, "statistic_pvalue", None) is not None:
@@ -136,14 +139,14 @@ def _dependences(
 
         def by_factor(
             target: int, xs: Sequence[int], cond: Sequence[int]
-        ) -> list[tuple[float, float]]:
+        ) -> tuple[np.ndarray, Callable[[int], float]]:
             if len(xs) < 2:
-                return [one(target, x, cond) for x in xs]
+                pairs = [one(target, x, cond) for x in xs]
+                keys = [key for _, key in pairs]
+                return np.array([p for p, _ in pairs], dtype=np.float64), lambda i: keys[i]
             r, p = given(target, xs, cond)
-            return [
-                (q, -round(abs(s), KEY_DP))
-                for s, q in zip(np.asarray(r).tolist(), np.asarray(p).tolist(), strict=True)
-            ]
+            statistics = np.asarray(r).tolist()
+            return np.asarray(p, dtype=np.float64), lambda i: -round(abs(statistics[i]), KEY_DP)
 
         return by_factor
     scan = getattr(test, "pvalues_given", None)
@@ -151,18 +154,13 @@ def _dependences(
 
         def by_scan(
             target: int, xs: Sequence[int], cond: Sequence[int]
-        ) -> list[tuple[float, float]]:
-            return [(p, _pvalue_key(p, significant)) for p in scan(target, xs, cond).tolist()]
+        ) -> tuple[np.ndarray, Callable[[int], float]]:
+            p = np.asarray(scan(target, xs, cond), dtype=np.float64)
+            pvalues = p.tolist()
+            return p, lambda i: _pvalue_key(pvalues[i], significant)
 
         return by_scan
-    dependence = _dependence(test, significant=significant)
-
-    def one_by_one(
-        target: int, xs: Sequence[int], cond: Sequence[int]
-    ) -> list[tuple[float, float]]:
-        return [dependence(target, x, cond) for x in xs]
-
-    return one_by_one
+    return None
 
 
 def _required(constraints: Constraints | None, target: int, ranks: Sequence[int]) -> list[int]:
@@ -215,7 +213,8 @@ def markov_blanket(
     ``target`` is set in it, in place, to the conditioning set of the last such test: the blanket
     of the grow step that left it out, or the other members when the shrink dropped it.
     """
-    dependences = _dependences(test, significant=True)
+    scan = _dependence_scan(test, significant=True)
+    one = _dependence(test, significant=True)
     required = _required(constraints, target, ranks)
     blanket: list[int] = list(required)
     seen: set[frozenset[int]] = set()
@@ -229,20 +228,34 @@ def markov_blanket(
         candidates = [x for x in range(d) if x != target and x not in blanket]
         given = tuple(sorted(blanket))
         missing = untested[frozenset(blanket)] = []
-        for x, (p, strength) in zip(
-            candidates, dependences(target, candidates, blanket), strict=True
-        ):
-            key = (strength, ranks[x])
-            if p <= alpha and (best_key is None or key < best_key):
-                best_key, best_x = key, x
-            if p > alpha:
-                separated.add(x)
-                if sepsets is not None:
-                    sepsets[x] = given
-            if not not_tested(p):
-                decided.add(x)
-            else:
-                missing.append(x)
+        if scan is None:
+            for x in candidates:
+                p, strength = one(target, x, blanket)
+                key = (strength, ranks[x])
+                if p <= alpha and (best_key is None or key < best_key):
+                    best_key, best_x = key, x
+                if p > alpha:
+                    separated.add(x)
+                    if sepsets is not None:
+                        sepsets[x] = given
+                if not not_tested(p):
+                    decided.add(x)
+                else:
+                    missing.append(x)
+        else:
+            pvalues, strength_of = scan(target, candidates, blanket)
+            dependent = np.flatnonzero(pvalues <= alpha).tolist()
+            if dependent:
+                best = min(dependent, key=lambda i: (strength_of(i), ranks[candidates[i]]))
+                best_x = candidates[best]
+            ids = np.asarray(candidates, dtype=np.intp)
+            independent = ids[pvalues > alpha].tolist()
+            separated.update(independent)
+            if sepsets is not None:
+                sepsets.update(dict.fromkeys(independent, given))
+            untested_here = np.isnan(pvalues)
+            decided.update(ids[~untested_here].tolist())
+            missing.extend(ids[untested_here].tolist())
         if best_x is None:
             capped = False
             break
