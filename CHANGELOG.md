@@ -160,6 +160,10 @@ names its pull request.
   so these searches run faster on tens of variables, with the same output bit for bit.
   `make_indep_test` with `chisq` or `gsq` on data with missing values raises for an unknown
   `degrees_of_freedom` when it builds the test, not at its first query. ([#1307])
+- `iamb`, `inter_iamb`, and `mmpc` with a list of `target` on data with missing values answer every
+  target with one search, so a run that several targets share is made once, and each result counts
+  the rows of the runs its target reads, as a call for that target alone counts them. These lists
+  run faster, with the same output bit for bit. ([#1317])
 
 ### Fixed
 
@@ -3135,3 +3139,4 @@ First alpha release.
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
+[#1317]: https://github.com/Abel-ai-lab/Andrey/pull/1317
