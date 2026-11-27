@@ -446,6 +446,8 @@ def residualize(X: np.ndarray, remaining: list[int], m: int) -> None:
     In place. The variance of column ``m`` is taken once, and each covariance runs the operations
     of ``np.cov`` for ``ddof=0``, so every column has the bits :func:`compute_residual` gives.
     """
+    if not remaining:
+        return
     b = X[:, m]
     var_b = np.var(b)
     inv_n = np.true_divide(1, len(b))

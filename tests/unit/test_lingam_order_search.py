@@ -146,6 +146,15 @@ def test_residualize_is_the_residual_loop(n: int) -> None:
             assert _same_bits(X, want), (n, order_of_memory, m)
 
 
+def test_residualize_computes_nothing_when_no_column_remains() -> None:
+    """The last pick has nothing to residualize, as the empty loop did no arithmetic."""
+    X = np.array([[0.0, 1.0], [1e308, 2.0]])
+    before = X.copy()
+    with np.errstate(all="raise"):
+        pwling.residualize(X, [], 0)
+    assert _same_bits(X, before)
+
+
 def test_residualize_leaves_the_other_columns_alone() -> None:
     X = _linear_sem(1, 6, 200, "uniform")
     before = X.copy()
