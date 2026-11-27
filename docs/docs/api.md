@@ -205,28 +205,27 @@ and 21.7% of the same true independences were rejected. Their time and power wer
 
 % concept: knowledge
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`, `ut_igsp`,
-`exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`, `das`,
-`direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`, `longitudinal_lingam`,
-`pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
+`ges`, `fges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `igsp`,
+`ut_igsp`, `exact_search`, `calm`, `notears`, `dagma`, `cam`, `resit`, `score_matching`, `nogam`,
+`das`, `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, `varma_lingam`,
+`longitudinal_lingam`, `pcmci`, `pcmciplus`, `jpcmciplus`, `lpcmci`, `granger`, `dynotears`, `rcd`,
 `bottom_up_parce_lingam`, and `camuv` take `knowledge`, a {py:class}`~andrey.Knowledge` of required
 and forbidden edges, the pairs allowed to be adjacent, and temporal tiers; each method's `knowledge`
-parameter says how it honors them. Every
-required edge is in the result, whatever its weight, test, or score says. For the time-series
-methods, an edge `(cause, effect, lag)` is the link from `cause` at time `t - lag` to `effect` at
-time `t`. Three more parts state causal paths and hidden common causes: `required_paths` and
-`forbidden_paths` list the pairs `(cause, effect)` with and without a directed path from `cause` to
-`effect`, and `confounded` the pairs with a hidden common cause. `pc`, `cdnod`, `ges`, `xges`, `hc`,
-`tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`, `inter_iamb`, and `mmpc` with
-`structure="cpdag"` and no `target` honor `required_paths` and `forbidden_paths`:
-the result is the MPDAG of the DAGs of the class found that meet them (Fang et al. 2025), and
-`metadata["ancestor_clauses"]` lists the claims no MPDAG can show. `fci`, `fci_jci`, `gfci`,
-`boss_fci`, `grasp_fci`, and `lpcmci` honor all three: on a pair the tests keep, a
-required path makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before
-Zhang's rules (Richardson and Spirtes 2002; Zhang 2008), and no test removes a `confounded` pair.
-These marks and checks assume no selection bias. `lpcmci` takes each claim with its lag.
-`direct_lingam` and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the
-order search's prior knowledge (Shimizu et al. 2011, Section 3.4).
+parameter says how it honors them. Every required edge is in the result, whatever its weight, test,
+or score says. For the time-series methods, an edge `(cause, effect, lag)` is the link from `cause`
+at time `t - lag` to `effect` at time `t`. Three more parts state causal paths and hidden common
+causes: `required_paths` and `forbidden_paths` list the pairs `(cause, effect)` with and without a
+directed path from `cause` to `effect`, and `confounded` the pairs with a hidden common cause. `pc`,
+`cdnod`, `ges`, `xges`, `hc`, `tabu`, `mmhc`, `rsmax2`, `boss`, `grasp`, `exact_search`, and `iamb`,
+`inter_iamb`, and `mmpc` with `structure="cpdag"` and no `target` honor `required_paths` and
+`forbidden_paths`: the result is the MPDAG of the DAGs of the class found that meet them (Fang et
+al. 2025), and `metadata["ancestor_clauses"]` lists the claims no MPDAG can show. `fci`, `fci_jci`,
+`gfci`, `boss_fci`, `grasp_fci`, and `lpcmci` honor all three: on a pair the tests keep, a required
+path makes the edge `a -> b` and a forbidden path puts an arrowhead at the cause, before Zhang's
+rules (Richardson and Spirtes 2002; Zhang 2008), and no test removes a `confounded` pair. These
+marks and checks assume no selection bias. `lpcmci` takes each claim with its lag. `direct_lingam`
+and `multi_group_direct_lingam` honor `required_paths` and `forbidden_paths` as the order search's
+prior knowledge (Shimizu et al. 2011, Section 3.4).
 
 These parts are supported wherever [true claims measured no
 worse](https://github.com/Abel-ai-lab/Andrey/blob/main/benchmarks/comparisons/knowledge-paths.md)
@@ -361,16 +360,16 @@ the defaults on sparse graphs. It did not shorten the fit in our runs. Each meth
 details.
 
 % concept: max_parents
-`ges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`, `rsmax2`,
-`gfci`, `boss_fci`, `grasp_fci`, `cam`, `das`, and `icp` take `max_parents`, a cap on every node's
-parents: no DAG the returned graph represents gives a node more than that many parents. `None`, the
-default, sets no cap, except in `das`, whose default is its paper's 20. `ges`, `gies`, `gnies`,
-`xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past the cap, `boss`
-and `grasp` grow no parent set past it, `exact_search` scores only the parent sets within it,
-`cam`'s order search adds no edge past it, and `das`'s edge screen keeps no candidate past it.
-`icp` tests only the sets of at most that many variables, and its guarantee then needs the target
-to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP phase;
-the PAG their tests then orient can put more arrowheads at a node.
+`ges`, `fges`, `gies`, `gnies`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `mmhc`,
+`rsmax2`, `gfci`, `boss_fci`, `grasp_fci`, `cam`, `das`, and `icp` take `max_parents`, a cap on
+every node's parents: no DAG the returned graph represents gives a node more than that many parents.
+`None`, the default, sets no cap, except in `das`, whose default is its paper's 20. `ges`, `fges`,
+`gies`, `gnies`, `xges`, `hc`, `tabu`, and the score phase of `mmhc` and `rsmax2` take no move past
+the cap, `boss` and `grasp` grow no parent set past it, `exact_search` scores only the parent sets
+within it, `cam`'s order search adds no edge past it, and `das`'s edge screen keeps no candidate
+past it. `icp` tests only the sets of at most that many variables, and its guarantee then needs the
+target to have no more parents. `gfci`, `boss_fci`, and `grasp_fci` cap their GES, BOSS, or GRaSP
+phase; the PAG their tests then orient can put more arrowheads at a node.
 
 % concept: seed
 `pc`, `fci`, `gfci`, `boss_fci`, `grasp_fci`, `cdnod`, `fci_jci`, `iamb`, `inter_iamb`, `mmpc`,
@@ -424,17 +423,17 @@ block with `andrey.config(n_jobs=...)`, or with the `ANDREY_*` variables of
 [Configuration](configuration.md); `bootstrap` follows them too.
 
 % concept: penalty_discount
-`ges`, `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,
-`gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the multiplier on the
-BIC penalty per parameter, as in Ramsey et al. (2017): larger values give sparser graphs, and `1.0`,
-the default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"` has this penalty,
-and `metadata["penalty_discount"]` records the value the score used. `ages` reads it as the lowest
-penalty of its solution path.
+`ges`, `fges`, `gies`, `gnies`, `xges`, `lges`, `ages`, `hc`, `tabu`, `boss`, `grasp`,
+`exact_search`, `gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `penalty_discount`, the
+multiplier on the BIC penalty per parameter, as in Ramsey et al. (2017): larger values give sparser
+graphs, and `1.0`, the default, with `ebic_gamma=0.0` is the standard BIC. Every score but `"bdeu"`
+has this penalty, and `metadata["penalty_discount"]` records the value the score used. `ages` reads
+it as the lowest penalty of its solution path.
 
 % concept: ebic_gamma
-`ges`, `gies`, `gnies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
-`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended BIC,
-from 0 to 1 (Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log
+`ges`, `fges`, `gies`, `gnies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`,
+`gfci`, `boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `ebic_gamma`, the weight of the extended
+BIC, from 0 to 1 (Chen and Chen 2008): their linear-Gaussian BIC adds `2 * ebic_gamma * log
 C(n_variables - 1, n_parents)` to each variable's score, a penalty that grows with the number of
 variables. `gfci`, `boss_fci`, `grasp_fci`, and `lges` default to `ebic_gamma=0.0`, the standard
 BIC, and the others to `1.0`; {py:func}`~andrey.ges` describes the choice, and
@@ -444,14 +443,15 @@ named or picked by `None`, raises a `ValueError`; `metadata["ebic_gamma"]` recor
 `"bic"` or `"normal_scores"` fit used. `gnies`, which has one score, always adds it.
 
 % concept: equivalent_sample_size
-`ges`, `gies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`, `boss_fci`,
-`grasp_fci`, `mmhc`, and `rsmax2` take `equivalent_sample_size`, the equivalent sample size of the
-BDeu score (Heckerman, Geiger and Chickering 1995; Buntine 1991): the number of rows its uniform
-prior over each variable's conditional distributions is worth, a positive number. The default is
-`1.0`. A larger value weighs the prior more against the data, and the learned graph can change with
-it (Silander, Kontkanen and Myllymaki 2007), so compare fits at one value. Only `score_func="bdeu"`
-reads it, so passing `equivalent_sample_size` with another score, named or picked by `None`, raises
-a `ValueError`; `metadata["equivalent_sample_size"]` records the value a `"bdeu"` fit used.
+`ges`, `fges`, `gies`, `xges`, `lges`, `hc`, `tabu`, `boss`, `grasp`, `exact_search`, `gfci`,
+`boss_fci`, `grasp_fci`, `mmhc`, and `rsmax2` take `equivalent_sample_size`, the equivalent sample
+size of the BDeu score (Heckerman, Geiger and Chickering 1995; Buntine 1991): the number of rows its
+uniform prior over each variable's conditional distributions is worth, a positive number. The
+default is `1.0`. A larger value weighs the prior more against the data, and the learned graph can
+change with it (Silander, Kontkanen and Myllymaki 2007), so compare fits at one value. Only
+`score_func="bdeu"` reads it, so passing `equivalent_sample_size` with another score, named or
+picked by `None`, raises a `ValueError`; `metadata["equivalent_sample_size"]` records the value a
+`"bdeu"` fit used.
 
 ```{eval-rst}
 .. currentmodule:: andrey
@@ -489,6 +489,7 @@ variable.
    mmpc
    icp
    ges
+   fges
    gies
    gnies
    xges

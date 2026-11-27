@@ -1301,6 +1301,7 @@ _CONCEPTS = (
                 "Not taken yet: the paper defines the search for complete data; structural EM "
                 "would suit it as it suits ges.",
                 "lges",
+                "fges",
             ),
             *_exempt(
                 "A score or a regression reads every column.",
@@ -1498,6 +1499,7 @@ _CONCEPTS = (
                 "Not taken yet: the paper defines the search for data from one environment; ges "
                 "is the score search that takes env.",
                 "lges",
+                "fges",
             ),
             *_exempt(
                 "Its model reads the noise of continuous variables, which an environment label "
