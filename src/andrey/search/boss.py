@@ -478,14 +478,14 @@ class _GSTNode:
         Appends each taken grow variable to ``parents`` and, on reaching the leaf, removes the
         shrink variables, so ``parents`` ends as the traced parent set, the leaf's ``parents``.
         Adds every branch variable it passes to ``excluded``; a node grows from the tree's
-        ``available`` variables outside it.
+        candidates outside it (:meth:`GrowShrinkTree.addable`).
         """
         if self.branches is None:
             cap = self.tree.max_parents
             if cap is not None and len(parents) >= cap:
                 self.branches = []
             else:
-                self._grow([u for u in self.tree.available if u not in excluded], parents)
+                self._grow(self.tree.addable(excluded), parents)
         branches = self.branches or []
         for branch in branches:
             add = branch.add
@@ -519,11 +519,12 @@ class GrowShrinkTree:
 
     __slots__ = (
         "vertex",
+        "n_features",
         "score",
         "delta",
         "empty_score",
         "root",
-        "available",
+        "candidates",
         "required",
         "max_parents",
         "leaves",
@@ -541,17 +542,26 @@ class GrowShrinkTree:
         max_parents: int | None = None,
     ) -> None:
         self.vertex = vertex
+        self.n_features = n_features
         self.score = score
         self.delta = delta
-        # Every variable that may parent `vertex` -- all others, or the `candidates`.
-        self.available = tuple(
-            [i for i in range(n_features) if i != vertex] if candidates is None else candidates
-        )
+        # `None` stores no list of the other variables; `addable` enumerates them per grow.
+        self.candidates = None if candidates is None else tuple(candidates)
         self.required = [] if required is None else required
         self.max_parents = max_parents
         self.empty_score = -score.score(vertex, self.required)
         self.root = _GSTNode(self)
         self.leaves: dict[tuple[int, ...], _Leaf] = {}
+
+    def addable(self, excluded: set[int]) -> list[int]:
+        """Return the parents a node may add: the candidates not in ``excluded``, in their order.
+
+        Without ``candidates``, the candidates are every variable other than ``vertex``, ascending.
+        """
+        if self.candidates is None:
+            vertex = self.vertex
+            return [u for u in range(self.n_features) if u != vertex and u not in excluded]
+        return [u for u in self.candidates if u not in excluded]
 
     def trace(self, prefix: set[int], parents: list[int] | None = None) -> _Leaf:
         """Return the leaf of ``vertex``'s best parents drawn from ``prefix``; fill ``parents``.

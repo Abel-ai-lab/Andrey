@@ -3,7 +3,9 @@
 ``_GSTNode.trace`` takes the first branch allowed by the prefix. Branch order therefore determines
 the search path. The grow and shrink steps of the tree BOSS and GRaSP share break score ties by
 variable index; BOSS's order move takes the leftmost tied position. Each step requires an
-improvement larger than ``SCORE_EPS``.
+improvement larger than ``SCORE_EPS``. A node grows from its tree's candidates in their order,
+every other variable ascending by default, and a tree without candidates stores no list of them,
+so the trees of a search take memory linear in the number of variables.
 BOSS and GRaSP search the columns sorted by tie rank, so a variable's index, the seeded starting
 order, and the visiting order follow the columns' data, and reordering the columns relabels the
 graph.
@@ -11,6 +13,7 @@ graph.
 
 from __future__ import annotations
 
+import tracemalloc
 from functools import partial
 from types import SimpleNamespace
 
@@ -69,6 +72,58 @@ def test_boss_grows_best_scoring_branch_first() -> None:
     # Require two branches so `_descending` cannot pass vacuously.
     assert len(node.branches) >= 2, "fixture yields too few improving additions to order"
     assert _descending([b.grow_score for b in node.branches], boss_mod.SCORE_EPS)
+
+
+def _flat_score() -> SimpleNamespace:
+    """A local score of 0 for every parent set: enough to build a tree."""
+    return SimpleNamespace(score=lambda vertex, parents: 0.0)
+
+
+@pytest.mark.parametrize("d", [12, 300])
+def test_a_node_grows_from_every_other_variable_in_ascending_order(d) -> None:
+    rng = np.random.default_rng(d)
+    for vertex in (0, d // 2, d - 1):
+        tree = boss_mod.GrowShrinkTree(vertex, _flat_score(), SimpleNamespace(), d)
+        others = tuple([i for i in range(d) if i != vertex])
+        for excluded in (
+            set(),
+            {vertex},
+            set(rng.choice(d, size=d // 3, replace=False).tolist()),
+            set(others),
+        ):
+            assert tree.addable(excluded) == [u for u in others if u not in excluded]
+
+
+def test_a_node_grows_from_the_candidates_in_their_order() -> None:
+    tree = boss_mod.GrowShrinkTree(3, _flat_score(), SimpleNamespace(), 12, candidates=[9, 2, 7, 0])
+
+    assert tree.addable(set()) == [9, 2, 7, 0]
+    assert tree.addable({2, 5}) == [9, 7, 0]
+
+
+def _traced_tree_bytes(d: int) -> int:
+    """The bytes traced while the ``d`` trees of a search without knowledge are built."""
+    score, delta = _flat_score(), SimpleNamespace()
+    started = not tracemalloc.is_tracing()
+    if started:
+        tracemalloc.start()
+    try:
+        before = tracemalloc.get_traced_memory()[0]
+        trees = [boss_mod.GrowShrinkTree(v, score, delta, d) for v in range(d)]
+        used = tracemalloc.get_traced_memory()[0] - before
+    finally:
+        if started:
+            tracemalloc.stop()
+    assert len(trees) == d
+    return used
+
+
+def test_the_trees_of_a_search_take_memory_linear_in_the_variables() -> None:
+    small, large = _traced_tree_bytes(500), _traced_tree_bytes(1000)
+
+    # A tree holding a list of the other variables would make these about 5x and 40 * d^2 bytes.
+    assert large < 3 * small
+    assert large < 2_000 * 1000
 
 
 @pytest.mark.parametrize(
