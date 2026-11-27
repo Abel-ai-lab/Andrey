@@ -153,6 +153,11 @@ names its pull request.
   neighbors, and `fci`, `fci_jci`, and `gfci` search possible-d-sep sets over sets of each node's
   arrowheads and neighbors, so they run faster on many variables, with the same output bit for bit.
   ([#1303])
+- `ages` runs faster, with the same output bit for bit: its backward phases share the covariance
+  inverses, each remove's penalty-free score change, and each target's Delete candidates across the
+  penalties of the solution path. The consistent DAG extension of a PDAG, the objective that `ges`,
+  `gies`, `lges`, `xges`, and `ages` report, and the neighborhoods the `ges`, `gies`, `lges`, and
+  `ages` scans read take each row's nodes of a graph from one `np.nonzero`. ([#1311])
 
 ### Fixed
 
@@ -3126,3 +3131,4 @@ First alpha release.
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
 [#1302]: https://github.com/Abel-ai-lab/Andrey/pull/1302
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
+[#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
