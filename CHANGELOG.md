@@ -75,6 +75,9 @@ names its pull request.
   the unit tests of `tests/unit/test_skewd.py` take 120 s on one core instead of 625 s, and the macOS
   unit job skips the `release` cases unless a manual run asks for them, and then has 90 minutes
   instead of 40. ([#1257])
+- For contributors, a test lists every module-level cache and checks each cache whose result can
+  change while its key does not, and registry-driven tests check that a wrong type of a parameter of
+  column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
 
 ### Fixed
 
@@ -89,6 +92,9 @@ names its pull request.
   (`chisq`, `gsq`, `bdeu`, and `discrete_bic`) refused it as a code of "2**53 or more", and reading
   the columns as numbers (`categorical=[]`) kept it as a value and returned another graph.
   ([#1241])
+- The limit to one BLAS thread that a fit runs under reaches a library imported before the fit starts
+  and after the first fit of the process, such as torch's OpenMP pool, which it missed because the
+  pools were found once per process. ([#1259])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3028,4 +3034,5 @@ First alpha release.
 [#1254]: https://github.com/Abel-ai-lab/Andrey/pull/1254
 [#1256]: https://github.com/Abel-ai-lab/Andrey/pull/1256
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
+[#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
