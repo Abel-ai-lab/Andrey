@@ -235,6 +235,13 @@ names its pull request.
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
+- `lpcmci` runs faster where a link's search set is large, with `fisherz` or `student_t` on complete
+  data: a search of subsets of four or more nodes reads each subset's partial correlation from the
+  factors of its parent subset, kept between rounds, instead of inverting its correlation
+  submatrix, and asks the test again for the subsets that decide what the search records, so the
+  output is the same bit for bit. A search whose factors would hold more than 1 GiB, or whose
+  correlation block is near singular, inverts as before. For contributors, `qa/identity.py` counts
+  the tests the lattice answers. ([#1360])
 
 ### Fixed
 
@@ -3232,3 +3239,4 @@ First alpha release.
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
+[#1360]: https://github.com/Abel-ai-lab/Andrey/pull/1360
