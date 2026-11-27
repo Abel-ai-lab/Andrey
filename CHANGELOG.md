@@ -78,6 +78,19 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- `pc`, `fci`, `mmpc`, and `mmhc` return the same results with less memory where the empty set
+  separates many pairs, as on a sparse graph. The skeleton search, which `fci_jci`, `cdnod`, `gfci`,
+  `boss_fci`, `grasp_fci`, and `rsmax2` share, holds the pairs the empty set separates as one
+  boolean matrix, and their p-values as the matrix of marginal p-values it already computes, only
+  where that takes less memory than a separating set and a p-value for each pair; each MMPC run
+  holds the candidates the empty set separates from its target the same way. Where it separates
+  few pairs, the search keeps a separating set and a p-value for each, as before. On a sparse graph
+  of 2,000 variables and 300 rows, the peak memory `pc` adds falls to about a third. ([#1277])
+- `ges`, `gfci`, and `ages` return the same results with less memory, because GES's forward phase
+  keeps the screening delta and bound of each candidate it scored in two arrays of floats, 16 bytes
+  for each candidate, where it kept a set and two dictionaries. On a sparse graph of 1,000
+  variables, a serial `ges` adds about a quarter of the memory it added before, and with
+  `n_jobs=4` each worker holds less than half as much. ([#1278])
 - `boss`, `grasp`, `boss_fci`, and `grasp_fci` take less memory on large graphs: without
   knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
   which took memory quadratic in the number of variables; the trees of a search share one tuple of
@@ -123,6 +136,9 @@ names its pull request.
   build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
   the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
   output bit for bit and the same counts of the queries not tested. ([#1296])
+- `nogam` runs faster: each fold of its cross-validated kernel regressions is assembled from slices
+  of the kernel, the kernels are built in place, and the repeated non-finite checks of the Cholesky
+  steps are skipped, with the same output bit for bit. ([#1298])
 - `iamb` and `inter_iamb` on data with missing values and `fisherz` or `student_t`, the default
   test, ask the test-wise deletion test for each grow scan at once and read its p-values as one
   array, so these searches run faster on tens of variables, with the same output bit for bit.
@@ -3088,10 +3104,13 @@ First alpha release.
 [#1274]: https://github.com/Abel-ai-lab/Andrey/pull/1274
 [#1275]: https://github.com/Abel-ai-lab/Andrey/pull/1275
 [#1276]: https://github.com/Abel-ai-lab/Andrey/pull/1276
+[#1277]: https://github.com/Abel-ai-lab/Andrey/pull/1277
+[#1278]: https://github.com/Abel-ai-lab/Andrey/pull/1278
 [#1284]: https://github.com/Abel-ai-lab/Andrey/pull/1284
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
 [#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
+[#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
