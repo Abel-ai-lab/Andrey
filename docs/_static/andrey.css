@@ -1861,19 +1861,35 @@ html[data-theme="dark"] .bd-content div.cell_output img {
 
 /* ---------- the AI statement ---------- */
 /* The last paragraph of a post or a release card: how AI tools were used to write it
-   (docs/conf.py, _ai_statement), in a box of the cards' surface, hairline, and radius. */
+   (docs/conf.py, _ai_statement). Its container is a left rule in the accent on a faint accent
+   tint, with the hairline and the medium radius on the other sides, and its label, a link to the
+   AI policy, in small uppercase above the text. */
 .bd-article p.ai-statement {
   margin: 2.5rem 0 0;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.1rem;
   border: 1px solid var(--andrey-line);
-  border-radius: var(--andrey-radius-lg);
-  background: var(--andrey-surface);
+  border-left: 3px solid var(--andrey-accent);
+  border-radius: var(--andrey-radius-md);
+  background: color-mix(in srgb, var(--andrey-accent) 6%, var(--andrey-surface));
   color: var(--andrey-muted);
   font-size: 0.85rem;
 }
 
 .bd-article p.ai-statement a {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+/* The label underlines under the pointer and under keyboard focus (the ring is the site's one
+   focus ring), as the site's other links do. */
+.bd-article p.ai-statement a:is(:hover, :focus-visible) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ---------- a post's update date ---------- */
