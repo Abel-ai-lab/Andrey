@@ -148,6 +148,10 @@ names its pull request.
   neighbors, and `fci`, `fci_jci`, and `gfci` search possible-d-sep sets over sets of each node's
   arrowheads and neighbors, so they run faster on many variables, with the same output bit for bit.
   ([#1303])
+- The `gcm` test and the `pcm` test with `regression="boosting"` tune their boosted trees faster:
+  each cross-validation fold grows only through the round where its early stop cuts it, and the
+  repeated input checks of the many small fits are skipped, so the methods that take them as
+  `indep_test` run faster, with the same output bit for bit. ([#1309])
 
 ### Fixed
 
@@ -3120,3 +3124,4 @@ First alpha release.
 [#1298]: https://github.com/Abel-ai-lab/Andrey/pull/1298
 [#1299]: https://github.com/Abel-ai-lab/Andrey/pull/1299
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
+[#1309]: https://github.com/Abel-ai-lab/Andrey/pull/1309
