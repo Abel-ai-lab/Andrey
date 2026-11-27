@@ -919,8 +919,9 @@ class GaussianDeletion(PartialCorrelationDeletion):
     degrees of freedom, and p-value are those of the block's test, so the p-value equals that
     test's up to rounding, as the sums run in another order. A query's answer does not depend on
     the queries evaluated with it, so every query path (a single call, :meth:`batched_call`,
-    :meth:`statistic_pvalues`, and the canonical query arrays the skeleton searches pass) gives it
-    the same bits.
+    :meth:`statistic_pvalues`, :meth:`statistic_pvalues_given`, which answers one conditioning set
+    against many candidates, and the canonical query arrays the skeleton searches pass) gives it the
+    same bits.
 
     With few missingness patterns, sums use tables stored once per pattern group
     (:mod:`~andrey.core.missing_groups`) instead of every row; the path is chosen once per test from
@@ -1001,6 +1002,26 @@ class GaussianDeletion(PartialCorrelationDeletion):
         y = np.asarray(y, dtype=np.intp)
         conds = np.sort(np.asarray(conditions, dtype=np.intp).reshape(len(x), -1), axis=1)
         return self._answer(np.minimum(x, y), np.maximum(x, y), conds)
+
+    def statistic_pvalues_given(
+        self, x: int, ys: Sequence[int], condition_set: Iterable[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Partial correlations and p-values of ``x`` and each of ``ys`` given one conditioning set.
+
+        Entry ``i`` equals ``statistic_pvalue(x, ys[i], condition_set)`` bit for bit, and the rows
+        each query counts are those of that call. A query the exact path raises on raises its error
+        after the queries before it are counted, as separate calls do. A repeated column of the set
+        counts once. ``ys`` excludes ``x`` and the set's members.
+        """
+        cond = sorted(set(map(int, condition_set)))
+        cols = np.asarray(ys, dtype=np.intp).reshape(-1)
+        if not len(cols):
+            return np.empty(0), np.empty(0)
+        in_set = int(x) in cond or np.isin(cols, cond).any()
+        assert not in_set, "x, y cannot be in condition_set."
+        xs = np.full(len(cols), int(x), dtype=np.intp)
+        sets = np.tile(np.asarray(cond, dtype=np.intp), (len(cols), 1))
+        return self._answer(np.minimum(xs, cols), np.maximum(xs, cols), sets)
 
     def _canonical_pvalues(
         self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
