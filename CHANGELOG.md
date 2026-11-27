@@ -65,7 +65,7 @@ names its pull request.
   fit reads, where twenty shared one. `anm`, `pnl`, `loci`, and `skewd` say that a gap in one column
   that depends on the other selects the rows on the effect, so their direction is evidence under
   values missing completely at random. `markov_check` says that `rows_per_test` counts the rows
-  each test draws before deletion and when a rejection or a pass says little about the graph.
+  each test draws before deletion, and gives the condition under which test-wise deletion is valid.
   ([#1256])
 
 ### Fixed

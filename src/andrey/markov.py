@@ -181,8 +181,9 @@ def markov_check(
         must agree. Missing values (``NaN``) are deleted test by test, from the rows each test
         draws: a test reads the drawn rows where all of its variables are observed, and
         ``metadata["rows_tested"]`` counts them. Test-wise deletion is valid when values are
-        missing completely at random; otherwise each test reads a selected sample, and a rejection
-        or a pass says little about the graph.
+        missing completely at random, which means that whether a value is missing depends on no
+        value in the data; the rows a test reads are then a random sample of all rows, and
+        otherwise they are a selected sample that more rows do not correct.
     indep_test : str or None, default=None
         The conditional-independence test, as ``pc`` takes it. ``None`` picks from the declared
         column types: ``"gsq"`` when every column is categorical, ``"cond_gauss"`` when some are,
