@@ -160,6 +160,11 @@ names its pull request.
   so these searches run faster on tens of variables, with the same output bit for bit.
   `make_indep_test` with `chisq` or `gsq` on data with missing values raises for an unknown
   `degrees_of_freedom` when it builds the test, not at its first query. ([#1307])
+- `ages` runs faster, with the same output bit for bit: its backward phases share the covariance
+  inverses, each remove's penalty-free score change, and each target's Delete candidates across the
+  penalties of the solution path. The consistent DAG extension of a PDAG, the objective that `ges`,
+  `gies`, `lges`, `xges`, and `ages` report, and the neighborhoods the `ges`, `gies`, `lges`, and
+  `ages` scans read take each row's nodes of a graph from one `np.nonzero`. ([#1311])
 
 ### Fixed
 
@@ -3135,3 +3140,4 @@ First alpha release.
 [#1303]: https://github.com/Abel-ai-lab/Andrey/pull/1303
 [#1306]: https://github.com/Abel-ai-lab/Andrey/pull/1306
 [#1307]: https://github.com/Abel-ai-lab/Andrey/pull/1307
+[#1311]: https://github.com/Abel-ai-lab/Andrey/pull/1311
