@@ -647,10 +647,10 @@ def fges(
 ) -> StructureOutput:
     """Learn a CPDAG from observational data with fast greedy equivalence search (FGES).
 
-    FGES is GES arranged for large sparse graphs [2]_: its first forward phase adds an edge between
-    two variables only when the graph of that single edge scores better than the empty graph, a
-    second pass covers the unshielded noncolliders that phase left, and by default a third pass
-    scans every pair. It returns the same kind of result as :func:`~andrey.ges`, from the same
+    FGES is GES [1]_ arranged for large sparse graphs [2]_: its first forward phase adds an edge
+    between two variables only when the graph of that single edge scores better than the empty
+    graph, a second pass covers the unshielded noncolliders that phase left, and by default a third
+    pass scans every pair. It returns the same kind of result as :func:`~andrey.ges`, from the same
     scores and the same search.
 
     Parameters
@@ -662,7 +662,7 @@ def fges(
         Local score objective: ``"bic"``, the linear-Gaussian BIC, for continuous data.
         ``"normal_scores"``, experimental, is ``"bic"`` on each column's normal scores, for
         continuous data that are Gaussian only after an unknown increasing transformation of each
-        column. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial BIC [7]_,
+        column. ``"bdeu"`` is the BDeu score [3]_ and ``"discrete_bic"`` the multinomial BIC [6]_,
         for categorical data coded by whole numbers. ``"degen_gauss"`` (degenerate Gaussian) [4]_
         and ``"cond_gauss"`` (conditional Gaussian) [5]_ are BIC scores for mixed data, continuous
         and categorical columns. ``None`` picks from the declared column types: ``"bdeu"`` when
@@ -676,7 +676,7 @@ def fges(
         the standard BIC. Must be finite and non-negative. BDeu ignores it; for the multinomial BIC
         it weighs ``log(n)`` per free parameter of a variable's conditional probability table.
     ebic_gamma : float, default=1.0
-        Weight on the extended-BIC term of the linear-Gaussian BIC: each variable's score adds
+        Weight on the extended-BIC term [7]_ of the linear-Gaussian BIC: each variable's score adds
         ``2 * ebic_gamma * log C(n_variables - 1, n_parents)``, which grows with the number of
         parent sets a variable can choose from. Larger values give sparser graphs; ``0.0`` is the
         standard BIC. Must be from 0 to 1. Only ``"bic"`` and ``"normal_scores"`` use it: passing it
@@ -821,11 +821,9 @@ def fges(
        acyclic graphs with mixed data-types. Proceedings of Machine Learning Research 104, 4-21.
     .. [5] Andrews, B., Ramsey, J., and Cooper, G. F. (2018). Scoring Bayesian networks of mixed
        variables. International Journal of Data Science and Analytics 6(1), 3-18.
-    .. [6] Friedman, J. H. (1989). Regularized discriminant analysis. Journal of the American
-       Statistical Association 84(405), 165-175.
-    .. [7] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
+    .. [6] Schwarz, G. (1978). Estimating the dimension of a model. Annals of Statistics 6(2),
        461-464.
-    .. [8] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
+    .. [7] Chen, J., and Chen, Z. (2008). Extended Bayesian information criteria for model
        selection with large model spaces. Biometrika 95(3), 759-771.
 
     Examples
