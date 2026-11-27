@@ -199,6 +199,12 @@ names its pull request.
   the rest. The graph's sparse store is built with `np.nonzero`, its partner marks are looked up
   with one `searchsorted` in `validate` and in the check that halves a `dag` or `cpdag` store, and
   a store loaded with its entries out of order or repeated takes the earlier code. ([#1325])
+- `ges`, `xges`, `hc`, `tabu`, `exact_search`, `boss`, `grasp`, `notears`, `dagma`, and `calm` on
+  data with missing values and `missing="em"` run faster, with the same output bit for bit: the
+  rows are grouped by which columns they observe once per fit, not in each of its E-steps, and the
+  groups of one row that miss the same number of columns are solved together, so a fit whose rows
+  mostly differ in their pattern, as with values missing completely at random, spends much less time
+  in the E-step. ([#1329])
 - `direct_lingam`, `multi_group_direct_lingam`, `varma_lingam`, and `longitudinal_lingam` search the
   causal order faster with `measure="skew"` or `"tanh"`, and return the same output bit for bit
   with every measure. With `"skew"`, each column's sign comes from the mean of `x * x * x` when that
@@ -3189,4 +3195,5 @@ First alpha release.
 [#1322]: https://github.com/Abel-ai-lab/Andrey/pull/1322
 [#1325]: https://github.com/Abel-ai-lab/Andrey/pull/1325
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
+[#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331

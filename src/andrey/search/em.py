@@ -32,9 +32,11 @@ after 10 rounds, and with :data:`PARAMETER_STEPS` parameter steps before each se
 round changed the graph in about 1 fit in 10. At 100 rows it did in about 4 in 10. The record
 tells whether each round changed the graph, and a fit whose last round did logs a warning.
 
-The rows are grouped by which columns they observe, so each group takes one solve per E-step, and
-the E-step runs on the columns in order of their :func:`~andrey.core.ties.tie_ranks`, with BLAS on
-one thread, so a new column order or more threads move no bit of ``S``.
+The rows are grouped by which columns they observe once per fit (:class:`Patterns`). Each E-step
+solves a group of several rows with one solve, and the groups of one row that miss the same number
+of columns together, in stacks, with the arithmetic each group has alone. The E-step runs on the
+columns in order of their :func:`~andrey.core.ties.tie_ranks`, with BLAS on one thread, so a new
+column order or more threads move no bit of ``S``.
 
 The missingness must be ignorable: missing completely at random or at random given observed
 values. Under values missing not at random the expected covariance is biased, and nothing in the
@@ -72,6 +74,9 @@ if TYPE_CHECKING:
 __all__ = [
     "ITERATIONS",
     "PARAMETER_STEPS",
+    "PLAN_CELLS",
+    "STACK_LIMIT",
+    "Patterns",
     "expected_moments",
     "fit_dag",
     "observed_copies",
@@ -90,6 +95,12 @@ ITERATIONS = 10
 #: 2,000 rows; with none it was still changing in most. Stopping the steps earlier, once a step
 #: gains less than 0.01 or 0.0001 in log-likelihood, returned another graph in 8 and 2 of 360 fits.
 PARAMETER_STEPS = 5
+#: The most patterns one stack solves in a call.
+STACK_LIMIT = 256
+#: The most entries each array of a stack holds, so a stack over wide columns has fewer patterns,
+#: and the most entries of covariance shares a plan indexes. When the shares of all patterns would
+#: hold more, each pattern is solved alone and adds its own share.
+PLAN_CELLS = 2**22
 
 # A node's noise variance is at least this share of its expected variance, so the precision stays
 # finite when a fitted node is a near copy of its parents.
@@ -98,45 +109,140 @@ _VARIANCE_FLOOR = 1e-12
 R = TypeVar("R")
 
 
+class Patterns:
+    """The rows of ``X`` grouped by which columns they observe, built once for a fit's E-steps.
+
+    Patterns come in the order of :func:`numpy.unique` over the observed masks. The patterns that
+    hold one row and miss the same number of columns are solved as stacks of at most
+    :data:`STACK_LIMIT` patterns, fewer when :data:`PLAN_CELLS` bounds their arrays; every other
+    pattern is solved alone, and so is every pattern when the shares of ``K_mm^-1`` of all of them
+    hold more than :data:`PLAN_CELLS` entries. Either way each pattern's arithmetic is the one it
+    has alone.
+    """
+
+    def __init__(self, X: np.ndarray) -> None:
+        n, d = X.shape
+        observed = ~np.isnan(X)
+        patterns, group = np.unique(observed, axis=0, return_inverse=True)
+        group = group.ravel()
+        order = np.argsort(group, kind="stable")
+        bounds = np.searchsorted(group[order], np.arange(len(patterns) + 1))
+        self.shape = (n, d)
+        self.n_patterns = len(patterns)
+        self.filled = np.where(observed, X, 0.0)
+        # The shares of K_mm^-1 add into the expected covariance in pattern order. Over the budget
+        # each pattern adds its own in the loop; otherwise one np.add.at adds them all.
+        shares = int(((d - patterns.sum(axis=1, dtype=np.int64)) ** 2).sum())
+        self.direct_adds = shares > PLAN_CELLS
+        stack_limit = max(1, min(STACK_LIMIT, PLAN_CELLS // max(d * d, 1)))
+        self.alone = []  # (k, rows, o, m, X block, (rows, m), (m, m), (o, o))
+        by_size: dict[int, list[tuple]] = {}
+        for k, pattern in enumerate(patterns):
+            rows = order[bounds[k] : bounds[k + 1]]
+            o, m = np.flatnonzero(pattern), np.flatnonzero(~pattern)
+            if rows.size == 1 and m.size and o.size and not self.direct_adds:
+                by_size.setdefault(int(m.size), []).append((k, int(rows[0]), o, m))
+            else:
+                self.alone.append(
+                    (k, rows, o, m, X[np.ix_(rows, o)], np.ix_(rows, m), np.ix_(m, m), np.ix_(o, o))
+                )
+        self.stacks = []
+        for all_items in by_size.values():
+            for start in range(0, len(all_items), stack_limit):
+                items = all_items[start : start + stack_limit]
+                ks = np.array([it[0] for it in items])
+                rows = np.array([it[1] for it in items])
+                os_ = np.stack([it[2] for it in items])
+                ms = np.stack([it[3] for it in items])
+                block = X[rows[:, None], os_][:, None, :]  # (K, 1, |o|)
+                self.stacks.append((ks, rows, os_, ms, block))
+        self.add_order = None
+        if self.direct_adds or not shares:
+            return
+        # Where each pattern's K_mm^-1 adds into the expected covariance, as a flat cell index: the
+        # stacks' patterns, then the others', reordered to pattern order so that every cell sums
+        # its shares in that order.
+        cell_type = np.int32 if d * d < 2**31 else np.int64
+        keys, cells = [], []
+        for ks, _, _, ms, _ in self.stacks:
+            keys.append(np.repeat(ks, ms.shape[1] ** 2))
+            cells.append((ms[:, :, None] * d + ms[:, None, :]).astype(cell_type).ravel())
+        for k, _, _, m, *_ in self.alone:
+            if m.size:
+                keys.append(np.full(m.size * m.size, k))
+                cells.append((np.repeat(m, m.size) * d + np.tile(m, m.size)).astype(cell_type))
+        self.add_order = np.argsort(np.concatenate(keys), kind="stable")
+        self.add_cells = np.concatenate(cells)[self.add_order]
+
+
 def expected_moments(
-    X: np.ndarray, mean: np.ndarray, precision: np.ndarray
+    X: np.ndarray | Patterns, mean: np.ndarray, precision: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """The expected mean, the expected covariance, and the observed-data log-likelihood.
 
-    ``X`` holds ``NaN`` where a value is missing; ``mean`` and ``precision`` (the inverse
-    covariance) are the model's. A row that observes the columns ``o`` and misses ``m`` has
-    ``x_m`` given ``x_o`` Gaussian with mean ``mean_m - K_mm^-1 K_mo (x_o - mean_o)`` and covariance
-    ``K_mm^-1``, ``K`` the precision. The covariance is about the expected mean and divided by the
-    number of rows. The log-likelihood is the sum over rows of the log density of each row's
-    observed values under the model; a row that observes nothing adds zero.
+    ``X`` holds ``NaN`` where a value is missing, or is its :class:`Patterns`; ``mean`` and
+    ``precision`` (the inverse covariance) are the model's. A row that observes the columns ``o``
+    and misses ``m`` has ``x_m`` given ``x_o`` Gaussian with mean
+    ``mean_m - K_mm^-1 K_mo (x_o - mean_o)`` and covariance ``K_mm^-1``, ``K`` the precision. The
+    covariance is about the expected mean and divided by the number of rows. The log-likelihood
+    is the sum over rows of the log density of each row's observed values under the model; a row
+    that observes nothing adds zero.
     """
-    n, d = X.shape
-    observed = ~np.isnan(X)
-    patterns, group = np.unique(observed, axis=0, return_inverse=True)
-    filled = np.where(observed, X, 0.0)
-    extra = np.zeros((d, d))
+    plan = X if isinstance(X, Patterns) else Patterns(X)
+    n, d = plan.shape
+    filled = plan.filled.copy()
     log_det = np.linalg.slogdet(precision)[1]
-    loglik = 0.0
-    for k, pattern in enumerate(patterns):
-        rows = np.flatnonzero(group.ravel() == k)
-        o, m = np.flatnonzero(pattern), np.flatnonzero(~pattern)
-        resid = X[np.ix_(rows, o)] - mean[o]
+    log_2pi = np.log(2 * np.pi)
+    terms = np.zeros(plan.n_patterns)  # each pattern's share of -2 * loglik, in pattern order
+    has_term = np.zeros(plan.n_patterns, dtype=bool)
+    extra = np.zeros((d, d))
+    added: list[np.ndarray] = []  # each K_mm^-1 share, stacks first, as Patterns lays them out
+    for ks, rows, os_, ms, block in plan.stacks:
+        resid = block - mean[os_][:, None, :]
+        k_mm = precision[ms[:, :, None], ms[:, None, :]]
+        k_mo = precision[ms[:, :, None], os_[:, None, :]]
+        factor = np.linalg.cholesky(k_mm)
+        solved = np.linalg.solve(factor.transpose(0, 2, 1), np.linalg.solve(factor, k_mo))
+        filled[rows[:, None], ms] = (mean[ms][:, None, :] - resid @ solved.transpose(0, 2, 1))[:, 0]
+        inverse = np.linalg.inv(factor)
+        cov_m = 1 * (inverse.transpose(0, 2, 1) @ inverse)
+        added.append(cov_m.ravel())
+        inner = precision[os_[:, :, None], os_[:, None, :]] - k_mo.transpose(0, 2, 1) @ solved
+        log_det_o = log_det - 2.0 * np.log(np.diagonal(factor, axis1=1, axis2=2)).sum(axis=1)
+        if os_.shape[1] == 2:  # the stacked einsum sums two observed columns in another order
+            quadratic = np.array([np.einsum("ij,jk,ik->", r, q, r) for r, q in zip(resid, inner)])
+        else:
+            quadratic = np.einsum("pij,pjk,pik->p", resid, inner, resid)
+        terms[ks] = quadratic + 1 * (os_.shape[1] * log_2pi - log_det_o)
+        has_term[ks] = True
+    for k, rows, o, m, block, rows_m, mm, oo in plan.alone:
+        resid = block - mean[o]
         if m.size == 0:
             inner = precision
             log_det_o = log_det
         else:
-            k_mm = precision[np.ix_(m, m)]
+            k_mm = precision[mm]
             k_mo = precision[np.ix_(m, o)]
             factor = np.linalg.cholesky(k_mm)
             solved = np.linalg.solve(factor.T, np.linalg.solve(factor, k_mo))  # K_mm^-1 K_mo
-            filled[np.ix_(rows, m)] = mean[m] - resid @ solved.T
+            filled[rows_m] = mean[m] - resid @ solved.T
             inverse = np.linalg.inv(factor)
-            extra[np.ix_(m, m)] += rows.size * (inverse.T @ inverse)  # rows * K_mm^-1
-            inner = precision[np.ix_(o, o)] - k_mo.T @ solved
+            cov_m = rows.size * (inverse.T @ inverse)  # rows * K_mm^-1
+            if plan.direct_adds:
+                extra[mm] += cov_m
+            else:
+                added.append(cov_m.ravel())
+            inner = precision[oo] - k_mo.T @ solved
             log_det_o = log_det - 2.0 * float(np.log(np.diagonal(factor)).sum())
         if o.size:
             quadratic = float(np.einsum("ij,jk,ik->", resid, inner, resid))
-            loglik -= 0.5 * (quadratic + rows.size * (o.size * np.log(2 * np.pi) - log_det_o))
+            terms[k] = quadratic + rows.size * (o.size * log_2pi - log_det_o)
+            has_term[k] = True
+    if plan.add_order is not None:  # each pattern's share in pattern order
+        np.add.at(extra.reshape(-1), plan.add_cells, np.concatenate(added)[plan.add_order])
+    loglik = 0.0
+    for term in terms[has_term]:
+        loglik -= 0.5 * term
     expected_mean = filled.mean(axis=0)
     centered = filled - expected_mean
     return expected_mean, (centered.T @ centered + extra) / n, loglik
@@ -239,6 +345,7 @@ def structural_em(
     order = np.argsort(tie_ranks(X))  # the E-step's column k is the data's column order[k]
     back = np.argsort(order)
     ranked = np.ascontiguousarray(X[:, order])
+    plan = Patterns(ranked)
     mean = np.nanmean(ranked, axis=0)
     precision = np.diag(1.0 / np.nanvar(ranked, axis=0))
     adjacency = np.zeros((X.shape[1], X.shape[1]), dtype=bool)
@@ -247,12 +354,12 @@ def structural_em(
     changed: list[bool] = []
     for k in range(iterations):
         with backend.one_blas_thread():
-            mean, cov, value = expected_moments(ranked, mean, precision)
+            mean, cov, value = expected_moments(plan, mean, precision)
             if k:
                 loglik.append(value)  # the model after the previous structure step
                 for _ in range(PARAMETER_STEPS):
                     precision = _precision(*fit_dag(adjacency, cov))
-                    mean, cov, _ = expected_moments(ranked, mean, precision)
+                    mean, cov, _ = expected_moments(plan, mean, precision)
         result, graph = m_step(cov[np.ix_(back, back)])
         found = np.asarray(graph.to_numpy())
         changed.append(not np.array_equal(found, marks))
@@ -260,7 +367,7 @@ def structural_em(
         adjacency = _dag_adjacency(graph)[np.ix_(order, order)]
         precision = _precision(*fit_dag(adjacency, cov))
     with backend.one_blas_thread():
-        loglik.append(expected_moments(ranked, mean, precision)[2])
+        loglik.append(expected_moments(plan, mean, precision)[2])
     if changed[-1]:
         _log.warning(
             "structural EM: the graph still changed in the last of %d rounds, so EM has not "
