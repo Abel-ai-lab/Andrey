@@ -2285,9 +2285,9 @@ def icp(
     over the accepted sets. Together the intervals hold every coefficient of the target's equation
     with probability at least ``1 - 2 alpha`` [1]_.
 
-    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test
-    regresses ``target`` on a set of the other variables in each environment. Drop the incomplete
-    rows first.
+    **Missing values.** A ``NaN`` in ``data`` raises ``ValueError``: every invariance test compares
+    the regression of ``target`` on a set of the other variables across the environments. Drop the
+    incomplete rows first.
 
     **Limitations.** On linear-Gaussian data whose environments leave the target's mechanism alone,
     the share of fits with a false parent stayed well below ``alpha``. When an intervention also
