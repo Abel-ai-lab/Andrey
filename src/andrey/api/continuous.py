@@ -387,14 +387,14 @@ def dagma(
         on the columns' units; it gives up the accuracy the default reads from units in which a
         variable's variance grows along the causal order (varsortability [5]_).
     missing : {"em"} or None, default=None
-        How missing values (``NaN``) are handled. ``"em"``, experimental, fits the method by
-        structural expectation-maximization (EM) over the expected covariance of the data, which
-        assumes values missing completely at random or at random given observed values. ``None``
-        refuses missing values. On data with missing values, ``metadata["missing"]`` records the
-        handling used and ``metadata["em"]`` the EM record, with the rows dropped for observing no
-        value and the fewest rows two columns share; two columns that share no observed row raise
-        ``ValueError``. ``"em"`` favors the partly observed rows, which dropping the incomplete rows
-        loses; it gives up time: each round runs the search again. See **Missing values.** in Notes.
+        How missing values (``NaN``) are handled. ``"em"`` fits the method by structural
+        expectation-maximization (EM) over the expected covariance of the data, which assumes values
+        missing completely at random or at random given observed values. ``None`` refuses missing
+        values. On data with missing values, ``metadata["missing"]`` records the handling used and
+        ``metadata["em"]`` the EM record, with the rows dropped for observing no value and the
+        fewest rows two columns share; two columns that share no observed row raise ``ValueError``.
+        ``"em"`` favors the partly observed rows, which dropping the incomplete rows loses; it gives
+        up time: each round runs the search again. See **Missing values.** in Notes.
     n_em_iterations : int, default=10
         The rounds of structural EM that ``missing="em"`` runs on data with missing values, at
         least 1. Each round runs the search once, increasing runtime. A fit whose last round changed
@@ -490,7 +490,7 @@ def dagma(
 
     **Missing values.** With ``missing=None``, a ``NaN`` in ``data`` raises ``ValueError``: the loss
     requires complete rows for every variable. The loss reads the data only through their
-    covariance, so ``missing="em"``, experimental, runs structural EM [7]_ [8]_, which Gao et al.
+    covariance, so ``missing="em"`` runs structural EM [7]_ [8]_, which Gao et al.
     [8]_ run with NOTEARS: under a linear-Gaussian model of the current graph, each row's missing
     values are Gaussian given its observed ones, and their conditional means and covariances give
     the expected covariance of the data (the E-step); the fit runs on it, with all of its settings,
@@ -527,6 +527,12 @@ def dagma(
     result depends on the data's scale (varsortability [5]_). The
     `0.18.0 release card <https://andrey.abel.ai/docs/benchmarks/0.18.0.html#dagma>`__ has the
     numbers.
+    With ``missing="em"`` on columns in the units of its paper's simulation it made fewer errors
+    than mean imputation, and no more than the same search inside the structural EM of Gao et al.
+    [8]_ and test-wise deletion in :func:`~andrey.pc`, in every setting measured; with about half of
+    the values missing it was no better than the empty graph on some graphs, as that EM was. The
+    `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data>`__ has
+    the settings.
 
     References
     ----------

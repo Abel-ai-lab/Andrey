@@ -81,8 +81,11 @@ approximation to structural EM, in which imputation under the current best graph
 re-search". It handles missing values by EM in the same searches with the same score, so the three
 searches are judged against it, at two settings of the sample size its score counts: every row, its
 default, and the mean pairwise count, which makes it a stronger arm. Both count for the status. For
-`xges`, `exact_search`, `calm`, and `dagma` no reference exists, and the page reports the baselines
-and the floor.
+`xges`, `exact_search`, and `dagma` the reference is the same search as the M-step of MissDAG's EM
+(Gao et al., 2022), with rows rebuilt from the expected covariance and least-squares weights for
+the two BIC searches; the [0.20.0 release
+card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data) has that comparison. For
+`calm` no reference exists, and the card reports the baselines and the floor.
 
 ## Scores
 
@@ -123,7 +126,8 @@ raised and were fit again, and the 7,920 fits of Andrey's EM arms under each of 
 | `boss(missing="em")` | `m2-tetrad` | Tetrad BOSS, EM covariance at `MEAN_PAIRWISE` | 72 / 59 / 1 of 132 | 70 / 58 / 4 | 0 of 1 | 3 of the 3 cells where Tetrad meets it; 122 of 132 | | supported |
 | `grasp(missing="em")` | `m2-tetrad` | Tetrad GRaSP, EM covariance | 101 / 31 / 0 of 132 | 89 / 43 / 0 | 0 | 2 of the 2 cells where Tetrad meets it; 124 of 132 | 0.05 to 7.76 | supported |
 | `grasp(missing="em")` | `m2-tetrad` | Tetrad GRaSP, EM covariance at `MEAN_PAIRWISE` | 68 / 61 / 3 of 132 | 64 / 62 / 6 | 0 of 3 | 4 of the 4 cells where Tetrad meets it; 124 of 132 | | supported |
-| `xges`, `exact_search`, `calm`, `dagma` with `missing="em"` | `m2-reduced` | none exists | | | | see below | | experimental |
+| `xges`, `exact_search`, `dagma` with `missing="em"` | the 0.20.0 release card | the same search as the M-step of MissDAG's EM | the card | | 0 | the card | the card | supported |
+| `calm(missing="em")` | the 0.20.0 release card | none: the empty graph and the complete-data fit | | | | the card | the card | supported |
 
 ### MVPC against the authors' R code
 
@@ -862,9 +866,19 @@ repeats, and below the empty graph in its claimed setting.
   per round, each was worse than the `MEAN_PAIRWISE` arm in one cell on the first datasets and again
   on fresh ones, which kept both experimental; with the alternating scheme `boss` ties in its cell
   and `grasp` is better in its own.
-- `xges`, `exact_search`, `calm`, and `dagma` with `missing="em"` stay experimental: no reference
-  implementation exists to measure them against. Their rows on this page were measured with the
-  earlier scheme.
+- `xges`, `exact_search`, and `dagma` with `missing="em"` are supported against the same search as
+  the M-step of MissDAG's EM (Gao et al., 2022): none is worse in any cell that repeats on fresh
+  datasets, the reference's search gives the same SHD on the real rows and on rows rebuilt from
+  their covariance on every complete dataset, and each meets the floor wherever it decides a cell.
+  The glue is ours: rows rebuilt from the expected covariance, and least-squares weights for the
+  two BIC searches.
+- `calm` with `missing="em"` is supported against the floor and the complete-data fit, as MissDAG's
+  EM around `calm` did not finish within the cost limit and no reference exists to compare it with.
+  It runs with `w_threshold=0.0`, the value of the paper and the authors' code, which keeps an edge
+  wherever its gate reaches 0.5; it meets the floor in every cell it claims, and its margin over the
+  empty graph is thin at about half of the values missing.
+- The [0.20.0 release card](https://andrey.abel.ai/docs/benchmarks/0.20.0.html#missing-data) has the
+  numbers of these four.
 
 ## Limits
 

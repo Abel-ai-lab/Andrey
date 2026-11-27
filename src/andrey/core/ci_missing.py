@@ -131,10 +131,22 @@ EM_METHODS = (
     "calm",
 )
 #: The methods in which ``missing="em"`` is supported: in the published comparison
-#: (benchmarks/comparisons/missing-data.md) none was less accurate than its reference
-#: implementation in a setting, on the first datasets and again on fresh ones. In the other
-#: :data:`EM_METHODS` it is experimental: no reference implementation exists for them.
-EM_SUPPORTED = ("ges", "hc", "tabu", "boss", "grasp", "notears")
+#: (benchmarks/comparisons/missing-data.md) none was less accurate than its reference in a setting,
+#: on the first datasets and again on fresh ones, and each was better than the empty graph where it
+#: decides a setting. ``calm``, whose reference did not finish within the benchmark's limit, was
+#: judged against the empty graph and its fit on the complete data.
+EM_SUPPORTED = (
+    "ges",
+    "xges",
+    "hc",
+    "tabu",
+    "exact_search",
+    "boss",
+    "grasp",
+    "notears",
+    "dagma",
+    "calm",
+)
 #: Missing-value PC (Tu et al. 2019), which only ``pc`` takes: test-wise deletion, then a corrected
 #: test of the edges a missingness indicator could have kept (:mod:`andrey.constraint.mvpc`).
 MVPC = "mvpc"

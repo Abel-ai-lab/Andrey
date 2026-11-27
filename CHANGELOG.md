@@ -16,6 +16,17 @@ names its pull request.
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
   `generate(Ensemble(scms=scms, seeds=range(10), n=500))`. ([#1221])
+- `calm`'s `w_threshold` defaults to 0.0, not 0.3: with no weight threshold, an edge is kept wherever
+  its gate reaches `gate_threshold`, as in the paper and the authors' code. A fit can keep more
+  edges than before, with `missing="em"` and on complete data. `w_threshold=0.3` gives the old
+  behavior. ([#1286])
+
+### Added
+
+- `missing="em"` is supported in `xges`, `exact_search`, `dagma`, and `calm`, so no method that takes
+  it is experimental. The first three were measured against the same search as the M-step of
+  MissDAG's EM, and `calm`, which has no such reference, against the empty graph and its fit on the
+  complete data; the 0.20.0 release card has the numbers. ([#1286])
 
 ### Changed
 
@@ -3042,4 +3053,5 @@ First alpha release.
 [#1257]: https://github.com/Abel-ai-lab/Andrey/pull/1257
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
+[#1286]: https://github.com/Abel-ai-lab/Andrey/pull/1286
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287

@@ -212,7 +212,7 @@ def calm(
     max_outer: int = 25,
     subproblem_iter: int = 3000,
     lr: float = 1e-2,
-    w_threshold: float = 0.3,
+    w_threshold: float = 0.0,
     gate_threshold: float = 0.5,
     standardize: bool = False,
     use_moral_graph: bool = True,
