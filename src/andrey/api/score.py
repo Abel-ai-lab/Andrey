@@ -798,11 +798,13 @@ def fges(
 
     **Limitations.** By default FGES makes no more errors than :func:`~andrey.ges`, and often
     fewer on denser graphs, in less time. Its time and memory still grow with the number of
-    variables much as GES's do, because the third pass scans every pair. With
-    ``one_edge_faithfulness=True`` it takes less time and holds less memory, and makes more errors
-    than GES: a pair whose variables show no link on their own is not added in the first phase, so
-    an edge whose effect shows only once other variables are in the graph can be missed, more so
-    with the standard BIC at a large ``penalty_discount``, as in [2]_, and on denser graphs. The
+    variables much as GES's do, because the third pass scans every pair, so very large graphs can
+    exceed practical time for this implementation. ``one_edge_faithfulness=True`` trades accuracy
+    for speed and memory: it takes less time and holds less memory on large sparse graphs, and
+    makes more errors than GES, because a pair whose variables show no link on their own is not
+    added in the first phase, so an edge whose effect shows only once other variables are in the
+    graph can be missed, more so with the standard BIC at a large ``penalty_discount``, as in
+    [2]_, and on denser graphs. The
     `0.20.0 release card <https://andrey.abel.ai/docs/benchmarks/0.20.0.html#fges>`__ has the
     measurements.
 
