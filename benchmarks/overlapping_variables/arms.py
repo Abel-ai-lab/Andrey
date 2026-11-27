@@ -73,7 +73,7 @@ def patch_fill(value: float) -> None:
     cm.TestwiseDeletion._query = _query
     cm.GaussianDeletion._settle = _settle
     _skeleton.kept_apart = lambda test, fixed, sides, size: (sides, 0)
-    cm.TestwiseDeletion.conditionable = lambda self, x, y, ordered: list(ordered)
+    cm.TestwiseDeletion.conditionable = lambda self, x, y, ordered, limit=None: list(ordered)
     cm.TestwiseDeletion.count_not_tested = lambda self, x, y, queries, held=None: None
 
     untested = cm.RowCounts.untested

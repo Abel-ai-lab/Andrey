@@ -732,14 +732,19 @@ class TestwiseDeletion:
             self._together = counts > 0
         return self._together
 
-    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+    def conditionable(
+        self, x: int, y: int, ordered: Iterable[int], limit: int | None = None
+    ) -> list[int]:
         """The conditions from ``ordered`` for a query of ``x`` and ``y``, selected in order: each
         joins if rows observing it, ``x``, ``y``, and earlier selections meet :meth:`least_rows` for
         another condition, keeping the full query testable and excluding columns never observed
-        together."""
+        together. With ``limit``, the scan stops once it has kept that many, so the result is the
+        first ``limit`` of the full selection."""
         rows = self._observed[:, x] & self._observed[:, y]
         kept: list[int] = []
         for column in ordered:
+            if limit is not None and len(kept) >= limit:
+                break
             joined = rows & self._observed[:, column]
             if np.count_nonzero(joined) >= self.least_rows(len(kept) + 1):
                 kept.append(column)

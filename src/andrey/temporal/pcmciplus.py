@@ -131,9 +131,11 @@ class Recorder:
         self.test = test
         self.largest: dict[tuple[int, int], tuple[float, float]] = {}
 
-    def conditionable(self, x: int, y: int, ordered: Iterable[int]) -> list[int]:
+    def conditionable(
+        self, x: int, y: int, ordered: Iterable[int], limit: int | None = None
+    ) -> list[int]:
         """:func:`~andrey.temporal.pcmci.conditionable` of ``test``."""
-        return conditionable(self.test, x, y, ordered)
+        return conditionable(self.test, x, y, ordered, limit)
 
     def count_not_tested(self, x: int, y: int, queries: int) -> None:
         """:func:`~andrey.temporal.pcmci.count_not_tested` of ``test``."""
