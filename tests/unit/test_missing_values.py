@@ -602,6 +602,40 @@ def test_a_chi_square_scan_that_raises_counts_the_queries_before_it(monkeypatch)
     assert got[0] is AssertionError
 
 
+def test_a_chi_square_scan_over_a_column_with_an_infinity_raises_as_separate_calls_do():
+    """The test reads a block with an infinity as ``ChiSquare`` reads one, and raises, so a scan
+    answers a candidate, a target, or a conditioning column over such a column as the separate
+    query does: a block that leaves the infinity's row out answers, and any other raises, after the
+    queries before it are counted. A scan over the other columns is the scan of any other data."""
+    x = _discrete_scan_data("cells", seed=9, d=8)
+    x[5, 2], x[40, 6] = np.inf, -np.inf
+    x[40, 3] = np.nan  # the row of the second infinity is left out of every block over column 3
+    raised = answered = 0
+    for target, xs, cond in _scans(8, np.random.default_rng(9), always=(2, 3, 4)):
+        apart = [c for c in range(8) if c not in (2, 6)]
+        kept = (target, [y for y in xs if y in apart], [c for c in cond if c in apart])
+        for scan_target, scan_xs, scan_cond in ((target, xs, cond), kept):
+            if scan_target not in apart and scan_xs is not xs:
+                continue
+            outcomes = []
+            for ask in ("scan", "alone"):
+                test = make_indep_test("chisq", x)
+                with rows_tested() as counter:
+                    try:
+                        if ask == "scan":
+                            out = _bits(test.pvalues_given(scan_target, scan_xs, scan_cond))
+                        else:
+                            out = _bits([test(scan_target, y, scan_cond) for y in scan_xs])
+                    except ValueError as error:
+                        out = (type(error), str(error))
+                outcomes.append((out, _counted(counter)))
+            assert outcomes[0] == outcomes[1]
+            raised += isinstance(outcomes[0][0], tuple)
+            answered += isinstance(outcomes[0][0], list)
+    assert raised
+    assert answered
+
+
 def test_a_chi_square_test_over_missing_values_checks_its_degrees_of_freedom_when_built():
     """A scan builds no test over values, which would raise for a rule that does not exist, so the
     wrapper raises the error of the test when it is built."""

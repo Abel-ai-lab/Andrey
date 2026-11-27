@@ -1348,6 +1348,7 @@ class ChiSquareDeletion(TestwiseDeletion):
         super().__init__(*args, **kwargs)
         _nonempty_rule(settings.get("degrees_of_freedom", "mean"))
         self._settings = dict(settings)
+        self._infinite = np.isinf(self._data).any(axis=0)
         self._coded: tuple[np.ndarray, np.ndarray] | None = None
 
     def _column_codes(self) -> tuple[np.ndarray, np.ndarray]:
@@ -1374,15 +1375,17 @@ class ChiSquareDeletion(TestwiseDeletion):
         Entry ``i`` equals ``self(target, xs[i], condition_set)`` bit for bit, and the running
         :func:`rows_tested` counter takes the rows, the pairs, and the queries not tested of those
         calls, in their order, as one call. A scan of fewer than two candidates, a scan over an
-        environment column, and a candidate whose block the test holds are answered as the
-        separate calls answer them. A query that raises does so after the queries before it are
-        counted, as separate calls do.
+        environment column, a candidate whose block the test holds, and a scan over a column that
+        holds an infinity, which a block over its rows raises on, are answered as the separate
+        calls answer them. A query that raises does so after the queries before it are counted, as
+        separate calls do.
         """
         target = int(target)
         candidates = [int(x) for x in xs]
         cond = sorted(set(map(int, condition_set)))
         out = np.empty(len(candidates), dtype=np.float64)
-        if len(candidates) < 2 or self._environments[[target, *cond]].any():
+        apart = self._environments | self._infinite  # the columns the separate query answers
+        if len(candidates) < 2 or apart[[target, *cond]].any():
             for i, x in enumerate(candidates):
                 out[i] = self(target, x, cond)
             return out
@@ -1412,7 +1415,7 @@ class ChiSquareDeletion(TestwiseDeletion):
         try:
             for i, x in enumerate(candidates):
                 a, b, _ = _canonical(target, x, cond)
-                if self._environments[x] or tuple(sorted((a, b, *cond))) in self._cache:
+                if apart[x] or tuple(sorted((a, b, *cond))) in self._cache:
                     count_asked()
                     out[i] = self(target, x, cond)
                     continue
