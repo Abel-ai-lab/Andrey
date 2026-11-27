@@ -78,6 +78,10 @@ names its pull request.
 - For contributors, a test lists every module-level cache and checks each cache whose result can
   change while its key does not, and registry-driven tests check that a wrong type of a parameter of
   column labels, of `knowledge`, of `targets`, and of `bootstrap` and `markov_check` raises. ([#1259])
+- The grow step of `iamb` and `inter_iamb`, and so of `calm` and `rsmax2` with `restrict="iamb"`,
+  reads the p-values of a scan as one array where the test answers a scan at once, so with
+  `fisherz`, `student_t`, or `normal_scores` on complete data these searches run faster on hundreds
+  of variables, with the same output bit for bit. ([#1289])
 - `pc`, `fci`, `cdnod`, `fci_jci`, `rsmax2`, and the other methods that run the PC family's skeleton
   search with `fisherz`, `student_t`, or `normal_scores` on complete data build the queries of the
   conditioning-size-1 pass from arrays, and the scans of conditioning sets of two or more variables
@@ -3043,3 +3047,4 @@ First alpha release.
 [#1259]: https://github.com/Abel-ai-lab/Andrey/pull/1259
 [#1267]: https://github.com/Abel-ai-lab/Andrey/pull/1267
 [#1287]: https://github.com/Abel-ai-lab/Andrey/pull/1287
+[#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
