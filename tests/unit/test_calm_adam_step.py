@@ -59,6 +59,41 @@ def test_adam_step_gives_the_bits_of_torch_adam(lr, steps, shape, rounds) -> Non
             assert _same_bits(optimizer.state[p]["exp_avg_sq"], exp_avg_sq)
 
 
+def test_adam_step_gives_the_bits_of_torch_adam_far_into_a_round() -> None:
+    """From step 36,314 of a round, the square root of ``1 - beta2**step`` rounds differently as
+    ``x ** 0.5`` and as ``math.sqrt(x)``; the optimizer takes ``x ** 0.5``, as the step does. Both
+    start from the same moments, the optimizer at step 36,300."""
+    lr, shape, first_step = 1e-2, (20, 20), 36_300
+    gen = torch.Generator().manual_seed(first_step)
+    start = [torch.randn(*shape, generator=gen, dtype=torch.double) for _ in range(2)]
+    first = [torch.randn(*shape, generator=gen, dtype=torch.double) for _ in range(2)]
+    second = [torch.rand(*shape, generator=gen, dtype=torch.double) + 0.1 for _ in range(2)]
+    reference = [p.clone().requires_grad_(True) for p in start]
+    inline = [p.clone().requires_grad_(True) for p in start]
+    optimizer = torch.optim.Adam(reference, lr=lr)
+    state = {
+        i: {
+            "step": torch.tensor(float(first_step)),
+            "exp_avg": first[i].clone(),
+            "exp_avg_sq": second[i].clone(),
+        }
+        for i in range(2)
+    }
+    optimizer.load_state_dict(
+        {"state": state, "param_groups": optimizer.state_dict()["param_groups"]}
+    )
+    moments = [(first[i].clone(), second[i].clone()) for i in range(2)]
+    for k in range(1, 201):
+        for p, q in zip(reference, inline, strict=True):
+            grad = torch.randn(*shape, generator=gen, dtype=torch.double)
+            p.grad, q.grad = grad.clone(), grad.clone()
+        optimizer.step()
+        with torch.no_grad():
+            calm_module._adam_step(tuple(inline), moments, first_step + k, lr)
+        for p, q in zip(reference, inline, strict=True):
+            assert _same_bits(p, q), f"parameters differ at step {first_step + k}"
+
+
 class _TorchAdamRound:
     """Stands in for ``_adam_step``: ``torch.optim.Adam``, built anew at each round's first step."""
 
