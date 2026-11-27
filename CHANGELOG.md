@@ -12,6 +12,9 @@ names its pull request.
 
 ### Breaking
 
+- Andrey needs scikit-learn 1.9 or later (it was 1.5), and the `torch` extra needs PyTorch 2.5 or
+  later (it was 2.2). An environment that pins an older version of either must upgrade it before it
+  installs this release. ([#1336])
 - `andrey.data.generate` and `andrey.data.Ensemble` are removed, as their warning said they would be
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
@@ -3202,3 +3205,4 @@ First alpha release.
 [#1327]: https://github.com/Abel-ai-lab/Andrey/pull/1327
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
+[#1336]: https://github.com/Abel-ai-lab/Andrey/pull/1336
