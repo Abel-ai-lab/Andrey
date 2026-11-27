@@ -98,6 +98,10 @@ names its pull request.
   together, so `exact_search`, `hc`, `tabu`, `ges`, `xges`, `lges`, `boss`, `grasp`, `boss_fci`,
   `grasp_fci`, `gfci`, `mmhc`, `rsmax2`, and `gies` run faster with either score, with the same
   scores and graphs bit for bit. ([#1284])
+- `pc`, `fci`, `cdnod`, and `fci_jci` with `fisherz` or `student_t` on data with missing values
+  build the conditioning-size-0 pass from arrays, and so does the search for the separating sets of
+  the pairs that knowledge makes non-adjacent, so they run faster on many variables, with the same
+  output bit for bit and the same counts of the queries not tested. ([#1296])
 
 ### Fixed
 
@@ -3061,3 +3065,4 @@ First alpha release.
 [#1289]: https://github.com/Abel-ai-lab/Andrey/pull/1289
 [#1290]: https://github.com/Abel-ai-lab/Andrey/pull/1290
 [#1293]: https://github.com/Abel-ai-lab/Andrey/pull/1293
+[#1296]: https://github.com/Abel-ai-lab/Andrey/pull/1296
