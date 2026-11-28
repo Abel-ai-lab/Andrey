@@ -2989,6 +2989,9 @@ def calm(
     If the edges that ``gate_threshold`` and ``w_threshold`` keep still form a cycle, edges are
     removed in order of increasing weight magnitude until none does.
 
+    The fit runs on one BLAS thread and one torch thread, so the machine's thread count does not
+    change its weights; its platform and its torch version still can.
+
     The defaults are a shorter schedule than the paper's [1]_, which starts ``rho`` at ``1e-5``,
     runs 40,000 steps per round at learning rate ``0.001``, and keeps every edge whose gate
     reaches ``0.5``. ``rho_init=1e-5, subproblem_iter=40000, lr=0.001, w_threshold=0.0`` with a
@@ -3104,7 +3107,9 @@ def calm(
         )
         return found, found.dag
 
-    with copies_named(labels):
+    # One torch thread and one BLAS thread: a threaded product rounds differently from a serial
+    # one, so the weights would depend on the machine's thread count.
+    with copies_named(labels), backend.one_torch_thread(), backend.one_blas_thread():
         result, em = fit_missing(
             X,
             missing,
