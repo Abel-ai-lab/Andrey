@@ -55,13 +55,13 @@ requested backend uses `auto`, without a warning.
   list of two or more targets over them with the `fisherz`, `student_t`, and `normal_scores` tests
   on complete data, with the same results for any number of workers, and with those tests and no
   target they send the search of every variable to them, as do MMHC and RSMAX2 for a restrict phase
-  that reads those sets, only when the data hold enough variables to repay them. `andrey.bootstrap` fits one
-  resample per worker, with the same result at any number. `1` (the default) and `0` run serially;
-  `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads unlimited and with
-  several limits each thread to one, so on a machine with several cores its p-values and statistics
-  can differ in the last digits between one worker and several. Each `pnl` thread holds three n x n
-  float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run, with a
-  `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
+  that reads those sets, only when the data hold enough variables to repay them. `andrey.bootstrap`
+  fits one resample per worker, with the same result at any number. `1` (the default) and `0` run
+  serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads unlimited and
+  with several limits each thread to one, so on a machine with several cores its p-values and
+  statistics can differ in the last digits between one worker and several. Each `pnl` thread holds
+  three n x n float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run,
+  with a `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
   and `skewd_mv` its conditional models and their searches; every search draws from its own random
   stream, so the results are the same bit for bit with any number of workers. Unlike `pnl`, both run
   on one BLAS thread with any number of workers, so their results do not depend on the BLAS thread
@@ -77,9 +77,9 @@ requested backend uses `auto`, without a warning.
   every size it tests. The default is `250000`, measured on an AMD EPYC server running Linux with 4
   and 8 workers; `0` always uses them.
 - `ANDREY_BLANKET_PARALLEL_MIN_WORK`: a full-graph fit of IAMB, Inter-IAMB, and MMPC, and the
-  restrict phase of MMHC and RSMAX2 that reads their sets, sends the search of every variable to
-  the workers only when the data hold at least this many target and candidate pairs, `d * (d - 1)`
-  for `d` variables. The default is `@DEFAULT@`, measured on an AMD EPYC 7713 server running Linux
+  restrict phase of MMHC and RSMAX2 that reads their sets, sends the search of every variable to the
+  workers only when the data hold at least this many target and candidate pairs, `d * (d - 1)` for
+  `d` variables. The default is `350000`, measured on an Intel Xeon Gold 6542Y server running Linux
   with 2, 4, and 8 workers; `0` always uses them. The pruning of spouses and the collider tests of
   the fit stay in the calling process.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses

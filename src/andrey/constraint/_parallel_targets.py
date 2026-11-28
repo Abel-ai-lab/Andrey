@@ -52,8 +52,13 @@ T = TypeVar("T")
 #: of the data, a full-graph fit of IAMB, Inter-IAMB, or MMPC needs to make its runs on the worker
 #: pool; a smaller fit makes them in the caller's process. ``ANDREY_BLANKET_PARALLEL_MIN_WORK``
 #: overrides it (0 sends every fit to the pool), and a fit with workers warns once on the default
-#: when it nears it; ``andrey calibrate --method blanket`` measures the value for a machine.
-MIN_POOL_BLANKET_WORK: int = 10_000
+#: when it nears it; ``andrey calibrate --method blanket`` measures the value for a machine. On an
+#: Intel Xeon Gold 6542Y server with 2, 4, and 8 workers, a fit on the first pool of its process,
+#: the start included, beat the serial fit of each learner from about 120,000 pairs (Inter-IAMB) to
+#: about 280,000 (MMPC on 2 workers), and at 359,400 pairs, 600 variables, every case took 0.26 to
+#: 0.84 of the serial time. The first pool of a process starts in about 1.4 s, a later one in about 0.05 s.
+#: The default stays above the crossovers.
+MIN_POOL_BLANKET_WORK: int = 350_000
 
 #: Chunks per worker: smaller chunks balance unequal target costs; workers keep searches across
 #: chunks, so only runs two workers both need are made twice.
