@@ -193,7 +193,8 @@ def direct_lingam(
     for uniform noise. ``"skew"`` takes ``rho * E[x^2 y - x y^2]`` after multiplying each variable
     by the sign of its skewness; it orients correctly when the noise is skewed, whatever the sign
     of the skewness, and says little when the noise is symmetric, where the skewness is near zero.
-    All three standardize the columns at each step, so none depends on their units.
+    All three center the columns once and standardize them at each step, so none depends on their
+    units.
 
     **Ties.** Two candidates that are interchangeable in the sample, such as two binary columns
     with the same number of ones, have equal scores up to rounding, which differs between CPUs.
@@ -217,7 +218,9 @@ def direct_lingam(
     **Limitations.** On linear data with uniform noise it made fewer errors than the empty graph on
     graphs of hundreds of variables at every density, while :func:`~andrey.ica_lingam` made more
     errors than the empty graph beyond small graphs. Its time grows quickly with the number of
-    variables, as it compares them in pairs, so large fits are slow. The
+    variables, as it compares them in pairs, so large fits are slow. On exactly symmetric columns,
+    such as balanced binary ones, the skewness is zero up to rounding and ``"skew"`` takes its sign
+    from the rounding, so its order can change with the order of the rows. The
     `0.10.0 release card <https://andrey.abel.ai/docs/benchmarks/0.10.0.html#the-boundary>`__ has
     every size.
 

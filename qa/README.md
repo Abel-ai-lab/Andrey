@@ -8,7 +8,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 |---|---|
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
 | `reference_parity.py` | Flag a published row where Andrey makes more errors than the reference package. |
-| `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
+| `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`; a recapture that changes a recorded value needs the `test-change-approved` label. |
 | `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
 | `profiler.py` | Time one method's fit and show where it spends its time. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
@@ -67,6 +67,49 @@ rounding:
 
 Method names select methods, as in `uv run python -m qa.identity PC GES --workers 4`, and `--seeds`
 sets the draws per dataset.
+
+A compare names the fit that differs, not where inside it the two builds parted. `--checkpoints`
+(with `-o`) records, for each draw's first fit, one worker and no column order, a digest of the
+algorithm's state at each of its stages, and the compare names the first stage and piece where the
+builds part. The stages are the skeleton search of PC, FCI, FCI-JCI, CD-NOD, GFCI, BOSS-FCI,
+GRaSP-FCI, and RSMAX2 by conditioning size, then its collider, Meek, conflict, possible-d-sep, and
+rule rounds; each applied move of GES, AGES, XGES, GIES, GnIES, HC, and Tabu, and of the greedy step
+of MMHC and RSMAX2; each target's grown and shrunk set of IAMB, Inter-IAMB, and MMPC; each round of
+structural EM; and each solve, dual step, path step, or outer round of NOTEARS, DYNOTEARS, DAGMA,
+and CALM. GES, XGES, GIES, structural EM, CALM, NOTEARS, DAGMA, and DYNOTEARS end with a stage that
+holds the total, the likelihoods, or the thresholded weights and objective they return. The other
+methods keep the whole-output hash alone. Each stage passes the state to the private sink
+`andrey.core._checkpoint.TAKE`, which is unset outside the harness: a stage then costs one read of a
+context variable and builds nothing, so the manifest of a run without the mode has the same rows as
+before. The harness exits with an error when the imported Andrey has no such sink, so a run against
+an older build fails instead of recording nothing.
+
+A row of a manifest with checkpoints has two more fields, `checkpoints`, the digest of the fit's
+stages in order, and `checkpoint_records`, their number. The pieces' bytes go to
+`<manifest>.checkpoints.npz`, next to the manifest, which the header names. With the stages of both
+manifests, `--compare` walks each differing fit's stages in order and prints the first one that
+differs, after the lines above: the stage, its level (the conditioning size of a skeleton search or
+the round of structural EM), the piece, the first element whose bytes differ read by the piece's
+form (a pair, a matrix entry, a position), the two values, and both lengths. `bits` marks a float
+piece whose elements agree to rounding. A fit's later stages follow from its first difference, so
+they are not reported, and fixing the first can show another behind it. The report groups the rows
+by fingerprint (method, stage, level, piece, kind, first differing element, both lengths), the
+rows that part alike, and then by stage across methods and datasets, so one bug in the skeleton
+search that PC, FCI, CD-NOD, GFCI, and RSMAX2 share reads as one line. A fit whose stages are all
+equal and whose output differs parts after its last stage, and the report names the parts of the
+output that differ (the graph, its edges, the weights, a metadata key): the steps a method takes
+after its last stage, such as the conversion of a DAG to its CPDAG, are not stages of their own. A
+fit whose output is equal and whose checkpoints differ is listed as information: the contract is
+the output. The exit status
+stays the one the output hashes and counts decide. A match of every checkpoint is necessary, not
+sufficient: the corpus is public and fixed, so a change that special-cases its draws matches every
+stage, and review stays the check.
+
+Two more fits, `GES-em` and `NOTEARS-em`, cover structural EM, `missing="em"` with a search over
+graphs and one over weights, on draws of `linear_gauss_er_d10` with 30% of the values removed
+completely at random. A column order moves the removed values, so they are not refitted under
+`--shuffle`. Record both manifests of a compare with one version of `qa/identity.py`: the older
+one has no rows for them, and the compare lists each as in one manifest only.
 
 Two options the gate's datasets cannot reach have fits of their own, named for the method and the
 option, on data where each changes the answer. `possibly_separable="ambiguous"` runs PC, FCI,
@@ -390,7 +433,10 @@ median SHD over the draws is:
 
 `quality_baselines.json` holds the baselines, and in its `tolerances` block every tolerance with the
 reason for its size. A median better than the baseline by more than the tolerance also fails, so an
-intended change is recorded by a recapture. Every fit runs on the numpy backend with one worker and
+intended change is recorded by a recapture. A pull request whose recapture changes a recorded value
+or a tolerance is flagged by the check of changes to tests until a maintainer sets the label
+`test-change-approved` (`DEVELOPMENT.md`, AI tools); a baseline for a new method is not flagged.
+Every fit runs on the numpy backend with one worker and
 one BLAS thread, so the host's accelerators and core count do not enter the result; the tolerances
 absorb rounding differences between CPUs. On every pull request,
 `tests/recovery/test_quality_gate.py` feeds each method the empty graph and a column-shifted true

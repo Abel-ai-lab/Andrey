@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from andrey.core import GraphStructure, _bitset, backend
+from andrey.core import GraphStructure, _bitset, _checkpoint, backend
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import cpdag_of_pdag, pdag2dag, to_structure
 from andrey.core.score import Score, make_score
@@ -190,6 +190,8 @@ def ges(
             sources=sources,
         )
         total = recompute_objective(adj, score, n)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("ges.total", total=total)
     if constraints is not None:
         adj = mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total

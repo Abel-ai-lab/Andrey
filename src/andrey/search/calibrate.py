@@ -4,9 +4,10 @@ A GES pass uses the pool when estimated candidate evaluations exceed
 ``ANDREY_GES_PARALLEL_MIN_WORK``, a conditioning-size pass of the PC, FCI, GFCI, and CD-NOD
 skeleton search when its tests reach ``ANDREY_SKELETON_PARALLEL_MIN_WORK``, or, with RCoT, when its
 tests times the rows reach ``ANDREY_RCOT_PARALLEL_MIN_WORK``, and a possible-d-separation search of
-FCI, FCI-JCI, and GFCI when its subsets reach ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK``. The
-crossover depends on the machine, worker count, and numerical libraries. Fits never calibrate
-automatically.
+FCI, FCI-JCI, and GFCI when its subsets reach ``ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK``, and a
+full-graph fit of IAMB, Inter-IAMB, or MMPC when its target and candidate pairs reach
+``ANDREY_BLANKET_PARALLEL_MIN_WORK``. The crossover depends on the machine, worker count, and
+numerical libraries. Fits never calibrate automatically.
 
 GES is timed on whole fits of sparse linear-Gaussian data over ``d`` variables: serial against every
 pass pooled, pool start included. The skeleton search is timed on one pass over ``d`` variables, at
@@ -15,11 +16,14 @@ pass on a started pool, with the pool start included; the cutoff is the largest 
 RCoT's skeleton search is timed the same way on one pass at conditioning size 2 over ``d`` variables
 of :data:`RCOT_ROWS` rows (:func:`rcot_pass`). The possible-d-separation search is timed on one
 search over the ``d - 2`` candidates of ``d`` variables, which tests every subset
-(:func:`dsep_test`), in this process against a started pool, with the pool start included.
-:func:`bracket` finds sizes around the crossover, extending beyond the probe grid when needed. Each
-size's work is the largest estimated work of a pass in its pooled run, as the gate counts it: a
-cutoff below it sends that pass, and every pass after it, to the pool. The process's first pool
-start occurs before timing, so the value suits many fits in one process (:data:`NOTE`).
+(:func:`dsep_test`), in this process against a started pool, with the pool start included. The
+full-graph fits of IAMB, Inter-IAMB, and MMPC are timed as whole fits over ``d`` variables
+(:func:`blanket_timers`), serial against every run on a pool, one fit for each learner, and the
+cutoff is the largest of the learners'. :func:`bracket` finds sizes around the crossover,
+extending beyond the probe grid when needed. Each size's work is the largest estimated work of a
+pass in its pooled run, as the gate counts it: a cutoff below it sends that pass, and every pass
+after it, to the pool. The process's first pool start occurs before timing, so the value suits many
+fits in one process (:data:`NOTE`).
 """
 
 from __future__ import annotations
@@ -99,6 +103,14 @@ METHODS = {
         timers=lambda workers: [dsep_timers(workers)],
         # 12 to 20 candidates, 4,095 to 1,048,575 subsets; the largest takes about 5 s serially.
         sizes=((14, 16, 18, 20, 22), 6, 22),
+    ),
+    "blanket": Method(
+        "ANDREY_BLANKET_PARALLEL_MIN_WORK",
+        "The full-graph search of IAMB, Inter-IAMB, and MMPC",
+        at_cutoff=True,
+        default=_constant("andrey.constraint._parallel_targets", "MIN_POOL_BLANKET_WORK"),
+        timers=lambda workers: [blanket_timers(m, s, workers) for m, s in BLANKET_FITS],
+        sizes=((50, 100, 200, 400), 10, 800),
     ),
 }
 NOTE = (
@@ -536,6 +548,35 @@ def dsep_timers(workers: int) -> Timers:
         return _time(search, _REPEATS)
 
     return serial, pooled, lambda d: 2 ** (d - 2) - 1
+
+
+# The learners a full-graph fit is timed for, each with the structure that adds no step after the
+# runs (the moral graph, or MMPC's skeleton), so a timing measures the runs.
+BLANKET_FITS = (("iamb", "moral"), ("inter_iamb", "moral"), ("mmpc", "skeleton"))
+# The rows of the blanket probe's data: a run reads the correlation matrix, not the rows.
+BLANKET_ROWS = 1000
+
+
+def blanket_timers(method: str, structure: str, workers: int) -> Timers:
+    """Serial and pooled timing functions for a whole full-graph fit of ``method`` with
+    ``structure`` on :func:`sample` data of :data:`BLANKET_ROWS` rows.
+
+    The serial arm fits in this process; the pooled arm runs ``workers`` processes with the cutoff
+    set to 0, so every variable's run goes to the pool and the time includes starting and closing
+    it. Times are as in :func:`fit_timers`. The third function gives the fit's work, ``d * (d - 1)``
+    target and candidate pairs, as the gate counts it.
+    """
+    import andrey
+
+    fit = getattr(andrey, method)
+    var = METHODS["blanket"].variable
+
+    def run(d: int, n_workers: int, cutoff: str | None) -> float:
+        x = sample(d, rows=BLANKET_ROWS)
+        with _cutoff(var, cutoff), andrey.config(n_jobs=n_workers):
+            return _time(lambda: fit(x, structure=structure), _REPEATS)
+
+    return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0")), lambda d: d * (d - 1)
 
 
 def calibrate(workers: int, methods: Sequence[str] = tuple(METHODS)) -> dict[str, Crossover]:

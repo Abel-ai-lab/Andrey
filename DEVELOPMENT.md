@@ -214,7 +214,12 @@ selection rules) and, for the greedy score-based searches, use the shared worker
 `src/andrey/search/_parallel.py`. Keep the recovery tests passing and the outputs equal across
 Andrey's execution paths, and measure the speedup with a benchmark campaign. `qa/identity.py`
 shows the change returns the same bits and makes no more queries: write its manifest on the base
-commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)).
+commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)). Tests a
+speed change computes ahead and discards do not count: the count is the algorithm's. When the
+compare names a fit that differs, record both manifests again with `--checkpoints`: the compare then
+names the first stage and piece where the two builds part. A stage of a search is one guarded call
+of the private sink `andrey.core._checkpoint.TAKE` in the function every route of the stage passes
+through, and a change that moves a stage boundary moves its call with it.
 
 ### Change a parameter or default
 
@@ -332,7 +337,8 @@ uv run python -m qa.capture_baselines --algorithms <NAME>
 ```
 
 `tests/recovery/test_regression_baselines.py` then fails whenever the output changes: a change to
-review, not necessarily a wrong one; recapture when it is intended.
+review, not necessarily a wrong one; recapture when it is intended. A pull request that recaptures
+a baseline needs the label `test-change-approved` ([AI tools](#ai-tools)).
 [`tests/recovery/README.md`](tests/recovery/README.md) describes the format and tolerances.
 
 ### 3. Device parity
@@ -422,10 +428,23 @@ fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`
 request runs the quality gate (`qa/README.md`), also required, once for the whole release.
 
 Pull-request CI (`.github/workflows/ci.yml`, [Testing](docs/docs/ci.md)) runs lint, types, the
-unit tests, the cheap recovery checks, and the fast consistency tests; on a pull request into a
+check of changes to tests ([AI tools](#ai-tools)), the unit tests, the cheap recovery checks, and
+the fast consistency tests; on a pull request into a
 release or topic branch it deselects the heavy accuracy checks with `-m "not release"`. The release
 pull request into `main` runs every test, the `release`-marked ones included, and so do CI's other
 triggers: a push to `main`, a manual run, and the tag's site deploy.
+
+At each release's freeze the test suite also runs, outside CI, on the oldest versions
+`pyproject.toml` allows: Python 3.11 with every direct dependency at its declared floor. It must
+pass; a failure raises that floor to the oldest version that passes. The pytest tools install
+apart, since `--resolution lowest-direct` would give them their oldest releases too:
+
+```shell
+uv venv --python 3.11 .venv-lowest
+uv pip install -p .venv-lowest --resolution lowest-direct -e ".[torch,viz]"
+uv pip install -p .venv-lowest pytest pytest-xdist
+.venv-lowest/bin/python -m pytest -m "not release" -n auto --dist loadfile
+```
 
 At each release's freeze the benchmark harness's own tests run too, outside CI: CI runs only the two
 endpoint-conversion files of `benchmarks/tests`, and the rest, which need the harness environments,
@@ -450,11 +469,12 @@ Every pull request has exactly one type label, which also gives its section in t
 
 Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
 Breaking. A third, `release`, marks a release's pull request and the issue that tracks its
-checklist; the release notes leave the release pull request out. Every pull request also has a
-milestone, the release it ships in. A maintainer sets the labels and the milestone when the pull
-request is opened or reviewed, and a `feature` or `bug` pull request adds a bullet under
-`## [Unreleased]` in `CHANGELOG.md` that ends with a link to it, `([#<number>])`, defined at the
-end of the file.
+checklist; the release notes leave the release pull request out. A fourth, `test-change-approved`,
+records a maintainer's approval of the pull request's changes to tests ([AI tools](#ai-tools)); it
+is not a type label. Every pull request also has a milestone, the release it ships in. A maintainer
+sets the labels and the milestone when the pull request is opened or reviewed, and a `feature` or
+`bug` pull request adds a bullet under `## [Unreleased]` in `CHANGELOG.md` that ends with a link to
+it, `([#<number>])`, defined at the end of the file.
 
 `CHANGELOG.md` is the record of each release. Before the release pull request merges, the
 maintainer (or an agent) lists the milestone's pull requests with
@@ -495,14 +515,49 @@ contributors:
 - **Numbers and references are never generated.** A benchmark number comes from a recorded run, and
   a reference is cited only after it has been opened and found to support the claim; the author
   answers for it.
+- **A change that skips, loosens, or removes a test needs a maintainer's approval.** A test or a
+  baseline is never changed to make a check pass. The `check-test-changes` job of a pull request
+  into a release or topic branch runs `scripts/check_test_changes.py`, which compares the base and
+  the head of `tests/` and `qa/` by their syntax trees, function by function, and flags a removed
+  `assert`, `assert_*` call, or `pytest.raises`; a `pytest.raises` widened to `Exception` or
+  `BaseException`; a looser tolerance or bound (a larger `rtol`, `atol`, `abs`, or `rel`, a smaller
+  `decimal` or `places`, a looser number in a comparison, an exact comparison turned into
+  `pytest.approx`); a `skip`, `skipif`, `xfail`, or `release` marker or call added to a test that
+  existed; a `skipif` or `xfail` condition made always true (a string condition made `True`
+  included); an `xfail` that gains `run=False`; a deleted test, a test file renamed out of the names
+  pytest collects, or a removed `parametrize` case; a test that stops running without a marker (a
+  `conftest.py` that sets `collect_ignore` or `collect_ignore_glob`, a `__test__ = False`, a
+  `test_*` function that becomes a fixture, a `parametrize` with no case added, a new
+  `setup_module`, `setup_class`, `setup_method`, or `setup_function` that skips); a warning filter
+  that lets a warning pass; a new or changed `pytest_*` hook; a function of `qa/` that is deleted or
+  emptied; and a re-recorded baseline file. It prints each flagged change with its reason and fails
+  until the pull request carries the label `test-change-approved`, which a maintainer sets after
+  reading the flags; the job reads the label when it runs, so re-run it after the label is set. The
+  label approves the head it was set after: a push withdraws it, and a maintainer removes it and
+  sets it again after reading the new flags. The job runs the copy of the script that the base
+  branch has, not the pull request's, and a change to the script or to the workflow job that runs it
+  is flagged too, so a pull request cannot loosen the check it is judged by. The job is a required
+  status check, and `.github/` and the script have code owners (`.github/CODEOWNERS`); a workflow
+  change elsewhere that stops the job from running is for the code owner asked to read it. A change
+  to the pytest options of `pyproject.toml` that choose the tests or judge them (`addopts`,
+  `testpaths`, `filterwarnings`, and the like) is flagged too. An added test, a tightened tolerance,
+  and a test that only moved or was renamed are not flagged, and the release pull request into
+  `main` is not read, since each of its changes passed the check in its own pull request. A person's
+  approval is what the label records, so an agent never sets it. Run `uv run python
+  scripts/check_test_changes.py --base origin/release/<x.y.z>` before opening the pull request to
+  see the flags. A pass is necessary and not sufficient: the check cannot see an assertion rewritten
+  to a weaker one, a tolerance passed through a variable, a check that moved into a helper, a call
+  of a function of `qa/` that was removed, a nested function of `qa/` that was deleted, or an
+  existing test pointed at a new baseline file, so review still reads every change to a test.
 - **Blog posts and release cards end with an AI statement.** It says how AI tools were used to
   write the page, as a conference asks of a paper's authors. The author sets `ai` (`none`,
   `edited`, or `drafted`) and `ai_tools` in the front matter, and the site writes the sentence
   ([The blog](docs/DEVELOPMENT.md#the-blog)). Every post and every release card has one.
 
 Not acceptable: a change nobody reviewed, a number or a reference an AI tool made up, a test or a
-gate weakened so that a change passes, and a post or a card whose statement is missing or untrue. A
-maintainer may close a pull request that shows one of these without a full review.
+gate skipped, loosened, or removed so that a change passes, and a post or a card whose statement is
+missing or untrue. A maintainer may close a pull request that shows one of these without a full
+review.
 
 These rules follow published ones. The
 [LLVM AI tool policy](https://llvm.org/docs/AIToolPolicy.html) and the

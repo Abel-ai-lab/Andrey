@@ -51,13 +51,14 @@ from andrey.constraint._skeleton import (
     MaskedMapping,
     _runs,
     adjacent_pairs,
+    canonical_capable,
     flagged_triples,
     kept_apart,
     scan_conditioning_sets,
     subset_rows,
 )
-from andrey.core import ARROW, NULL, TAIL, backend
-from andrey.core.ci import CITest, make_indep_test, pins_blas
+from andrey.core import ARROW, NULL, TAIL, _checkpoint, backend
+from andrey.core.ci import CITest, PartialCorrelationTest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
     RowCounts,
@@ -284,6 +285,8 @@ def markov_blanket(
         blanket.extend(sorted(stay, key=lambda x: ranks[x]))
         if interleaved and stay:
             _shrink(test, target, alpha, blanket, required, sepsets)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.grow", target=target, members=blanket)
     if not interleaved:
         _shrink(test, target, alpha, blanket, required, sepsets)
     if sepsets is not None:
@@ -295,6 +298,8 @@ def markov_blanket(
         blanket = [x for x in blanket if support[x]]
     if undecided:
         _count_beside_undecided(test, target, blanket, required, max_depth, undecided)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.shrink", target=target, members=blanket, sepsets=sepsets)
     return blanket
 
 
@@ -328,17 +333,40 @@ def _shrink(
 ) -> list[int]:
     """Drop, in place and in joining order, each member independent of ``target`` given the rest;
     the members in ``keep`` are not tested. With ``sepsets``, a dropped member's entry is set to the
-    rest. Returns the members dropped."""
+    rest. Returns the members dropped.
+
+    A test that answers stacked queries (:func:`~andrey.constraint._skeleton.canonical_capable`)
+    asks every member not yet visited in one call, which returns the p-values up to the first member
+    found independent (``pvalues_until_separated``). That member is dropped and the members after it
+    are asked again given the smaller blanket, so the tests used are those of one query at a time.
+    """
     dropped = []
-    for x in list(blanket):
-        if x in keep:
-            continue
+    pending = [x for x in blanket if x not in keep]
+    stack = test if isinstance(test, PartialCorrelationTest) and canonical_capable(test) else None
+    while pending:
+        if stack is not None and len(pending) > 1:
+            pvalues = stack.pvalues_until_separated(
+                np.full(len(pending), target, dtype=np.intp),
+                np.array(pending, dtype=np.intp),
+                np.array([[z for z in blanket if z != x] for x in pending], dtype=np.intp),
+                alpha,
+            )
+            if not pvalues[-1] > alpha:
+                break
+            first = len(pvalues) - 1
+        else:
+            rest = [z for z in blanket if z != pending[0]]
+            if not test(target, pending[0], rest) > alpha:
+                pending = pending[1:]
+                continue
+            first = 0
+        x = pending[first]
         rest = [z for z in blanket if z != x]
-        if test(target, x, rest) > alpha:
-            blanket.remove(x)
-            dropped.append(x)
-            if sepsets is not None:
-                sepsets[x] = tuple(sorted(rest))
+        blanket.remove(x)
+        dropped.append(x)
+        if sepsets is not None:
+            sepsets[x] = tuple(sorted(rest))
+        pending = pending[first + 1 :]
     return dropped
 
 
@@ -584,6 +612,8 @@ def parents_children(
         del open_[best]
         admit(best, open_)
         weakest = open_
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.grow", target=target, members=members)
     for x in list(members):
         if x in required:
             continue
@@ -599,6 +629,8 @@ def parents_children(
                 break
     if undecided:
         _count_beside_undecided(test, target, members, required, max_depth, undecided)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.shrink", target=target, members=members, sepsets=sepsets)
     return members
 
 
@@ -1119,9 +1151,15 @@ class LocalSearch:
 
     def structure(self, method: str, structure: str) -> np.ndarray:
         """Every variable's set by the learner ``method`` joined into the graph ``structure``
-        names, as an endpoint-mark matrix (:func:`local_structure`)."""
+        names, as an endpoint-mark matrix (:func:`local_structure`).
+
+        With more than one worker, a large enough fit makes the variables' runs on the worker
+        processes (:func:`~andrey.constraint._parallel_targets.pooled_runs`), and the sets and bits
+        are the ones a single process gives.
+        """
         learner = LEARNERS[method]
         name = method if learner.pc is None else learner.pc
+        self._make_runs(name)
         sets = self._sets(lambda i: self.run(name, i)[0])
         if learner.kind == "pc":
             skeleton, blankets = sets & sets.T, reach(sets)
@@ -1138,11 +1176,24 @@ class LocalSearch:
             mb = self._sets(lambda i: self.local(method, i)[1] or [])
             blankets = mb & mb.T
             skeleton = blankets if structure == "moral" else sets & sets.T
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("blanket.structure", sets=sets, skeleton=skeleton)
         if structure != "cpdag":
             return np.where(skeleton, TAIL, NULL).astype(np.int8)
         return blanket_cpdag(
             self.test, skeleton, blankets, self.alpha, self.max_depth, self.constraints
         )
+
+    def _make_runs(self, method: str) -> None:
+        """Make every run of ``method`` the search has not made, on the worker pool when the fit
+        is large enough (:func:`~andrey.constraint._parallel_targets.pooled_runs`); otherwise
+        :meth:`run` makes each when it is read."""
+        from andrey.constraint._parallel_targets import pooled_runs
+
+        targets = [t for t in range(self.d) if (method, t) not in self._runs]
+        runs = pooled_runs(self, method, targets)
+        if runs is not None:
+            self._runs.update(zip(((method, t) for t in targets), runs, strict=True))
 
     def _sets(self, members: Callable[[int], list[int]]) -> np.ndarray:
         """``[i, j]`` when ``j`` is in ``members(i)``, a boolean ``(d, d)`` matrix."""

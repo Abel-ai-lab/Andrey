@@ -18,7 +18,7 @@ from collections.abc import Iterator, Sequence
 
 import numpy as np
 
-from andrey.core import GraphStructure, backend
+from andrey.core import GraphStructure, _checkpoint, backend
 from andrey.core.orient import meek, pdag2dag, to_structure
 from andrey.core.score import BICScore
 from andrey.core.score_delta import DeltaBICScore, _InvCache, remove_ratio
@@ -47,6 +47,8 @@ def _forward(
         graphs.append(ops.insert_cpdag(graphs[-1].copy(), x, y, T))
         totals.append(recompute_objective(graphs[-1], score, n))
         limits.append(score.penalty_discount + (totals[-2] - totals[-1]) / score.log_n)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("ages.forward", move=(x, y, T), cpdag=graphs[-1], limit=limits[-1])
     return graphs, totals, limits
 
 
@@ -138,7 +140,10 @@ def _backward(
         x, y, H = best
         adj = ops.delete_cpdag(adj.copy(), x, y, H)
         after = recompute_objective(adj, score, n)
-        yield adj, score.penalty_discount + (after - total) / score.log_n
+        limit = score.penalty_discount + (after - total) / score.log_n
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("ages.backward", move=(x, y, H), cpdag=adj, limit=limit)
+        yield adj, limit
         total = after
 
 

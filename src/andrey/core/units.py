@@ -12,6 +12,11 @@ units is divided by the column's factor.
 from __future__ import annotations
 
 import numpy as np
+from scipy.linalg import lstsq
+
+#: ``LinearRegression``'s default ``tol``, which it passes to ``scipy.linalg.lstsq`` as ``cond``
+#: (scikit-learn 1.9 and later) so that singular values below it, relative to the largest, drop.
+_RANK_CUTOFF = 1e-6
 
 
 def unit_factors(x: np.ndarray, *, standardize: bool = False) -> np.ndarray:
@@ -42,9 +47,50 @@ def least_squares(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     from the others'. The fit runs on the unit-scale predictors (:func:`unit_factors`) and the
     coefficients are mapped back. A ``y`` with several columns gives one row of ``coef`` and one
     ``intercept`` per column. The fitted values are ``x @ coef.T + intercept``.
-    """
-    from sklearn.linear_model import LinearRegression
 
+    A finite float64 design with at least one row and one column, and a ``y`` of one or two
+    dimensions with the same rows, is solved with the steps of ``LinearRegression.fit``: centering
+    by the means, ``scipy.linalg.lstsq`` with ``cond`` set to its ``tol``, and
+    ``intercept = y_offset - x_offset @ coef``, which gives its bits without its input checks.
+    Any other input goes through ``LinearRegression``, so its errors stay.
+    """
     factors = unit_factors(x)
-    fit = LinearRegression().fit(x * factors, y)
-    return fit.coef_ * factors, np.asarray(fit.intercept_)
+    scaled = x * factors
+    target = _float_target(scaled, y)
+    if target is None:
+        from sklearn.linear_model import LinearRegression
+
+        fit = LinearRegression().fit(scaled, y)
+        return fit.coef_ * factors, np.asarray(fit.intercept_)
+    x_offset = np.average(scaled, axis=0)
+    y_offset = np.average(target, axis=0)
+    coef = lstsq(scaled - x_offset, target - y_offset, cond=_RANK_CUTOFF)[0].T
+    if target.ndim == 1:
+        return coef * factors, np.asarray(y_offset - x_offset @ coef)
+    return coef * factors, np.asarray(y_offset - x_offset @ coef.T)
+
+
+def _float_target(scaled: np.ndarray, y: np.ndarray) -> np.ndarray | None:
+    """``y`` as float64 when :func:`least_squares` solves the pair directly, else ``None``.
+
+    That is a finite float64 ``scaled`` and a ``y`` of real numbers whose float64 values are finite,
+    both plain arrays, with ``scaled`` of at least one row and one column and ``y`` of one or two
+    dimensions, at least one column when two, and the rows of ``scaled``.
+    """
+    if not (
+        type(scaled) is np.ndarray
+        and scaled.dtype == np.float64
+        and scaled.ndim == 2
+        and scaled.shape[0] >= 1
+        and scaled.shape[1] >= 1
+        and type(y) is np.ndarray
+        and y.dtype.kind in "fiu"
+        and y.ndim in (1, 2)
+        and y.shape[0] == scaled.shape[0]
+        and y.size > 0
+    ):
+        return None
+    target = np.array(y, dtype=np.float64)
+    if not (np.isfinite(scaled).all() and np.isfinite(target).all()):
+        return None
+    return target
