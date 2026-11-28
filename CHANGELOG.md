@@ -267,6 +267,15 @@ names its pull request.
   `ANDREY_BLANKET_PARALLEL_MIN_WORK` target and candidate pairs, `d * (d - 1)` for `d` variables;
   `andrey calibrate --method blanket` measures the value for a machine, and a fit with more than
   one worker warns once when it nears the default. ([#1371])
+- `calm`, `anm`, `loci`, and `pnl`, and the separating sets, collider votes, and orientation rules
+  of `gfci`, `boss_fci`, and `grasp_fci`, run on one BLAS thread, and on one torch thread where
+  torch computes, in `calm` and under `backend="cpu"`, so each returns the result it gives on one
+  thread whatever the machine's thread count, and `pnl` returns the same bits with one worker and
+  with several. KCI from 2,000 rows keeps every thread in the GFCI family, as it does in `pc`. On a
+  machine with several BLAS threads their results can change in the last digits, and `calm` can
+  return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
+  there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
+  free cores. ([#1369])
 
 ### Fixed
 
@@ -3291,5 +3300,6 @@ First alpha release.
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
+[#1369]: https://github.com/Abel-ai-lab/Andrey/pull/1369
 [#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371

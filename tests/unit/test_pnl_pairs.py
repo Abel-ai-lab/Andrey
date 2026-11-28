@@ -98,8 +98,7 @@ def test_worker_threads_are_capped_by_a_byte_budget(monkeypatch):
             with pytest.warns(andrey.PerformanceWarning, match=f"runs {threads} of the 4 worker"):
                 capped = _pnl.pnl_pairs(X, n_jobs=4)
             assert len(runs) == threads
-            if threads > 1:  # every task's result is the same on any number of limited threads
-                assert np.array_equal(capped, full)
+            assert np.array_equal(capped, full)  # every task's result is the same on any threads
         # `pnl` fits two directions, so 64 workers ask for two threads, which this budget holds.
         monkeypatch.setattr(_pnl, "_THREAD_BYTES", 2 * per_thread)
         runs.clear()
