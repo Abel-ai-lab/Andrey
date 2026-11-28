@@ -33,10 +33,19 @@ metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near
 bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
 only by rounding is reported as information.
 
+``--checkpoints`` (with ``-o``) also records, for each draw's first fit, a digest of the
+algorithm's state at its stages (:class:`Checkpoints`), the stages the package passes to its
+private sink, ``andrey.core._checkpoint.TAKE``, which :func:`checkpointing` sets for the fit. The
+manifest row gains two fields, the pieces' bytes go to a sidecar file next to the manifest, and
+``--compare`` of two such manifests names, for each fit that differs, the first stage and piece
+where the builds part, and groups the differences by fingerprint (:func:`report_checkpoints`). The
+exit status is the one the output hashes and counts decide.
+
     uv run python -m qa.identity -o before.json             # fit the corpus, write a manifest
     uv run python -m qa.identity --compare before.json after.json  # exit 1 on any difference
     uv run python -m qa.identity --shuffle 3                # exit 1 if an order changes a graph
     uv run python -m qa.identity GES GFCI --workers 4       # exit 1 if 4 workers change one
+    uv run python -m qa.identity PC -o a.json --checkpoints # a manifest and its sidecar
 """
 
 from __future__ import annotations
@@ -45,6 +54,7 @@ import argparse
 import dataclasses
 import functools
 import hashlib
+import importlib
 import json
 import math
 import os
@@ -52,12 +62,14 @@ import platform
 import struct
 import subprocess
 import sys
-from collections import defaultdict
+import zipfile
+import zlib
+from collections import Counter, defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 import scipy
@@ -67,6 +79,7 @@ from threadpoolctl import threadpool_limits
 import andrey
 from andrey import GraphStructure, StructureOutput, TemporalStructure, data
 from andrey.core import ci, ci_cmiknn, ci_gpdc, ci_kernel, ci_missing, score, score_delta
+from andrey.data import missingness
 from andrey.search import hc, xges
 from qa import quality_gate as qg
 
@@ -509,12 +522,40 @@ def _nonempty_fits() -> dict[str, OptionFit]:
 OPTIONS: dict[str, OptionFit] = {**_ambiguous_fits(), **_nonempty_fits()}
 FITS |= {name: option.fit for name, option in OPTIONS.items()}
 
-#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
-#: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, the possible-d-sep searches of
-#: FCI, FCI-JCI, and GFCI, the full-graph searches of IAMB, Inter-IAMB, and MMPC, which MMHC and
-#: RSMAX2's restrict phase run, and the starts of Regime-PCMCI in worker processes, PNL's two
-#: directions on threads, and the lists of targets of :data:`TARGET_LISTS`, and the option fits of
-#: those methods.
+# --------------------------------------------------------------------------------------------------
+# Structural EM -- fitted outside the gate, on a gate dataset with values removed at random.
+# --------------------------------------------------------------------------------------------------
+
+#: The gate dataset of the structural-EM fits, and the share of its values removed completely at
+#: random (:func:`andrey.data.missingness.mcar`) with the draw's seed 0, the rate the EM tests use.
+EM_DATASET, EM_RATE = "linear_gauss_er_d10", 0.3
+#: The structural-EM fits, one with a search over graphs and one with a search over weights: each
+#: method's ``missing="em"`` on a draw of :data:`EM_DATASET` with values removed. A column order
+#: moves the draw's missing values, so they are not refitted under ``--shuffle``.
+EM_FITS: dict[str, Callable[..., StructureOutput]] = {
+    "GES-em": andrey.ges,
+    "NOTEARS-em": andrey.notears,
+}
+
+
+def _with_missing(
+    search: Callable[..., StructureOutput],
+) -> Callable[[np.ndarray], StructureOutput]:
+    def fit(x: np.ndarray) -> StructureOutput:
+        mask = missingness.draw(x, missingness.mcar(EM_RATE), seed=0).mask
+        return search(np.where(mask, np.nan, x), missing="em")
+
+    return fit
+
+
+FITS |= {name: Fit(_with_missing(search), shuffled=False) for name, search in EM_FITS.items()}
+
+#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GES in each structural-EM round of
+#: ``GES-em``, GFCI's GES phase, the skeleton searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and
+#: RSMAX2's PC phase, the possible-d-sep searches of FCI, FCI-JCI, and GFCI, the full-graph
+#: searches of IAMB, Inter-IAMB, and MMPC, which MMHC and RSMAX2's restrict phase run, and the
+#: starts of Regime-PCMCI in worker processes, PNL's two directions on threads, and the lists of
+#: targets of :data:`TARGET_LISTS`, and the option fits of those methods.
 _WORKERS = (
     "PC",
     "FCI",
@@ -523,6 +564,7 @@ _WORKERS = (
     "CDNOD",
     "RSMAX2",
     "GES",
+    "GES-em",
     "PNL",
     "IAMB",
     "InterIAMB",
@@ -665,6 +707,8 @@ def datasets(method: str) -> tuple[str, ...]:
         return (OPTIONS[method].dataset,)
     if method in EXPERIMENTAL:
         return EXPERIMENTAL[method]
+    if method in EM_FITS:
+        return (EM_DATASET,)
     method = TARGET_LISTS.get(method, method)
     if method in UNKNOWN_TARGETS:
         return UNKNOWN_TARGETS[method]
@@ -1133,6 +1177,294 @@ def _counted(
 
 
 # ==================================================================================================
+# Checkpoints -- a digest of each algorithm's state at its stages, for ``--checkpoints``.
+# ==================================================================================================
+
+#: How the elements of a piece's array read, by form. ``pairs``: a symmetric adjacency as its upper
+#: triangle in ``np.triu_indices(d, 1)`` order, one element per pair. ``matrix``: row-major, one
+#: element per entry. ``sets``: a mapping from keys to collections as the rows ``[*key, k,
+#: *members]`` in key order, a separating set or the marks an orientation round implied, as the
+#: round leaves them: the marks it applied are gone. ``values``: a mapping from keys to numbers as
+#: the rows ``[*key, value]``. ``list``: a sequence flattened in order, a string as its length
+#: and its characters. ``scalar``: one number, an integer too wide for 64 bits as its 64-bit limbs.
+#: ``text``: the bytes of a string. The width of a piece is its row length for ``matrix`` and
+#: ``values``, the node count for ``pairs``, and the length of a key for ``sets``.
+FORMS = ("pairs", "matrix", "sets", "values", "list", "scalar", "text")
+
+
+@dataclass(frozen=True)
+class Piece:
+    """One piece of a record: its name, its form (:data:`FORMS`) and width, the digest of its
+    array, and the canonical 1-D array itself."""
+
+    name: str
+    form: str
+    width: int
+    digest: str
+    array: np.ndarray
+
+
+@dataclass(frozen=True)
+class Record:
+    """One call of the sink: the stage, its level (the conditioning size of a skeleton search, a
+    round of structural EM) when the algorithm has one, and the pieces of the state."""
+
+    stage: str
+    level: int | None
+    pieces: tuple[Piece, ...]
+
+
+class Label(NamedTuple):
+    """What the manifest and the sidecar keep of a piece: its record's position in the fit, the
+    record's stage and level, the piece's name, form, width, and digest, and its array's length."""
+
+    record: int
+    stage: str
+    level: int | None
+    piece: str
+    form: str
+    width: int
+    digest: str
+    length: int
+
+
+def _wide(value: int) -> list[int]:
+    """``value`` as 64-bit limbs, little-endian: one limb for a value that fits in 64 bits."""
+    size = (value.bit_length() // 64 + 1) * 8
+    return np.frombuffer(value.to_bytes(size, "little", signed=True), dtype="<i8").tolist()
+
+
+def _flat(value: Any) -> list[Any]:
+    """Flatten ``value`` to numbers in order: a set or frozenset sorted, a string as its length
+    and the code points, an integer as its limbs (:func:`_wide`)."""
+    out: list[Any] = []
+
+    def walk(item: Any) -> None:
+        if isinstance(item, str):
+            out.append(len(item))
+            out.extend(ord(c) for c in item)
+        elif isinstance(item, (set, frozenset)):
+            for member in sorted(item):
+                walk(member)
+        elif isinstance(item, (list, tuple)):
+            for member in item:
+                walk(member)
+        elif isinstance(item, np.ndarray):
+            walk(item.ravel().tolist())
+        elif isinstance(item, (bool, np.bool_, int, np.integer)):
+            out.extend(_wide(int(item)))
+        else:
+            out.append(float(item))
+
+    walk(value)
+    return out
+
+
+def _numbers(values: list[Any]) -> np.ndarray:
+    """``values`` as one int64 array, or a float64 array when any is a float."""
+    floats = any(isinstance(v, float) for v in values)
+    return np.array(values, dtype=np.float64 if floats else np.int64)
+
+
+def _keys(mapping: Mapping[Any, Any]) -> tuple[list[Any], int]:
+    """The keys of ``mapping`` in order, and their length: a pair or an integer."""
+    keys = sorted(mapping, key=lambda k: tuple(int(e) for e in k) if isinstance(k, tuple) else (k,))
+    return keys, 0 if not keys else (len(keys[0]) if isinstance(keys[0], tuple) else 1)
+
+
+def _mapping(mapping: Mapping[Any, Any]) -> tuple[str, int, np.ndarray]:
+    keys, arity = _keys(mapping)
+    rows: list[Any] = []
+    numeric = bool(keys) and all(
+        isinstance(mapping[k], (int, float, np.integer, np.floating)) for k in keys
+    )
+    for key in keys:
+        head = _flat(key)
+        if numeric:
+            rows.extend((*head, float(mapping[key])))
+        else:
+            members = _flat(mapping[key])
+            rows.extend((*head, len(members), *members))
+    if numeric:
+        return "values", arity + 1, np.array(rows, dtype=np.float64)
+    return "sets", arity, np.array(rows, dtype=np.int64)
+
+
+def _canonical(name: str, value: Any) -> tuple[str, int, np.ndarray]:
+    """Return a piece's form, width, and canonical 1-D array, copied, so that a later change to
+    the search's state does not reach the record."""
+    if name == "parents":  # the bitset rows of HC and Tabu: row u holds the children of u
+        d = len(value)
+        bits = [[(row >> v) & 1 for v in range(d)] for row in value]
+        return "matrix", d, np.array(bits, dtype=np.int64).ravel()
+    if isinstance(value, Mapping):
+        return _mapping(value)
+    if isinstance(value, str):
+        return "text", 0, np.frombuffer(value.encode(), dtype=np.uint8).copy()
+    if callable(value):
+        return "text", 0, np.frombuffer(value.__name__.encode(), dtype=np.uint8).copy()
+    if isinstance(value, np.ndarray) and value.ndim == 2:
+        kind = "f" if value.dtype.kind == "f" else "i"
+        a = np.array(value, dtype=np.float64 if kind == "f" else np.int64)
+        if name == "adjacency" and a.shape[0] == a.shape[1] and np.array_equal(a, a.T):
+            return "pairs", a.shape[0], a[np.triu_indices(a.shape[0], 1)]
+        return "matrix", a.shape[1], a.ravel()
+    if isinstance(value, (bool, int, float, np.number, np.bool_)):
+        return "scalar", 0, _numbers(_flat(value))
+    return "list", 0, _numbers(_flat(value))
+
+
+def _piece(name: str, form: str, width: int, array: np.ndarray) -> Piece:
+    return Piece(name, form, width, digest(array), array)
+
+
+class Checkpoints:
+    """The recorder of :func:`checkpointing`: called as ``take(stage, level, **pieces)``, it
+    serializes each piece at once (:func:`_canonical`), since the search rewrites its state in
+    place, and keeps the :class:`Record`. A piece that is ``None`` is left out. An array of more
+    than two dimensions is flattened, so its shape follows it as a piece of its own,
+    ``<name>.shape``.
+
+    A skeleton search's ``skeleton.size`` record holds the whole adjacency but only the pairs the
+    size removed, with their separating sets and p-values, read from the cumulative mappings;
+    ``skeleton.end`` resets that, so a second search in one fit starts from no pairs.
+    """
+
+    def __init__(self) -> None:
+        self.records: list[Record] = []
+        self._removed: set[Any] = set()
+
+    def __call__(self, stage: str, level: int | None = None, **pieces: Any) -> None:
+        if stage == "skeleton.size":
+            pieces = self._removed_at_this_size(pieces)
+        elif stage == "skeleton.end":
+            self._removed = set()
+        kept = []
+        for name, value in pieces.items():
+            if value is not None:
+                kept.append(_piece(name, *_canonical(name, value)))
+                if isinstance(value, np.ndarray) and value.ndim > 2:
+                    shape = np.array(value.shape, dtype=np.int64)
+                    kept.append(_piece(f"{name}.shape", "list", 0, shape))
+        self.records.append(Record(stage, level, tuple(kept)))
+
+    def _removed_at_this_size(self, pieces: dict[str, Any]) -> dict[str, Any]:
+        sepsets, pvalues = pieces["sepsets"], pieces["pvalues"]
+        new = [pair for pair in sepsets if pair not in self._removed]
+        self._removed.update(new)
+        return {
+            **pieces,
+            "sepsets": {pair: sepsets[pair] for pair in new},
+            "pvalues": {pair: pvalues[pair] for pair in new if pair in pvalues},
+        }
+
+
+@contextmanager
+def checkpointing(enabled: bool) -> Generator[Checkpoints | None]:
+    """Record the stages of the fit run inside the block: yield the recorder and set the package's
+    sink to it, reset on exit, even after an exception. With ``enabled`` false, yield ``None`` and
+    touch nothing: the package module the sink lives in is not imported, so a build without it
+    runs the plain harness."""
+    if not enabled:
+        yield None
+        return
+    sink = importlib.import_module("andrey.core._checkpoint")
+    recorder = Checkpoints()
+    token = sink.TAKE.set(recorder)
+    try:
+        yield recorder
+    finally:
+        sink.TAKE.reset(token)
+
+
+def labels(records: Iterable[Record]) -> list[Label]:
+    """One :class:`Label` per piece of ``records``, in order."""
+    return [
+        Label(i, r.stage, r.level, p.name, p.form, p.width, p.digest, int(p.array.size))
+        for i, r in enumerate(records)
+        for p in r.pieces
+    ]
+
+
+def checkpoint_fields(records: list[Record]) -> dict[str, Any]:
+    """The two fields a manifest row gains: the SHA-256 of the fit's labels in order, and the number
+    of records. A fit with no record has neither."""
+    if not records:
+        return {}
+    text = json.dumps([list(label) for label in labels(records)])
+    return {
+        "checkpoints": hashlib.sha256(text.encode()).hexdigest(),
+        "checkpoint_records": len(records),
+    }
+
+
+def sidecar_name(manifest: Path) -> str:
+    """The file name of the sidecar of ``manifest``, which holds the pieces' arrays."""
+    return f"{manifest.name}.checkpoints.npz"
+
+
+def _array_key(key: tuple) -> str:
+    return "|".join(map(str, key))
+
+
+def write_checkpoints(path: Path, records: Mapping[tuple, list[Record]]) -> None:
+    """Write the sidecar: per fit, keyed by the row's :data:`KEY` values, ``labels``, a JSON list of
+    :class:`Label`, and one array per piece."""
+    arrays: dict[str, np.ndarray] = {}
+    for key, fit in records.items():
+        name = _array_key(key)
+        arrays[f"{name}/labels"] = np.array(json.dumps([list(label) for label in labels(fit)]))
+        for i, array in enumerate(p.array for r in fit for p in r.pieces):
+            arrays[f"{name}/{i}"] = array
+    # The array names are the keyword arguments.
+    np.savez_compressed(path, **arrays)  # ty: ignore[invalid-argument-type]
+
+
+@dataclass(frozen=True)
+class Stages:
+    """The stages of one fit: its labels and the array of each piece, by position."""
+
+    labels: list[Label]
+    array: Callable[[int], np.ndarray]
+
+
+def stages_of(records: list[Record]) -> Stages:
+    """The stages of a fit as :func:`run` recorded them."""
+    arrays = [p.array for r in records for p in r.pieces]
+    return Stages(labels(records), arrays.__getitem__)
+
+
+def read_stages(path: Path, rows: Iterable[dict]) -> dict[tuple, Stages]:
+    """The stages of each fit of ``rows`` that has records, read lazily from the sidecar at
+    ``path``."""
+    npz = np.load(path, allow_pickle=False)
+    out = {}
+    for r in rows:
+        key = tuple(r[k] for k in KEY)
+        name = _array_key(key)
+        if "checkpoints" in r:
+            if f"{name}/labels" not in npz:
+                raise ValueError(f"the sidecar has no checkpoints for the fit {name}")
+            text = str(npz[f"{name}/labels"])
+            if hashlib.sha256(text.encode()).hexdigest() != r["checkpoints"]:
+                raise ValueError(
+                    f"the sidecar's checkpoints of the fit {name} are not the manifest's"
+                )
+            fit = [Label(*entry) for entry in json.loads(text)]
+            out[key] = Stages(fit, functools.partial(_load, npz, name))
+    return out
+
+
+def _load(npz: Any, name: str, i: int) -> np.ndarray:
+    return npz[f"{name}/{i}"]
+
+
+#: What reading a sidecar raises when it is not an archive, is cut short, lacks a member, or holds a
+#: member that does not decompress.
+SIDECAR_ERRORS = (ValueError, OSError, EOFError, KeyError, zipfile.BadZipFile, zlib.error)
+
+
+# ==================================================================================================
 # The run and the manifest
 # ==================================================================================================
 
@@ -1162,9 +1494,12 @@ def commit() -> dict[str, Any]:
     }
 
 
-def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict[str, Any]:
+def header(
+    code: dict[str, Any], seeds: int, shuffle: int, workers: int, checkpoints: str | None = None
+) -> dict[str, Any]:
     """Return ``code`` (:func:`commit`, read before the fits), the versions, the BLAS and OpenMP
-    libraries loaded by now, the CPU, and the thread settings."""
+    libraries loaded by now, the CPU, and the thread settings; with ``checkpoints``, the name of
+    the sidecar that holds the pieces of the stages (:func:`sidecar_name`)."""
     blas = [
         {key: value for key, value in pool.items() if key != "filepath"}
         for pool in threadpoolctl.threadpool_info()
@@ -1193,6 +1528,7 @@ def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict
         "refit_possible_dsep_min_pool_subsets": 0 if workers > 1 else None,
         "refit_blanket_parallel_min_work": 0 if workers > 1 else None,
         "refit_rpcmci_parallel_min_work": 0 if workers > 1 else None,
+        **({} if checkpoints is None else {"checkpoints": checkpoints}),
     }
 
 
@@ -1339,7 +1675,11 @@ def documented(method: str, changed: list[str]) -> str | None:
 
 
 def run(
-    methods: list[str], seeds: int, shuffle: int = 0, workers: int = 1
+    methods: list[str],
+    seeds: int,
+    shuffle: int = 0,
+    workers: int = 1,
+    checkpoints: dict[tuple, list[Record]] | None = None,
 ) -> tuple[list[dict], list[tuple[str, str]]]:
     """Fit ``methods`` on the corpus; return the manifest's rows and the refits that differ.
 
@@ -1353,14 +1693,23 @@ def run(
     :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
     difference is reported as ``(kind, description)``, naming the parts that changed, with the kind
     of :func:`classify`.
+
+    With a dict as ``checkpoints``, each draw's first fit, one worker and no column order, also
+    records the stages of the algorithm (:func:`checkpointing`): the dict gets the records by the
+    row's :data:`KEY` values, and the row the two fields of :func:`checkpoint_fields`. The refits
+    run with the sink unset.
     """
     rows, findings = [], []
     with andrey.config(backend="numpy", n_jobs=1), threadpool_limits(limits=1):
         for method, dataset, seed, x in corpus(methods, seeds):
             fit = FITS[method]
-            with counting(fit.alpha) as counts:
+            with counting(fit.alpha) as counts, checkpointing(checkpoints is not None) as recorder:
                 out = fit.call(x)
             rows.append({**row(method, dataset, seed, 0, 1, out), **counts.summary()})
+            if recorder is not None and recorder.records:
+                rows[-1] |= checkpoint_fields(recorder.records)
+                assert checkpoints is not None
+                checkpoints[tuple(rows[-1][k] for k in KEY)] = recorder.records
             print(f"{method:24s} {dataset:40s} seed {seed}  {_brief(rows[-1])}", flush=True)
             refits = []  # (permutation, workers, the first fit hashed as the refit is, the refit)
             n_vars = x.shape[-1] // fit.blocks
@@ -1433,10 +1782,20 @@ def _counters(r: dict) -> dict[str, int]:
     return out
 
 
-def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
+def compare(
+    before: dict,
+    after: dict,
+    *,
+    allow_fewer: bool = False,
+    stages: tuple[Mapping[tuple, Stages], Mapping[tuple, Stages]] | None = None,
+) -> int:
     """Print how manifest ``after`` differs from ``before``; return 1 if a row's hash differs, a row
     is in one only, or a count rose or fell, else 0. A count that fell passes with ``allow_fewer``:
     it is either a real algorithmic change or a query the counting no longer sees.
+
+    With the ``stages`` of both manifests' fits, read from their sidecars or recorded by
+    :func:`run`, it also reports, after the lines above, the first stage and piece where each
+    differing fit parts (:func:`report_checkpoints`). The report does not change the return value.
 
     A row whose graph differs keeps its edges when its :func:`parts` show that only the kind
     changed. A row whose graph is unchanged differs in its bits, or, when its :func:`parts` show
@@ -1484,6 +1843,12 @@ def compare(before: dict, after: dict, *, allow_fewer: bool = False) -> int:
     ):
         for line in lines:
             print(f"{title}: {line}")
+    with_records = [any("checkpoints" in r for r in m["rows"]) for m in (before, after)]
+    if stages is not None:
+        report_checkpoints(old, new, stages)
+    elif any(with_records):
+        reason = "only one manifest has them" if not all(with_records) else "no sidecar was read"
+        print(f"checkpoints: {reason}, so there is no checkpoint report")
     named = f" ({', '.join(sorted(keys))})" if keys else ""
     print(
         f"\n{len(old.keys() & new.keys())} rows in both: {len(graph)} with a different graph, "
@@ -1514,6 +1879,230 @@ def kind_change(before: Mapping[str, str], after: Mapping[str, str]) -> list[str
     return sorted({name.split("metadata.", 1)[1] for name in changed if "metadata." in name})
 
 
+# --------------------------------------------------------------------------------------------------
+# The first stage where two builds part (``--checkpoints``)
+# --------------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Difference:
+    """Where two fits' stages first part, in the first piece whose label or digest differs.
+
+    ``kind`` is ``"value"``, the same piece with different elements; ``"bits"``, a float piece
+    whose differing elements all agree up to :data:`RTOL` and :data:`ATOL`; ``"sequence"``, another
+    stage or piece at that position, or the same bytes under another record, form, or width;
+    ``"missing"``, a fit that ends first; or ``"after"``, fits whose stages are all equal and whose
+    outputs differ, so they part after the last stage (:func:`_after_the_last`). ``index`` is the
+    first element whose bytes differ, ``where`` reads it by the piece's form, ``change`` shows the
+    two values, and ``lengths`` are the arrays' lengths (:data:`FORMS`).
+    """
+
+    record: int
+    stage: str
+    level: int | None
+    piece: str
+    kind: str
+    index: int | None = None
+    lengths: tuple[int, int] = (0, 0)
+    where: str = ""
+    change: str = ""
+
+    def fingerprint(self, method: str) -> tuple:
+        """The method, stage, level, piece, kind, first differing element, and both lengths."""
+        return (method, self.stage, self.level, self.piece, self.kind, self.index, *self.lengths)
+
+    def stage_text(self) -> str:
+        return self.stage + ("" if self.level is None else f" level {self.level}")
+
+
+def _element(label: Label, array: np.ndarray, index: int) -> str:
+    """Read element ``index`` of a piece's array by the piece's form."""
+    form, width = label.form, label.width
+    if form == "pairs" and index < width * (width - 1) // 2:
+        a, b = (int(v[index]) for v in np.triu_indices(width, 1))
+        return f"pair ({a}, {b})"
+    if form == "matrix" and width:
+        return "entry ({}, {})".format(*divmod(index, width))
+    if form == "values" and width > 1:
+        at = index // width * width
+        key = ", ".join(str(int(v)) for v in array[at : at + width - 1])
+        return f"pair ({key})" if width == 3 else f"key ({key})"
+    if form == "sets":
+        at = 0
+        while at < array.size:
+            end = at + width + 1 + int(array[at + width])
+            if index < end:
+                key = ", ".join(str(int(v)) for v in array[at : at + width])
+                return f"pair ({key})" if width == 2 else f"key ({key})"
+            at = end
+    return {"scalar": "value", "text": f"character {index}"}.get(form, f"position {index}")
+
+
+def _show(array: np.ndarray, index: int) -> str:
+    if index >= array.size:
+        return "none"
+    value = array[index].item()
+    return str(value) if isinstance(value, int) else f"{value:.17g}"
+
+
+def _bytes_differ(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Which of the first ``min(len)`` elements of ``x`` and ``y`` differ in their bytes, with every
+    NaN as one bit pattern."""
+    n = min(x.size, y.size)
+    x, y = x[:n], y[:n]
+    if x.dtype != y.dtype:  # a changed dtype is a changed representation from the first element
+        return np.ones(n, dtype=bool)
+    if x.dtype.kind == "f":
+        x, y = (np.where(np.isnan(a), np.nan, a).view(np.uint64) for a in (x, y))
+    return x != y
+
+
+def _at(stage: str, level: int | None) -> str:
+    """A stage with its level, when it has one."""
+    return stage if level is None else f"{stage} level {level}"
+
+
+def first_difference(before: Stages, after: Stages) -> Difference | None:
+    """Walk two fits' labels in order to the first position where the stage, level, or piece, or
+    the digest, differs; ``None`` when the fits agree."""
+    for i in range(max(len(before.labels), len(after.labels))):
+        a = before.labels[i] if i < len(before.labels) else None
+        b = after.labels[i] if i < len(after.labels) else None
+        if a is None or b is None:
+            side = a or b
+            assert side is not None
+            lengths = (a.length if a else 0, b.length if b else 0)
+            return Difference(
+                side.record, side.stage, side.level, side.piece, "missing", None, lengths
+            )
+        if (a.stage, a.level, a.piece) != (b.stage, b.level, b.piece):
+            here = f"{_at(a.stage, a.level)} {a.piece}"
+            there = f"{_at(b.stage, b.level)} {b.piece}"
+            return Difference(
+                a.record, a.stage, a.level, a.piece, "sequence", None, where=f"{here} -> {there}"
+            )
+        if a.digest == b.digest:
+            if (a.record, a.form, a.width, a.length) == (b.record, b.form, b.width, b.length):
+                continue
+            layout = (
+                f"{a.stage} {a.piece} (record {a.record}, {a.form}, width {a.width}) -> "
+                f"{b.stage} {b.piece} (record {b.record}, {b.form}, width {b.width})"
+            )
+            return Difference(
+                a.record, a.stage, a.level, a.piece, "sequence", None, (a.length, b.length), layout
+            )
+        x, y = before.array(i), after.array(i)
+        differs = _bytes_differ(x, y)
+        index = int(np.flatnonzero(differs)[0]) if differs.any() else min(x.size, y.size)
+        close = (
+            x.size == y.size
+            and x.dtype == y.dtype == np.float64
+            and np.allclose(x[differs], y[differs], RTOL, ATOL, equal_nan=True)
+        )
+        source, array = (a, x) if index < x.size else (b, y)
+        return Difference(
+            a.record,
+            a.stage,
+            a.level,
+            a.piece,
+            "bits" if close else "value",
+            index,
+            (a.length, b.length),
+            _element(source, array, index),
+            f"{_show(x, index)} -> {_show(y, index)}",
+        )
+    return None
+
+
+def _after_the_last(a: dict, b: dict) -> Difference:
+    """The difference of two fits with equal stages and different outputs: the stage ``output``,
+    and as its piece the :func:`parts` of the output that differ, or ``hash`` when the rows record
+    none. The steps a method takes after its last stage, such as the conversion of a DAG to its
+    CPDAG, show here."""
+    before, after = a.get("parts", {}), b.get("parts", {})
+    changed = sorted(n for n in before.keys() | after.keys() if before.get(n) != after.get(n))
+    return Difference(
+        a.get("checkpoint_records", 0), "output", None, ", ".join(changed) or "hash", "after"
+    )
+
+
+def _records(before: int, after: int) -> str:
+    """Which record of how many: the count when both fits have as many, else each fit's."""
+    return f"of {before}" if before == after else f"({before} before, {after} after)"
+
+
+def _describe(d: Difference) -> str:
+    where = f"{d.stage_text()}, {d.piece}"
+    if d.kind == "after":
+        return f"the output differs in {d.piece} (after)"
+    if d.kind == "sequence":
+        return f"{where}: the builds record another stage here, {d.where} (sequence)"
+    if d.kind == "missing":
+        return f"{where}: in one fit only (missing)"
+    return (
+        f"{where}: element {d.index} = {d.where}, {d.change}; "
+        f"{d.lengths[0]} elements before, {d.lengths[1]} after ({d.kind})"
+    )
+
+
+def _text(fingerprint: tuple) -> str:
+    method, stage, level, piece, kind, index, before, after = fingerprint
+    at = _at(stage, level)
+    return f"{method} {at} {piece} {kind} {'-' if index is None else index} {before} {after}"
+
+
+def report_checkpoints(
+    old: Mapping[tuple, dict], new: Mapping[tuple, dict], stages: tuple[Mapping, Mapping]
+) -> None:
+    """Print, for each row in both manifests whose checkpoints differ and whose output differs, the
+    first stage and piece that differ; for each row whose checkpoints are all equal and whose output
+    differs, the parts of the output that differ (:func:`_after_the_last`); the rows grouped by
+    fingerprint and by stage; and, as information, the rows whose output is equal. Later stages
+    follow from the first and are not reported. A sidecar piece that cannot be read ends the report
+    with a line saying so. The exit status of the compare does not read it."""
+    empty = Stages([], lambda i: np.empty(0, dtype=np.int64))
+    found, equal = [], []
+    try:
+        for key in sorted(old.keys() & new.keys(), key=str):
+            a, b = old[key], new[key]
+            counts = (a.get("checkpoint_records", 0), b.get("checkpoint_records", 0))
+            if a.get("checkpoints") == b.get("checkpoints"):
+                if "checkpoints" in a and a["hash"] != b["hash"]:
+                    found.append((key, counts, _after_the_last(a, b)))
+                continue
+            difference = first_difference(stages[0].get(key, empty), stages[1].get(key, empty))
+            if difference is not None:
+                (equal if a["hash"] == b["hash"] else found).append((key, counts, difference))
+    except SIDECAR_ERRORS as error:
+        print(f"checkpoints not compared: a sidecar piece cannot be read ({error!r})")
+        return
+    for key, counts, d in found:
+        label = " ".join(map(str, key))
+        at = f"after all {counts[0]} records" if d.kind == "after" else None
+        at = at or f"record {d.record + 1} {_records(*counts)}"
+        print(f"first checkpoint difference: {label}: {at}, {_describe(d)}")
+    prints = Counter(d.fingerprint(key[0]) for key, _, d in found)
+    for fingerprint, count in sorted(prints.items(), key=lambda kv: (-kv[1], _text(kv[0]))):
+        print(f"fingerprint {count} rows: {_text(fingerprint)}")
+    where: defaultdict[tuple, defaultdict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    rows: Counter[tuple] = Counter()
+    for key, _, d in found:
+        group = (d.stage_text(), d.piece, d.kind)
+        where[group][key[0]].add(key[1])
+        rows[group] += 1
+    for group, count in sorted(rows.items(), key=lambda kv: (-kv[1], kv[0])):
+        methods = ", ".join(
+            f"{m} ({', '.join(sorted(ds))})" for m, ds in sorted(where[group].items())
+        )
+        print(f"by stage {count} rows: {group[0]} {group[1]} {group[2]} -- {methods}")
+    for key, _, d in equal:
+        label = " ".join(map(str, key))
+        print(
+            f"checkpoints differ, output equal: {label}: record {d.record + 1}, "
+            f"{d.stage_text()} {d.piece} ({d.kind})"
+        )
+
+
 # ==================================================================================================
 # Command line
 # ==================================================================================================
@@ -1530,6 +2119,27 @@ LABELS = {
 }
 
 
+def _sidecar_stages(
+    paths: list[Path], manifests: list[dict]
+) -> tuple[dict[tuple, Stages], dict[tuple, Stages]] | None:
+    """The stages of the fits of both manifests, read from the sidecars their headers name, next
+    to each manifest; ``None`` unless both name one that exists."""
+    names = [m["header"].get("checkpoints") for m in manifests]
+    if not all(names):
+        return None
+    sidecars = [path.with_name(name) for path, name in zip(paths, names, strict=True)]
+    if not all(s.is_file() for s in sidecars):
+        return None
+    try:
+        before, after = (
+            read_stages(s, m["rows"]) for s, m in zip(sidecars, manifests, strict=True)
+        )
+    except SIDECAR_ERRORS as error:
+        print(f"checkpoints not compared: {error}")
+        return None
+    return before, after
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Hash every supported method's full output.")
     ap.add_argument("methods", nargs="*", help="methods to fit (default: all supported)")
@@ -1541,18 +2151,40 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--allow-fewer-queries", action="store_true", help="with --compare, pass when a count fell"
     )
+    ap.add_argument(
+        "--checkpoints",
+        action="store_true",
+        help="record the stages of each fit, for --compare to name where builds part (needs -o)",
+    )
     args = ap.parse_args(argv)
 
     if args.compare:
-        before, after = (json.loads(path.read_text()) for path in args.compare)
-        return compare(before, after, allow_fewer=args.allow_fewer_queries)
+        manifests = [json.loads(path.read_text()) for path in args.compare]
+        return compare(
+            *manifests,
+            allow_fewer=args.allow_fewer_queries,
+            stages=_sidecar_stages(args.compare, manifests),
+        )
+    if args.checkpoints:
+        if not args.out:
+            ap.error("--checkpoints needs -o: the pieces of the stages go next to the manifest")
+        try:
+            importlib.import_module("andrey.core._checkpoint")
+        except ImportError:
+            ap.error(f"the Andrey imported from {Path(andrey.__file__).parent} has no checkpoints")
     unknown = sorted(set(args.methods) - set(FITS))
     if unknown:
         ap.error(f"unknown methods {unknown}; known: {list(FITS)}")
     code = commit()
-    rows, findings = run(args.methods or list(FITS), args.seeds, args.shuffle, args.workers)
+    records: dict[tuple, list[Record]] | None = {} if args.checkpoints else None
+    rows, findings = run(
+        args.methods or list(FITS), args.seeds, args.shuffle, args.workers, records
+    )
     if args.out:
-        write(args.out, header(code, args.seeds, args.shuffle, args.workers), rows)
+        name = sidecar_name(args.out) if args.checkpoints else None
+        write(args.out, header(code, args.seeds, args.shuffle, args.workers, name), rows)
+        if records is not None and name is not None:
+            write_checkpoints(args.out.with_name(name), records)
     for kind, line in findings:
         print(f"{LABELS[kind]}: {line}")
     refits = sum(r["permutation"] > 0 or r["workers"] > 1 for r in rows)

@@ -288,6 +288,25 @@ names its pull request.
   baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it and flags a
   change to the script or to its workflow job, it is a required check, `.github/` and the script
   have code owners, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
+- The `gcm` and `wgcm` tests, and the `pcm` test with `regression="boosting"`, grow the boosted
+  trees of their cross-validation folds in a lean loop over scikit-learn's decision trees, not in a
+  gradient-boosting fit per fold, so the methods that take them as `indep_test` run faster, with the
+  same output bit for bit on every platform: each prediction keeps the arithmetic it had, and the
+  loop uses scikit-learn's compiled staged prediction only after a check at its first use that it
+  returns the bytes of the fits it replaces. ([#1373])
+- For contributors, `qa/identity.py --checkpoints` records a digest of each algorithm's state at its
+  stages, for the constraint-based, score-based, Markov blanket, structural EM, and continuous
+  searches, and `--compare` of two such manifests names, for each fit that differs, the first stage
+  and piece where the builds part, or the output parts that differ when every stage is equal, and
+  groups the differences by fingerprint. A run without the mode has the rows it had, and the fits
+  `GES-em` and `NOTEARS-em` add structural EM to the corpus, so record both manifests of a compare
+  with one version of the gate. ([#1362])
+- `rpcmci` solves the regime-learning linear program of each iteration through the HiGHS bindings
+  that SciPy bundles, in place of `scipy.optimize.linprog`, so a fit runs faster with the same
+  weights, objective, and PCMCI results bit for bit. The bindings are private to SciPy: Andrey uses
+  them only after a check at import that they return the bytes of `linprog` on small programs of the
+  same form, and `linprog` solves the program with SciPy before 1.15 and wherever the check fails.
+  ([#1383])
 
 ### Fixed
 
@@ -3311,9 +3330,12 @@ First alpha release.
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
 [#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
+[#1362]: https://github.com/Abel-ai-lab/Andrey/pull/1362
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
 [#1369]: https://github.com/Abel-ai-lab/Andrey/pull/1369
 [#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371
 [#1378]: https://github.com/Abel-ai-lab/Andrey/pull/1378
+[#1373]: https://github.com/Abel-ai-lab/Andrey/pull/1373
+[#1383]: https://github.com/Abel-ai-lab/Andrey/pull/1383

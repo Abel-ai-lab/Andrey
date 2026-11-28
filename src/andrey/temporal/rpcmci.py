@@ -20,8 +20,8 @@ weights the regimes at each step. Each start draws its first ``Gamma`` entry by 
    every ``k``,
 
    written with one slack ``eta_k(t) >= |gamma_k(t + 1) - gamma_k(t)|`` per step and solved by
-   the dual simplex method (:func:`scipy.optimize.linprog`, HiGHS), which returns an optimal
-   vertex. The first ``tau_max`` steps have no prediction and cost ``0`` in every regime.
+   HiGHS's dual simplex method (:func:`regime_lp`), which returns an optimal vertex. The first
+   ``tau_max`` steps have no prediction and cost ``0`` in every regime.
 
 A start stops when ``Gamma`` no longer changes, or from its sixth iteration on when the summed
 absolute change is at most ``2 * K * T // 100``. A start fails when a regime keeps fewer than
@@ -39,8 +39,11 @@ https://doi.org/10.1063/5.0020538
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from functools import lru_cache
+from types import ModuleType
 
 import numpy as np
 import scipy.sparse as sp
@@ -119,13 +122,37 @@ def regime_costs(
     return cost
 
 
-def regime_lp(costs: np.ndarray, max_transitions: int) -> tuple[np.ndarray, float]:
-    """Solve the regime-learning linear program for the ``(K, T)`` ``costs``.
+@dataclass(frozen=True, eq=False)
+class _Program:
+    """The regime linear program of one shape, which the costs do not change.
 
-    Returns the optimal ``(K, T)`` ``Gamma`` and the objective. The variables are ``Gamma`` row by
-    row, then the slacks ``eta_k(t)``, ``t = 0 .. T - 2``, row by row.
+    ``A_ub``, ``b_ub``, ``A_eq``, ``b_eq``, and ``bounds`` are the arguments of ``linprog``. The
+    rest is the same model in HiGHS's form, as ``linprog`` hands it over: the stacked constraint
+    matrix in compressed-column form with 32-bit indices, the row bounds, and the column bounds.
     """
-    n_regimes, n_steps = costs.shape
+
+    n_gamma: int
+    n_eta: int
+    A_ub: sp.csr_array
+    b_ub: np.ndarray
+    A_eq: sp.csr_array
+    b_eq: np.ndarray
+    bounds: list[tuple[float, float | None]]
+    indptr: np.ndarray
+    indices: np.ndarray
+    data: np.ndarray
+    row_lower: np.ndarray
+    row_upper: np.ndarray
+    col_lower: np.ndarray
+    col_upper: np.ndarray
+
+
+def _build_program(n_regimes: int, n_steps: int, max_transitions: int) -> _Program:
+    """The :class:`_Program` of ``n_regimes`` regimes and ``n_steps`` steps.
+
+    The variables are ``Gamma`` row by row, then the slacks ``eta_k(t)``, ``t = 0 .. T - 2``, row by
+    row.
+    """
     n_gamma = n_regimes * n_steps
     n_eta = n_regimes * (n_steps - 1)
     gamma = np.arange(n_gamma).reshape(n_regimes, n_steps)
@@ -149,20 +176,190 @@ def regime_lp(costs: np.ndarray, max_transitions: int) -> tuple[np.ndarray, floa
         (np.ones(n_gamma), (np.tile(np.arange(n_steps), n_regimes), gamma.ravel())),
         shape=(n_steps, n_gamma + n_eta),
     )
-    bounds = np.array([(0.0, 1.0)] * n_gamma + [(0.0, None)] * n_eta, dtype=object)
-    solution = linprog(
-        np.concatenate([costs.ravel(), np.zeros(n_eta)]),
+    b_eq = np.ones(n_steps)
+    bounds = np.array([(0.0, 1.0)] * n_gamma + [(0.0, None)] * n_eta, dtype=object).tolist()
+    stacked = sp.csc_array(sp.vstack((A_ub, A_eq)))
+    return _Program(
+        n_gamma=n_gamma,
+        n_eta=n_eta,
         A_ub=A_ub,
         b_ub=b_ub,
         A_eq=A_eq,
-        b_eq=np.ones(n_steps),
-        bounds=bounds.tolist(),
+        b_eq=b_eq,
+        bounds=bounds,
+        indptr=stacked.indptr.astype(np.int32),
+        indices=stacked.indices.astype(np.int32),
+        data=stacked.data,
+        row_lower=np.concatenate([np.full(b_ub.size, -np.inf), b_eq]),
+        row_upper=np.concatenate([b_ub, b_eq]),
+        col_lower=np.zeros(n_gamma + n_eta),
+        col_upper=np.concatenate([np.ones(n_gamma), np.full(n_eta, np.inf)]),
+    )
+
+
+#: The program of the last shapes fitted: a fit solves one shape at every iteration of every start.
+_program = lru_cache(maxsize=2)(_build_program)
+
+
+def _solve_linprog(program: _Program, objective: np.ndarray) -> tuple[np.ndarray, float]:
+    """Solve ``program`` for the cost vector ``objective`` through ``scipy.optimize.linprog``.
+
+    Returns the optimal point and value, or raises ``RuntimeError`` when the solver does not
+    finish, and the errors of ``linprog`` on an input it rejects, such as a cost that is not finite.
+    """
+    solution = linprog(
+        objective,
+        A_ub=program.A_ub,
+        b_ub=program.b_ub,
+        A_eq=program.A_eq,
+        b_eq=program.b_eq,
+        bounds=program.bounds,
         method="highs-ds",
     )
     if solution.status != 0:  # the program is feasible and bounded; a failure is the solver's
         raise RuntimeError(f"the regime linear program did not solve: {solution.message}")
-    weights = np.clip(solution.x[:n_gamma], 0.0, 1.0)  # a vertex's last bits can leave [0, 1]
-    return weights.reshape(n_regimes, n_steps), float(solution.fun)
+    return solution.x, float(solution.fun)
+
+
+#: The options of the direct call, which are the ones ``scipy.optimize.linprog`` sets for
+#: ``method="highs-ds"``: presolve on, the simplex solver with the dual strategy (1), no debug
+#: checks (0), and no output.
+_HIGHS_OPTIONS = (
+    ("presolve", "on"),
+    ("solver", "simplex"),
+    ("simplex_strategy", 1),
+    ("highs_debug_level", 0),
+    ("log_to_console", False),
+    ("output_flag", False),
+)
+
+
+def _solve_highs(
+    core: ModuleType, program: _Program, objective: np.ndarray
+) -> tuple[np.ndarray, float] | None:
+    """Solve ``program`` for the cost vector ``objective`` in a new HiGHS object of ``core``.
+
+    The model and the options are those ``scipy.optimize.linprog`` passes for ``method="highs-ds"``:
+    presolve on, the simplex solver with its dual strategy, and no output. Returns the optimal point
+    and value, or ``None`` when HiGHS does not report an optimal solution, so that
+    :func:`_solve_linprog` solves it and raises its error.
+    """
+    highs = core._Highs()
+    for name, value in _HIGHS_OPTIONS:
+        if highs.setOptionValue(name, value) != core.HighsStatus.kOk:
+            raise RuntimeError(f"HiGHS rejects the option {name}")
+    model = core.HighsLp()
+    n_columns, n_rows = objective.size, program.row_upper.size
+    model.num_col_ = n_columns
+    model.num_row_ = n_rows
+    model.a_matrix_.num_col_ = n_columns
+    model.a_matrix_.num_row_ = n_rows
+    model.a_matrix_.format_ = core.MatrixFormat.kColwise
+    model.col_cost_ = objective
+    model.col_lower_ = program.col_lower
+    model.col_upper_ = program.col_upper
+    model.row_lower_ = program.row_lower
+    model.row_upper_ = program.row_upper
+    model.a_matrix_.start_ = program.indptr
+    model.a_matrix_.index_ = program.indices
+    model.a_matrix_.value_ = program.data
+    if highs.passModel(model) == core.HighsStatus.kError:
+        return None
+    if highs.run() == core.HighsStatus.kError:
+        return None
+    if highs.getModelStatus() != core.HighsModelStatus.kOptimal:
+        return None
+    return np.array(highs.getSolution().col_value), float(highs.getInfo().objective_function_value)
+
+
+#: The programs of the self-check, each a ``(costs, max_transitions)``: two with a vertex whose
+#: ``Gamma`` has fractional entries, for two and for three regimes, and one with three regimes whose
+#: ``Gamma`` is 0 or 1 and whose budget of two switches binds.
+_SELF_CHECK = (
+    (
+        np.array(
+            [
+                [2.0, 3.75, 0.5, 3.75, 1.25, 1.75, 3.25, 1.75],
+                [2.25, 0.0, 3.0, 2.25, 1.25, 3.25, 1.25, 1.75],
+            ]
+        ),
+        1,
+    ),
+    (
+        np.array(
+            [
+                [2.5, 3.0, 2.75, 3.75, 3.5, 0.75, 2.75, 3.25],
+                [3.0, 3.25, 2.75, 3.25, 2.75, 2.0, 1.25, 3.5],
+                [0.25, 2.0, 0.75, 0.25, 1.0, 1.75, 3.5, 2.5],
+            ]
+        ),
+        1,
+    ),
+    (
+        np.array(
+            [
+                [0.5, 2.5, 0.25, 3.0, 1.5, 0.75, 2.0, 0.5, 1.0],
+                [1.5, 0.5, 2.0, 0.25, 1.0, 2.5, 0.5, 1.5, 3.0],
+                [2.0, 1.0, 1.0, 1.5, 0.5, 1.0, 1.5, 2.0, 0.25],
+            ]
+        ),
+        2,
+    ),
+)
+
+
+def _load_highs() -> ModuleType | None:
+    """The HiGHS bindings of SciPy 1.15 or later, when :func:`_solve_highs` reproduces ``linprog``.
+
+    The bindings are private to SciPy and have changed between its versions. They are used only
+    when the solution of each program of ``_SELF_CHECK``, point and value, has the bytes that
+    ``linprog`` returns for it, so any other SciPy, and any failure of the import or of a call,
+    leaves ``linprog``.
+    """
+    try:
+        core = importlib.import_module("scipy.optimize._highspy._core")
+        for costs, max_transitions in _SELF_CHECK:
+            program = _build_program(*costs.shape, max_transitions)
+            objective = np.concatenate([costs.ravel(), np.zeros(program.n_eta)])
+            direct = _solve_highs(core, program, objective)
+            point, value = _solve_linprog(program, objective)
+            if (
+                direct is None
+                or direct[0].tobytes() != point.tobytes()
+                or float(direct[1]).hex() != float(value).hex()
+            ):
+                return None
+        return core
+    except Exception:
+        return None
+
+
+_HIGHS = _load_highs()
+
+
+def regime_lp(costs: np.ndarray, max_transitions: int) -> tuple[np.ndarray, float]:
+    """Solve the regime-learning linear program for the ``(K, T)`` ``costs``.
+
+    Returns the optimal ``(K, T)`` ``Gamma`` and the objective. The variables are ``Gamma`` row by
+    row, then the slacks ``eta_k(t)``, ``t = 0 .. T - 2``, row by row.
+
+    The program goes to HiGHS through the bindings SciPy bundles, in a new object with the options
+    ``scipy.optimize.linprog`` passes for ``method="highs-ds"``, so the point is the one ``linprog``
+    returns. ``linprog`` solves it instead where those bindings are missing or fail
+    :func:`_load_highs`'s check, when a cost is not finite, and when HiGHS finishes without an
+    optimal solution, which raises ``linprog``'s error.
+    """
+    n_regimes, n_steps = costs.shape
+    program = _program(n_regimes, n_steps, max_transitions)
+    objective = np.concatenate([costs.ravel(), np.zeros(program.n_eta)])
+    solution = None
+    if _HIGHS is not None and np.isfinite(objective).all():
+        solution = _solve_highs(_HIGHS, program, objective)
+    if solution is None:
+        solution = _solve_linprog(program, objective)
+    point, value = solution
+    weights = np.clip(point[: program.n_gamma], 0.0, 1.0)  # a vertex's last bits can leave [0, 1]
+    return weights.reshape(n_regimes, n_steps), value
 
 
 def _constant_column(data: np.ndarray, tau_max: int, rows: np.ndarray) -> bool:

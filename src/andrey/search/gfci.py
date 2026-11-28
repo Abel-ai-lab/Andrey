@@ -42,7 +42,7 @@ from andrey.constraint.fci import (
 )
 from andrey.constraint.fci_jci import mark_index
 from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowledge_masks
-from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
+from andrey.core import ARROW, NULL, TAIL, GraphStructure, _checkpoint, backend
 from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.orient import from_structure
 from andrey.search.boss import boss
@@ -385,6 +385,8 @@ def fci_from_pattern(
         if confounded is not None:  # a confounded pair stays adjacent, so it has no separating set
             derived = {pair: found for pair, found in derived.items() if not confounded[pair]}
         sepsets.update(derived)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("gfci.sepsets", sepsets=sepsets)
 
         marks = circle_pag(skeleton)
         knowledge_marks(marks, constraints)
