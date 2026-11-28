@@ -259,12 +259,13 @@ names its pull request.
   (centering, `scipy.linalg.lstsq` with its `tol` as `cond`, and its intercept) without the
   estimator's input checks, and any other input still goes through it. `bottom_up_parce_lingam`,
   `varma_lingam`, and `rcd` fit the same way and return the same output bit for bit. ([#1359])
-- For contributors, the lint job of a pull request into a release or topic branch runs
+- For contributors, the `test-weakening` job of a pull request into a release or topic branch runs
   `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
   tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
-  a deleted test or `parametrize` case, and a re-recorded baseline file in `tests/` and `qa/`. The
-  job runs the script as the base branch has it and flags a change to the script or to its workflow
-  step, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
+  a warning filter that lets a warning pass, a deleted test or `parametrize` case, and a re-recorded
+  baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it and flags a
+  change to the script or to its workflow job, it is a required check, `.github/` and the script
+  have code owners, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
 
 ### Fixed
 

@@ -512,29 +512,30 @@ contributors:
 - **Numbers and references are never generated.** A benchmark number comes from a recorded run, and
   a reference is cited only after it has been opened and found to support the claim; the author
   answers for it.
-- **A weakened test needs a maintainer's approval.** A test or a baseline is never changed to make
-  a check pass. The lint job of a pull request into a release or topic branch runs
+- **A weakened test needs a maintainer's approval.** A test or a baseline is never changed to make a
+  check pass. The `test-weakening` job of a pull request into a release or topic branch runs
   `scripts/test_weakening.py`, which compares the base and the head of `tests/` and `qa/` by their
   syntax trees, function by function, and flags a removed `assert`, `assert_*` call, or
   `pytest.raises`; a looser tolerance or bound (a larger `rtol`, `atol`, `abs`, or `rel`, a smaller
   `decimal` or `places`, a looser number in a comparison, an exact comparison turned into
   `pytest.approx`); a `skip`, `skipif`, `xfail`, or `release` marker or call added to a test that
   existed; a deleted test, a test file renamed out of the names pytest collects, or a removed
-  `parametrize` case; and a re-recorded baseline file. It prints each flagged change with its reason
-  and fails until the pull request carries the label `test-change-approved`, which a maintainer sets
-  after reading the flags; the job reads the label when it runs, so re-run it after the label is
-  set. The label approves the head it was set after: a push withdraws it, and a maintainer removes
-  it and sets it again after reading the new flags. The job runs the copy of the script that the
-  base branch has, not the pull request's, and a change to the script or to the workflow step that
-  runs it is flagged too, so a pull request cannot weaken the check it is judged by; a workflow
-  change that deletes the step or edits its condition is for the reviewer to catch. So is a change
-  to the pytest options of `pyproject.toml` that choose the tests or judge them (`addopts`,
-  `testpaths`, `filterwarnings`, and the like). An added test, a tightened tolerance,
-  and a test that only moved or was renamed are not flagged, and the release pull request into
-  `main` is not read, since each of its changes passed the check in its own pull request. A person's
-  approval is what the label records, so an agent never sets it. Run
-  `uv run python scripts/test_weakening.py --base origin/release/<x.y.z>` before opening the pull
-  request to see the flags. A pass is necessary and not sufficient: the check cannot see an
+  `parametrize` case; a warning filter that lets a warning pass; and a re-recorded baseline file. It
+  prints each flagged change with its reason and fails until the pull request carries the label
+  `test-change-approved`, which a maintainer sets after reading the flags; the job reads the label
+  when it runs, so re-run it after the label is set. The label approves the head it was set after: a
+  push withdraws it, and a maintainer removes it and sets it again after reading the new flags. The
+  job runs the copy of the script that the base branch has, not the pull request's, and a change to
+  the script or to the workflow job that runs it is flagged too, so a pull request cannot weaken the
+  check it is judged by. The job is a required status check, and `.github/` and the script have code
+  owners (`.github/CODEOWNERS`); a workflow change elsewhere that stops the job from running is for
+  the code owner asked to read it. A change to the pytest options of `pyproject.toml` that choose
+  the tests or judge them (`addopts`, `testpaths`, `filterwarnings`, and the like) is flagged too.
+  An added test, a tightened tolerance, and a test that only moved or was renamed are not flagged,
+  and the release pull request into `main` is not read, since each of its changes passed the check
+  in its own pull request. A person's approval is what the label records, so an agent never sets it.
+  Run `uv run python scripts/test_weakening.py --base origin/release/<x.y.z>` before opening the
+  pull request to see the flags. A pass is necessary and not sufficient: the check cannot see an
   assertion rewritten to a weaker one, a tolerance passed through a variable, a check that moved
   into a helper, or an existing test pointed at a new baseline file, so review still reads every
   change to a test.

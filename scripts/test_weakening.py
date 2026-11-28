@@ -7,21 +7,26 @@ function by function, and flags:
 
 - a removed ``assert`` statement, ``assert_*``, ``pytest.fail`` or ``self.fail`` call,
   ``pytest.raises`` check, or ``pytest.approx`` assertion, and a ``pytest.raises`` that lost its
-  ``match`` (or matches every message), widened to ``Exception``, or lists more exceptions;
+  ``match`` (or matches every message) or its ``check``, widened to ``Exception``, or lists more
+  exceptions;
 - a looser tolerance or bound: a larger ``rtol``, ``atol``, ``abs``, ``rel``, ``tol``, or ``delta``
   (a ``delta`` of ``assertAlmostEqual`` replaces its ``places``), a smaller ``decimal`` or
   ``places``, a looser bound in a comparison, an exact comparison turned into ``pytest.approx``, in
   a call, a default, a module constant, or a tolerance table;
 - a new ``skip``, ``skipif``, or ``xfail`` marker or call, or a new ``release`` marker (a pull
   request into a release branch skips those tests), on a test that existed in the base, written out,
-  through a module name bound to one, or through an alias of ``pytest``; a ``skipif`` made always
-  true, and an ``xfail`` made non-strict or without its ``raises``;
+  through a module name bound to one, or through an alias of ``pytest``; a conditional skip
+  (``skipif``, unittest's ``skipIf`` and ``skipUnless``) made to skip always, and an ``xfail`` made
+  non-strict or without its ``raises``; an autouse fixture or a ``pytest_*`` hook that skips, added
+  to a ``conftest.py`` or to a test file that existed; a ``__test__ = False`` or a lost ``TestCase``
+  base that stops pytest collecting a class; a ``filterwarnings`` marker that stops raising a
+  warning or lets one pass;
 - a deleted test function or parametrized fixture, a test file renamed out of the names pytest
   collects (or into another kind of file), or a removed ``parametrize`` case (a literal list,
   tuple, set, or ``range``; a case that another replaced counts as removed);
 - a re-recorded baseline file: a changed or deleted file of ``baselines/`` or named for one, and a
   JSON baseline whose recorded values changed;
-- a change to this script or to the workflow step that runs it (see below), or to the pytest
+- a change to this script or to the workflow job that runs it (see below), or to the pytest
   options of ``pyproject.toml`` that choose the tests or judge them (``addopts``, ``testpaths``,
   ``norecursedirs``, ``python_files``, ``python_classes``, ``python_functions``, ``xfail_strict``,
   ``filterwarnings``).
@@ -42,8 +47,9 @@ cannot decide.
 
 CI runs the copy of this script that the base branch has, never the pull request's own, so a pull
 request cannot weaken the check it is judged by: it flags a change to this file, and to the
-workflow step that runs it, like any other weakening. The workflow file itself is the pull
-request's, so a pull request that deletes the step is for a reviewer to catch.
+workflow job that runs it, like any other weakening. The workflow file itself is the pull
+request's, so a change to the rest of it that stops the job is for a reviewer to catch: the job is
+a required status check, and ``.github/`` and this script have code owners.
 
     python3 scripts/test_weakening.py --base HEAD^1 --pr 123 --since 2026-11-20T12:00:00Z
 """
@@ -69,7 +75,7 @@ from typing import Any, NamedTuple
 
 LABEL = "test-change-approved"
 ROOTS = ("tests", "qa")
-# This script and the workflow that runs it: a change to either needs the label too.
+# This script and the workflow whose job runs it: a change to either needs the label too.
 DETECTOR = "scripts/test_weakening.py"
 WORKFLOW = ".github/workflows/ci.yml"
 # The pytest options (``pyproject.toml``) that choose which tests run, and how a failure counts.
@@ -84,6 +90,8 @@ PYTEST_OPTIONS = (
     "filterwarnings",
 )
 UNITTEST_SKIPS = frozenset({"skip", "skipIf", "skipUnless", "expectedFailure"})
+# The conditional skips, and the value of the condition that skips the test.
+SKIP_WHEN = {"pytest.mark.skipif": True, "unittest.skipIf": True, "unittest.skipUnless": False}
 
 LARGER_IS_LOOSER = frozenset(
     {"rtol", "atol", "rel_tol", "abs_tol", "rel", "abs", "tol", "tolerance", "eps", "epsilon"}
@@ -249,6 +257,13 @@ class _Exact(ast.NodeTransformer):
         number = _number(node)
         return node if number is None else ast.Constant(value=number, kind=None)
 
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        node = self.generic_visit(node)
+        if _callee(node) == "param":
+            # The ``id`` of a case names it in the report and changes nothing it runs.
+            node.keywords = [keyword for keyword in node.keywords if keyword.arg != "id"]
+        return node
+
 
 def _case(node: ast.AST) -> str:
     """Return the node with its numbers kept: one case of a parametrization before and after."""
@@ -357,6 +372,18 @@ def _marker_kind(node: ast.AST, imports: dict[str, str] | None = None) -> str:
     return ""
 
 
+def _test_flag(node: ast.ClassDef) -> bool | None:
+    """Return the ``__test__`` a class body sets to a literal ``True`` or ``False``, else None."""
+    flag = None
+    for statement in node.body:
+        if not isinstance(statement, ast.Assign | ast.AnnAssign):
+            continue
+        for name, value in _assigned(statement):
+            if name == "__test__" and isinstance(value, ast.Constant):
+                flag = value.value if isinstance(value.value, bool) else flag
+    return flag
+
+
 def _collected_class(
     node: ast.ClassDef,
     classes: dict[str, ast.ClassDef],
@@ -367,9 +394,13 @@ def _collected_class(
 
     A class named ``Test...`` is collected, and so is one that derives from a ``TestCase``, directly
     or through classes of the file. A base imported from another module cannot be read, so it counts
-    as one that may derive from a ``TestCase``.
+    as one that may derive from a ``TestCase``. A literal ``__test__ = False`` in the body stops the
+    collection of a class, and a ``True`` collects one whatever its name.
     """
     seen = seen | {node.name}
+    flag = _test_flag(node)
+    if flag is not None:
+        return flag
     if node.name.startswith("Test"):
         return True
     for base in node.bases:
@@ -483,10 +514,15 @@ def _self_call(node: ast.AST) -> str:
     return ""
 
 
+def _imported_callee(node: ast.Call, imports: dict[str, str]) -> str:
+    """Return the imported name of a call: ``raises`` for ``expect`` after an aliased import."""
+    return _dotted(node.func, imports).rsplit(".", 1)[-1] or _callee(node)
+
+
 def _checks(unit: Unit) -> list[Check]:
     checks = []
     for node in sorted(unit.nodes, key=_position):
-        name = _callee(node) if isinstance(node, ast.Call) else ""
+        name = _imported_callee(node, unit.imports) if isinstance(node, ast.Call) else ""
         if (
             isinstance(node, ast.Assert)
             or name.lstrip("_").startswith("assert")
@@ -509,12 +545,10 @@ def _call_knobs(call: ast.Call, imports: dict[str, str]) -> list[Knob]:
     opaque: set[str] = set()
     positional = POSITIONAL.get(name, {})
     named = [(positional[i], arg) for i, arg in enumerate(call.args) if i in positional]
-    named += [
-        (kw.arg, kw.value)
-        for kw in call.keywords
-        if kw.arg in TOLERANCES and not (kw.arg == "delta" and _is_none(kw.value))
-    ]
+    named += [(kw.arg, kw.value) for kw in call.keywords if kw.arg in TOLERANCES]
     for tolerance, value in named:
+        if _is_none(value) and (tolerance == "delta" or name == "approx"):
+            continue  # left out: ``approx`` reads a ``None`` tolerance as the default
         number = _number(value)
         if number is None:
             opaque.add(tolerance)
@@ -721,10 +755,17 @@ def _matches(call: ast.Call) -> bool:
     return any(k.arg == "match" and _limits_message(k.value) for k in call.keywords)
 
 
+def _checked(call: ast.Call) -> bool:
+    """Whether a ``pytest.raises`` tests the exception with a ``check`` predicate."""
+    return any(k.arg == "check" and not _is_none(k.value) for k in call.keywords)
+
+
 def _raises_reasons(before: ast.Call, after: ast.Call) -> list[str]:
     reasons = []
     if _matches(before) and not _matches(after):
         reasons.append("pytest.raises lost its match")
+    if _checked(before) and not _checked(after):
+        reasons.append("pytest.raises lost its check")
     reasons += [
         f"pytest.raises {reason}" for reason in _widened(_first_arg(before), _first_arg(after))
     ]
@@ -908,13 +949,14 @@ def _keywords(use: ast.expr) -> dict[str, ast.expr]:
     return {k.arg: k.value for k in use.keywords if k.arg} if isinstance(use, ast.Call) else {}
 
 
-def _skipifs(unit: Unit) -> list[tuple[ast.Call, bool]]:
-    """List a unit's ``skipif`` markers in order, with whether the condition is a literal true."""
+def _skipifs(unit: Unit, kind: str) -> list[tuple[ast.Call, bool]]:
+    """List a unit's conditional skips of a kind in order, with whether the condition skips."""
     found = []
-    for node in _marker_uses(unit, "pytest.mark.skipif"):
+    for node in _marker_uses(unit, kind):
         if isinstance(node, ast.Call):
             condition = node.args[0] if node.args else _keywords(node).get("condition")
-            found.append((node, isinstance(condition, ast.Constant) and bool(condition.value)))
+            skips = isinstance(condition, ast.Constant) and bool(condition.value) == SKIP_WHEN[kind]
+            found.append((node, skips))
     return found
 
 
@@ -941,15 +983,49 @@ def _xfail_reasons(before: ast.expr, after: ast.expr) -> list[str]:
     return reasons
 
 
+def _filters(unit: Unit) -> list[str]:
+    """List the literal warning filters of a unit's ``filterwarnings`` markers, in order."""
+    found = []
+    for node in sorted(unit.nodes, key=_position):
+        if isinstance(node, ast.Call) and (
+            _dotted(node.func, unit.imports).endswith("mark.filterwarnings")
+        ):
+            found += [
+                arg.value
+                for arg in node.args
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+            ]
+    return found
+
+
+def _is_error(warning_filter: str) -> bool:
+    """Whether a warning filter (``action:message:category:module:line``) raises the warning."""
+    action = warning_filter.split(":", 1)[0].strip()
+    return bool(action) and "error".startswith(action)
+
+
+def _filter_findings(old: Unit, new: Unit, flag: Flag) -> None:
+    """Flag a ``filterwarnings`` marker that no longer raises a warning, or lets one pass."""
+    before, after = Counter(_filters(old)), Counter(_filters(new))
+    dropped = [f for f in before - after if _is_error(f)]
+    added = [f for f in after - before if not _is_error(f)]
+    if dropped:
+        flag(None, "pytest.mark.filterwarnings error filter removed or changed", dropped)
+    if added:
+        flag(None, "pytest.mark.filterwarnings filter that lets a warning pass added", [], added)
+
+
 def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -> None:
     """Flag the skip, xfail, and release markers a unit gained, but not in an exempt constant.
 
     A ``skipif`` that stays and whose condition becomes a literal true also skips the test, and an
     ``xfail`` that stays and turns non-strict or loses its ``raises`` also lets a failure pass.
     """
-    for (_, was), (call, now) in zip(_skipifs(old), _skipifs(new)):
-        if now and not was:
-            flag(call, "skipif condition made always true", [], [_clip(_text(new, call))])
+    for kind, skips in SKIP_WHEN.items():
+        reason = f"{kind.rsplit('.', 1)[-1]} condition made always {str(skips).lower()}"
+        for (_, was), (call, now) in zip(_skipifs(old, kind), _skipifs(new, kind)):
+            if now and not was:
+                flag(call, reason, [], [_clip(_text(new, call))])
     xfail = "pytest.mark.xfail"
     for before_use, after_use in zip(_marker_uses(old, xfail), _marker_uses(new, xfail)):
         if reasons := _xfail_reasons(before_use, after_use):
@@ -959,6 +1035,7 @@ def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -
                 [_clip(_text(old, before_use))],
                 [_clip(_text(new, after_use))],
             )
+    _filter_findings(old, new, flag)
     before = _markers(old, exempt)
     for name, nodes in _markers(new, exempt).items():
         extra = len(nodes) - len(before.get(name, []))
@@ -1050,6 +1127,49 @@ def _is_fixture(unit: Unit) -> bool:
     return unit.is_function and any(n == ("params",) for n, _, _ in _parametrizations(unit))
 
 
+def _autouse(unit: Unit) -> bool:
+    """Whether a unit is a fixture that every test of its scope uses: ``fixture(autouse=...)``."""
+    if not unit.is_function:
+        return False
+    for decorator in getattr(unit.node, "decorator_list", []):
+        if (
+            isinstance(decorator, ast.Call)
+            and _dotted(decorator.func, unit.imports).rsplit(".", 1)[-1] == "fixture"
+        ):
+            for keyword in decorator.keywords:
+                off = isinstance(keyword.value, ast.Constant) and not keyword.value.value
+                if keyword.arg == "autouse" and not off:
+                    return True
+    return False
+
+
+def _hook(unit: Unit) -> bool:
+    """Whether a unit is a pytest hook: a function named ``pytest_...``."""
+    return unit.is_function and unit.qualname.rsplit(".", 1)[-1].startswith("pytest_")
+
+
+def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Finding]:
+    """Flag the autouse fixtures and hooks that skip tests and that the change added.
+
+    An autouse fixture or a hook of a ``conftest.py`` reaches the tests that already exist, so a
+    skip in one skips them without a marker on any test. One that was an autouse fixture or a
+    hook before is compared with its old self, like any other unit.
+    """
+    findings = []
+    for name, unit in units.items():
+        kind = "autouse fixture" if _autouse(unit) else "pytest hook" if _hook(unit) else ""
+        was = old_units.get(name)
+        if not kind or (was is not None and (_autouse(was) or _hook(was))):
+            continue
+        if any(_markers(unit._replace(inherited=[])).values()):
+            reason = f"{kind} that skips tests added"
+            line = _position(unit.node)[0]
+            findings.append(
+                Finding(unit.path, line, unit.qualname, reason, "", _clip(_text(unit, unit.node)))
+            )
+    return findings
+
+
 def analyze(changes: Sequence[Change]) -> list[Finding]:
     """Return the weakenings in the changed Python files of a pull request."""
     findings: list[Finding] = []
@@ -1066,6 +1186,8 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 continue
             added += [u for u in new_file.values() if u.is_test and _collected(change.path)]
             added_fixtures += [u for u in new_file.values() if _is_fixture(u)]
+            if change.path.rsplit("/", 1)[-1] == "conftest.py":
+                findings += _skipping(new_file, {})
             continue
         try:
             old_units = collect(change.old_path, change.old)
@@ -1083,11 +1205,18 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             reason = f"test no longer collected: the file was renamed to {change.path}"
             new_units = {}
         exempt = _only_added_tests(old_units, new_units)
+        findings += _skipping(new_units, old_units)
         for name, unit in old_units.items():
             if name in new_units:
-                findings += compare(
-                    unit, new_units[name], exempt if name == "<module>" else frozenset()
-                )
+                now = new_units[name]
+                if unit.is_test and now.is_function and not now.is_test:
+                    # Same function, but pytest no longer collects its class.
+                    reason = "test no longer collected: pytest stops collecting its class"
+                    line = _position(now.node)[0]
+                    findings.append(
+                        Finding(now.path, line, name, reason, _clip(_text(unit, unit.node)))
+                    )
+                findings += compare(unit, now, exempt if name == "<module>" else frozenset())
             elif unit.is_test:
                 deleted.append((unit, reason))
             elif _is_fixture(unit):
@@ -1242,39 +1371,41 @@ def _pytest_options(root: str, revision: str) -> dict[str, Any]:
         return {}
 
 
-def workflow_steps(workflow: str) -> list[tuple[int, str]]:
-    """Return the steps of a workflow file that run this script, found by content: (line, text).
+def workflow_jobs(workflow: str) -> list[tuple[int, str]]:
+    """Return the jobs of a workflow file that run this script, found by content: (line, text).
 
-    A step is the list item around a line that names the script, up to the next line at or left of
-    its dash. Its text leaves out blank lines and comments, so a reworded comment is not a change.
+    A job is the mapping under its name in ``jobs:``, up to the next line at or left of its name.
+    Its text leaves out blank lines and comments, so a reworded comment is not a change, and keeps
+    the job's own condition, runner, and permissions, which decide whether its steps run.
     """
     lines = workflow.splitlines()
-    starts = set()
-    for index, line in enumerate(lines):
-        if DETECTOR.rsplit("/", 1)[-1][:-3] not in line or line.lstrip().startswith("#"):
-            continue
-        indent = len(line) - len(line.lstrip())
-        for i in range(index, -1, -1):
-            dash = len(lines[i]) - len(lines[i].lstrip())
-            if lines[i].lstrip().startswith("- ") and (i == index or dash < indent):
-                starts.add(i)
-                break
-    steps = []
-    for start in sorted(starts):
-        dash = len(lines[start]) - len(lines[start].lstrip())
-        end = len(lines)
-        for i in range(start + 1, len(lines)):
-            text = lines[i].lstrip()
-            if text and not text.startswith("#") and len(lines[i]) - len(text) <= dash:
-                end = i
-                break
-        body = [ln.rstrip() for ln in lines[start:end] if ln.strip()]
-        steps.append((start + 1, "\n".join(ln for ln in body if not ln.lstrip().startswith("#"))))
-    return steps
+    name = DETECTOR.rsplit("/", 1)[-1][:-3]
+    heads = [i for i, line in enumerate(lines) if re.fullmatch(r"jobs:\s*", line)]
+    if not heads:
+        return []
+
+    def content(i: int) -> bool:
+        return bool(lines[i].strip()) and not lines[i].lstrip().startswith("#")
+
+    def indent(i: int) -> int:
+        return len(lines[i]) - len(lines[i].lstrip())
+
+    rest = [i for i in range(heads[0] + 1, len(lines)) if content(i)]
+    if not rest:
+        return []
+    column = indent(rest[0])
+    starts = [i for i in rest if indent(i) == column]
+    jobs = []
+    for start, stop in zip(starts, [*starts[1:], len(lines)]):
+        end = next((i for i in rest if i > start and indent(i) < column), len(lines))
+        block = [lines[i].rstrip() for i in range(start, min(stop, end)) if content(i)]
+        if any(name in line for line in block):
+            jobs.append((start + 1, "\n".join(block)))
+    return jobs
 
 
 def guard_findings(base: str, head: str, root: str) -> list[Finding]:
-    """Flag a change to this script or to the workflow step that runs it.
+    """Flag a change to this script or to the workflow job that runs it.
 
     CI runs the copy of this script on the base branch, so a pull request cannot weaken the check
     it is judged by without a maintainer reading the change. A file the base does not have yet is
@@ -1296,16 +1427,16 @@ def guard_findings(base: str, head: str, root: str) -> list[Finding]:
         reason = f"pytest options that choose or judge the tests changed: {', '.join(changed)}"
         findings.append(Finding("pyproject.toml", 0, "", reason))
     if _exists(root, merge_base, WORKFLOW):
-        before = workflow_steps(_show(root, merge_base, WORKFLOW).decode("utf-8", "replace"))
+        before = workflow_jobs(_show(root, merge_base, WORKFLOW).decode("utf-8", "replace"))
         text = (
             _show(root, head, WORKFLOW).decode("utf-8", "replace")
             if _exists(root, head, WORKFLOW)
             else ""
         )
-        after = workflow_steps(text)
-        if before and [step for _, step in before] != [step for _, step in after]:
+        after = workflow_jobs(text)
+        if before and [job for _, job in before] != [job for _, job in after]:
             line = after[0][0] if after else 0
-            reason = "the workflow step that runs the weakened-test check changed or was removed"
+            reason = "the workflow job that runs the weakened-test check changed or was removed"
             findings.append(Finding(WORKFLOW, line, "", reason))
     return findings
 

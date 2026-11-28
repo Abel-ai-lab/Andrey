@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 PATH = "tests/unit/test_example.py"
@@ -1204,6 +1205,231 @@ FLAGGED = {
         """,
         "loosened from 1e-06 to 0.01",
     ),
+    "raises removed through an aliased import": (
+        """
+        from pytest import raises as expect
+
+        def test_fit():
+            with expect(ValueError):
+                fit(None)
+            with expect(TypeError):
+                fit(1)
+        """,
+        """
+        from pytest import raises as expect
+
+        def test_fit():
+            with expect(ValueError):
+                fit(None)
+        """,
+        "pytest.raises check removed",
+    ),
+    "raises removed through a module alias": (
+        """
+        import pytest as pt
+
+        def test_fit():
+            with pt.raises(ValueError):
+                fit(None)
+            with pt.raises(TypeError):
+                fit(1)
+        """,
+        """
+        import pytest as pt
+
+        def test_fit():
+            with pt.raises(ValueError):
+                fit(None)
+        """,
+        "pytest.raises check removed",
+    ),
+    "assertion helper removed through an aliased import": (
+        """
+        from numpy.testing import assert_allclose as close
+
+        def test_fit():
+            close(a, b)
+            close(c, d)
+        """,
+        """
+        from numpy.testing import assert_allclose as close
+
+        def test_fit():
+            close(a, b)
+        """,
+        "assertion removed",
+    ),
+    "unittest skipIf condition made true": (
+        """
+        import unittest
+
+        class TestFit(unittest.TestCase):
+            @unittest.skipIf(False, "never")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        import unittest
+
+        class TestFit(unittest.TestCase):
+            @unittest.skipIf(True, "never")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        "skipIf condition made always true",
+    ),
+    "unittest skipUnless condition made false": (
+        """
+        from unittest import TestCase, skipUnless
+
+        class TestFit(TestCase):
+            @skipUnless(True, "needs it")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        from unittest import TestCase, skipUnless
+
+        class TestFit(TestCase):
+            @skipUnless(False, "needs it")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        "skipUnless condition made always false",
+    ),
+    "class disabled with __test__": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            __test__ = False
+
+            def test_fit(self):
+                assert fit()
+        """,
+        "test no longer collected",
+    ),
+    "unittest class stops deriving from TestCase": (
+        """
+        import unittest
+
+        class FitTest(unittest.TestCase):
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        import unittest
+
+        class FitTest:
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        "test no longer collected",
+    ),
+    "approx rel set to None": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=1e-9)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=None)
+        """,
+        "rel loosened from 1e-09 to 1e-06",
+    ),
+    "approx abs set to None": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, abs=1e-14)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, abs=None)
+        """,
+        "rel loosened from 0 to 1e-06",
+    ),
+    "raises lost its check": (
+        """
+        def test_fit():
+            with pytest.raises(OSError, check=lambda e: e.errno == errno.EACCES):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(OSError):
+                fit(None)
+        """,
+        "pytest.raises lost its check",
+    ),
+    "parametrized case changed along with its id": (
+        """
+        @pytest.mark.parametrize("n", [pytest.param(1, id="one"), pytest.param(2, id="two")])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", [pytest.param(1, id="one"), pytest.param(3, id="two")])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        "1 parametrize case(s) removed",
+    ),
+    "warning filter relaxed to ignore": (
+        """
+        @pytest.mark.filterwarnings("error::RuntimeWarning")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+        def test_fit():
+            assert fit()
+        """,
+        "error filter removed or changed",
+    ),
+    "warning filter that errors removed": (
+        """
+        @pytest.mark.filterwarnings("error")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+        """,
+        "error filter removed or changed",
+    ),
+    "warning ignore filter added": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+        def test_fit():
+            assert fit()
+        """,
+        "filter that lets a warning pass added",
+    ),
+    "warning default filter added through a module name": (
+        """
+        from pytest import mark
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from pytest import mark
+
+        @mark.filterwarnings("default")
+        def test_fit():
+            assert fit()
+        """,
+        "filter that lets a warning pass added",
+    ),
 }
 
 
@@ -1874,6 +2100,259 @@ NOT_FLAGGED = {
         RTOL, ATOL = 1e-6, 1e-12
         """,
     ),
+    "raises through an import that is not pytest's": (
+        """
+        from tools import expect
+
+        def test_fit():
+            expect(fit(None))
+            expect(fit(1))
+        """,
+        """
+        from tools import expect
+
+        def test_fit():
+            expect(fit(None))
+        """,
+    ),
+    "aliased raises kept": (
+        """
+        from pytest import raises as expect
+
+        def test_fit():
+            with expect(ValueError, match="alpha"):
+                fit(None)
+        """,
+        """
+        from pytest import raises as expect
+
+        def test_fit():
+            with expect(ValueError, match="alpha"):
+                fit(None)
+            with expect(TypeError):
+                fit(1)
+        """,
+    ),
+    "unittest skipIf condition made false": (
+        """
+        import unittest
+
+        class TestFit(unittest.TestCase):
+            @unittest.skipIf(True, "never")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        import unittest
+
+        class TestFit(unittest.TestCase):
+            @unittest.skipIf(False, "never")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+    ),
+    "unittest skipUnless condition made true": (
+        """
+        from unittest import TestCase, skipUnless
+
+        class TestFit(TestCase):
+            @skipUnless(False, "needs it")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        from unittest import TestCase, skipUnless
+
+        class TestFit(TestCase):
+            @skipUnless(True, "needs it")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+    ),
+    "unittest skip condition not a literal": (
+        """
+        import sys
+        from unittest import TestCase, skipIf
+
+        class TestFit(TestCase):
+            @skipIf(sys.platform == "win32", "posix only")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        import sys
+        from unittest import TestCase, skipIf
+
+        class TestFit(TestCase):
+            @skipIf(sys.platform == "darwin", "posix only")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+    ),
+    "class that opts into collection with __test__": (
+        """
+        class TestFit:
+            __test__ = False
+
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+    ),
+    "class that stays disabled with __test__": (
+        """
+        class TestFit:
+            __test__ = False
+
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            __test__ = False
+
+            def test_fit(self):
+                assert fit()
+                assert fit() > 0
+        """,
+    ),
+    "__test__ set to True": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            __test__ = True
+
+            def test_fit(self):
+                assert fit()
+        """,
+    ),
+    "approx rel tightened from None": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=None)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=1e-9)
+        """,
+    ),
+    "approx rel from a value to None that is the default": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=1e-3)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=None)
+        """,
+    ),
+    "approx rel None unchanged": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=None, abs=1e-3)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, rel=None, abs=1e-3)
+        """,
+    ),
+    "raises check kept": (
+        """
+        def test_fit():
+            with pytest.raises(OSError, check=lambda e: e.errno == errno.EACCES):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(OSError, check=lambda e: e.errno == errno.EACCES):
+                fit(None)
+            with pytest.raises(ValueError):
+                fit(1)
+        """,
+    ),
+    "raises check added": (
+        """
+        def test_fit():
+            with pytest.raises(OSError):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(OSError, check=lambda e: e.errno == errno.EACCES):
+                fit(None)
+        """,
+    ),
+    "parametrized case renamed by its id": (
+        """
+        @pytest.mark.parametrize("n", [pytest.param(1, id="old"), pytest.param(2)])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", [pytest.param(1, id="new"), pytest.param(2, id="two")])
+        def test_fit(n):
+            assert fit(n)
+        """,
+    ),
+    "warning filter tightened to error": (
+        """
+        @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.filterwarnings("error::RuntimeWarning")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "warning error filter added": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.filterwarnings("error")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "warning filters reordered": (
+        """
+        @pytest.mark.filterwarnings("error::RuntimeWarning")
+        @pytest.mark.filterwarnings("ignore::UserWarning")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.filterwarnings("ignore::UserWarning")
+        @pytest.mark.filterwarnings("error::RuntimeWarning")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "warning filter on an added test": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+
+        @pytest.mark.filterwarnings("ignore")
+        def test_new():
+            assert fit()
+        """,
+    ),
 }
 
 
@@ -2100,6 +2579,92 @@ def test_a_test_moved_into_a_skipped_module_is_flagged(check):
     assert [f.reason for f in found] == ["pytest.mark.skip added to a test that existed"]
 
 
+CONFTEST = "tests/unit/conftest.py"
+AUTOUSE_SKIP = """
+import pytest
+
+@pytest.fixture(autouse=True)
+def gpu():
+    pytest.skip("no gpu")
+"""
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        AUTOUSE_SKIP,
+        "import pytest\n\n@pytest.fixture(autouse=True)\n"
+        'def gpu():\n    pytest.importorskip("torch")\n',
+        'import pytest\n\n@pytest.fixture(scope="session", autouse=True)\n'
+        "def gpu(request):\n    request.applymarker(pytest.mark.skip)\n",
+        "from pytest import fixture, skip\n\n@fixture(autouse=True)\ndef gpu():\n    skip('x')\n",
+        "import pytest\n\ndef pytest_collection_modifyitems(items):\n"
+        "    for item in items:\n        item.add_marker(pytest.mark.skip)\n",
+    ],
+)
+def test_a_new_conftest_that_skips_every_test_is_flagged(check, source):
+    found = reasons(check, None, source, CONFTEST)
+    assert len(found) == 1 and found[0].endswith("that skips tests added"), found
+
+
+@pytest.mark.parametrize("path", [CONFTEST, "tests/unit/test_a.py"])
+def test_a_skipping_autouse_fixture_added_to_an_existing_file_is_flagged(check, path):
+    old = "def helper():\n    return 1\n"
+    found = reasons(check, old, old + AUTOUSE_SKIP, path)
+    assert found == ["autouse fixture that skips tests added"]
+
+
+def test_an_existing_fixture_made_autouse_that_skips_is_flagged(check):
+    old = "import pytest\n\n@pytest.fixture\ndef gpu():\n    pytest.skip('no gpu')\n"
+    new = old.replace("@pytest.fixture", "@pytest.fixture(autouse=True)")
+    assert reasons(check, old, new, CONFTEST) == ["autouse fixture that skips tests added"]
+
+
+def test_a_skip_added_to_an_existing_autouse_fixture_is_flagged_once(check):
+    old = "import pytest\n\n@pytest.fixture(autouse=True)\ndef gpu():\n    return 1\n"
+    new = old.replace("return 1", "pytest.skip('no gpu')")
+    assert reasons(check, old, new, CONFTEST) == ["pytest.skip() added to a test that existed"]
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "path"),
+    [
+        (
+            None,
+            "import pytest\n\n@pytest.fixture(autouse=True)\ndef seed():\n    return 1\n",
+            CONFTEST,
+        ),
+        (
+            None,
+            "import pytest\n\n@pytest.fixture\ndef gpu():\n    pytest.skip('no gpu')\n",
+            CONFTEST,
+        ),
+        (None, AUTOUSE_SKIP, "tests/unit/test_new.py"),
+        (
+            "def helper():\n    return 1\n",
+            "import pytest\n\n@pytest.fixture(autouse=False)\ndef gpu():\n    pytest.skip('x')\n",
+            CONFTEST,
+        ),
+        (AUTOUSE_SKIP, AUTOUSE_SKIP, CONFTEST),
+        (
+            None,
+            "def pytest_configure(config):\n    config.addinivalue_line('markers', 'slow: x')\n",
+            CONFTEST,
+        ),
+    ],
+    ids=[
+        "autouse without a skip",
+        "skip in a fixture that is not autouse",
+        "autouse skip in a new test file",
+        "autouse=False",
+        "unchanged autouse skip",
+        "hook without a skip",
+    ],
+)
+def test_other_fixtures_and_hooks_are_not_flagged(check, old, new, path):
+    assert reasons(check, old, new, path) == []
+
+
 def test_a_marker_on_a_class_is_reported_once(check):
     methods = (
         "    def test_a(self):\n        assert a()\n\n    def test_b(self):\n        assert b()\n"
@@ -2322,7 +2887,7 @@ def test_a_change_outside_tests_and_qa_is_not_read(check, repo):
     assert check.main(["--base", "main"]) == 0
 
 
-# The check and the workflow step that runs it are guarded: a pull request cannot weaken the check
+# The check and the workflow job that runs it are guarded: a pull request cannot weaken the check
 # it is judged by without a maintainer reading the change.
 
 WORKFLOW = textwrap.dedent("""
@@ -2331,13 +2896,20 @@ WORKFLOW = textwrap.dedent("""
       lint:
         steps:
           - uses: actions/checkout@v7
+          - name: ty
+            run: ty check
+      # A required check, by its name.
+      test-weakening:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-24.04
+        steps:
+          - uses: actions/checkout@v7
           - name: Weakened tests need a maintainer's approval
             # Judges the pull request's tests.
+            if: github.base_ref != 'main'
             run: |
               git show HEAD^1:scripts/test_weakening.py > "$RUNNER_TEMP/test_weakening.py"
               python -I "$RUNNER_TEMP/test_weakening.py" --base HEAD^1
-          - name: ty
-            run: ty check
       other:
         steps:
           - run: echo hi
@@ -2363,10 +2935,22 @@ GUARDED = {
     "the check edited": {CHECK_FILE: "import sys\nsys.exit(0)\n"},
     "the step edited": {WORKFLOW_FILE: WORKFLOW.replace("--base HEAD^1", "--base HEAD")},
     "the step renamed": {WORKFLOW_FILE: WORKFLOW.replace("Weakened tests", "Tests")},
+    "the step condition edited": {
+        WORKFLOW_FILE: WORKFLOW.replace("github.base_ref != 'main'", "false")
+    },
     "the step pointed at the pull request's copy": {
         WORKFLOW_FILE: WORKFLOW.replace('"$RUNNER_TEMP/test_weakening.py"', CHECK_FILE)
     },
     "the step removed": {WORKFLOW_FILE: WORKFLOW.replace("test_weakening", "other")},
+    "the job condition edited": {
+        WORKFLOW_FILE: WORKFLOW.replace("github.event_name == 'pull_request'", "false")
+    },
+    "the job runner edited": {WORKFLOW_FILE: WORKFLOW.replace("ubuntu-24.04", "macos-14")},
+    "the job renamed": {WORKFLOW_FILE: WORKFLOW.replace("  test-weakening:", "  test-tests:")},
+    "the job removed": {
+        WORKFLOW_FILE: WORKFLOW[: WORKFLOW.index("  # A required check")]
+        + WORKFLOW[WORKFLOW.index("  other:") :]
+    },
 }
 NOT_GUARDED = {
     "an unrelated edit of the workflow": {
@@ -2375,6 +2959,10 @@ NOT_GUARDED = {
     "a reworded comment of the step": {
         WORKFLOW_FILE: WORKFLOW.replace("Judges the pull request's tests.", "Judges tests.")
     },
+    "a reworded comment of the job": {
+        WORKFLOW_FILE: WORKFLOW.replace("A required check, by its name.", "Required.")
+    },
+    "an edit of another job": {WORKFLOW_FILE: WORKFLOW.replace("echo hi", "echo hello")},
     "a job added": {WORKFLOW_FILE: WORKFLOW + "  extra:\n    steps:\n      - run: echo x\n"},
 }
 
@@ -2446,12 +3034,22 @@ def test_a_pull_request_that_adds_the_check_and_its_step_is_not_flagged(check, r
     assert check.main(["--base", "main"]) == 0
 
 
-def test_the_step_of_this_repository_runs_the_check_of_the_base_branch(check):
+def test_the_job_of_this_repository_runs_the_check_of_the_base_branch(check):
     text = (ROOT / WORKFLOW_FILE).read_text()
-    [(_, step)] = check.workflow_steps(text)
-    assert 'git show HEAD^1:scripts/test_weakening.py > "$detector"' in step
-    assert 'python -I "$detector"' in step
-    assert "python scripts/test_weakening.py" not in step
+    [(_, job)] = check.workflow_jobs(text)
+    assert job.startswith("  test-weakening:")
+    assert 'git show HEAD^1:scripts/test_weakening.py > "$detector"' in job
+    assert 'python -I "$detector"' in job
+    assert "python scripts/test_weakening.py" not in job
+
+
+def test_the_job_of_this_repository_is_a_gated_check_that_reports_on_every_pull_request(check):
+    workflow = yaml.safe_load((ROOT / WORKFLOW_FILE).read_text())
+    job = workflow["jobs"]["test-weakening"]
+    assert "needs" not in job
+    assert "base_ref" not in job["if"]
+    assert "test-weakening" in workflow["jobs"]["ci-gate"]["needs"]
+    assert [s["if"] for s in job["steps"] if "if" in s] == ["github.base_ref != 'main'"]
 
 
 SINCE = "2026-11-20T12:00:00Z"
