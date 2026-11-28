@@ -372,10 +372,15 @@ def _scope_nodes(root: ast.AST, definitions: list[ast.AST]) -> Iterator[ast.AST]
         stack.extend(ast.iter_child_nodes(node))
 
 
-def _imports(tree: ast.AST) -> dict[str, str]:
-    """Return what each imported name stands for: ``{"pt": "pytest", "sk": "pytest.skip"}``."""
+def _imports(root: ast.AST) -> dict[str, str]:
+    """Return what each name a scope imports stands for: ``{"pt": "pytest", "sk": "pytest.skip"}``.
+
+    The scope is a module, class, or function body without the functions and classes in it, so an
+    import in one function does not rename a name that the module or another function imports.
+    """
     found = {}
-    for node in ast.walk(tree):
+    scope = [n for n in _scope_nodes(root, []) if isinstance(n, ast.Import | ast.ImportFrom)]
+    for node in sorted(scope, key=lambda n: n.lineno):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 found[alias.asname or alias.name.split(".")[0]] = (
@@ -518,8 +523,14 @@ def collect(path: str, source: str) -> dict[str, Unit]:
     units: dict[str, Unit] = {}
 
     def add(
-        root: ast.AST, qualname: str, collected: bool = True, inherited: tuple[ast.AST, ...] = ()
+        root: ast.AST,
+        qualname: str,
+        collected: bool = True,
+        inherited: tuple[ast.AST, ...] = (),
+        outer: dict[str, str] = imports,
     ) -> None:
+        # What the unit imports on top of what the unit around it does.
+        scope = {**outer, **_imports(root)}
         definitions: list[ast.AST] = []
         if isinstance(root, ast.ClassDef | ast.Module):
             nodes = list(_scope_nodes(root, definitions))
@@ -534,7 +545,7 @@ def collect(path: str, source: str) -> dict[str, Unit]:
             constants,
             aliases,
             collected,
-            imports,
+            scope,
             list(inherited),
         )
         # What a test inherits from its class and module: their decorators and ``pytestmark``.
@@ -561,6 +572,7 @@ def collect(path: str, source: str) -> dict[str, Unit]:
                 name if qualname == "<module>" else f"{qualname}.{name}",
                 collected and not inside,
                 above,
+                scope,
             )
 
     add(tree, "<module>")
@@ -1076,15 +1088,28 @@ def _applies(condition: ast.expr | None, kind: str) -> bool:
     return _literal(condition, kind.startswith("pytest.")) == SKIP_WHEN[kind]
 
 
+def _conditions(use: ast.expr, kind: str) -> list[ast.expr]:
+    """List the conditions of a marker that pytest or ``unittest`` evaluates, in order.
+
+    pytest applies a marker when any of its positional conditions is true, and reads only a
+    ``condition=`` keyword when there is one; ``unittest`` takes one condition, then the reason.
+    """
+    args = use.args if isinstance(use, ast.Call) else []
+    keyword = _keywords(use).get("condition")
+    if kind.startswith("pytest."):
+        return [keyword] if keyword is not None else list(args)
+    return list(args[:1]) or ([keyword] if keyword is not None else [])
+
+
 def _skipifs(unit: Unit, kind: str) -> list[tuple[ast.expr, bool]]:
     """List a unit's conditional skips of a kind in order, with whether the condition skips."""
     found = []
     for node in _marker_uses(unit, kind):
         if isinstance(node, ast.Call):
-            condition = node.args[0] if node.args else _keywords(node).get("condition")
-            skips = _applies(condition, kind)
+            conditions = _conditions(node, kind)
+            skips = any(_applies(condition, kind) for condition in conditions)
             # An ``xfail`` with no condition always applies, and so does a bare one.
-            found.append((node, skips or (condition is None and kind.endswith("xfail"))))
+            found.append((node, skips or (not conditions and kind.endswith("xfail"))))
         elif kind.endswith("xfail"):
             found.append((node, True))
     return found
@@ -1104,13 +1129,11 @@ def _strict(use: ast.expr) -> bool | None:
 def _stops_running(use: ast.expr) -> bool:
     """Whether an ``xfail`` marker has the literal ``run=False`` and a condition that can apply."""
     run = _keywords(use).get("run")
-    condition = (
-        use.args[0] if isinstance(use, ast.Call) and use.args else _keywords(use).get("condition")
-    )
+    conditions = _conditions(use, "pytest.mark.xfail")
     return (
         isinstance(run, ast.Constant)
         and run.value is False
-        and _literal(condition, True) is not False
+        and (not conditions or any(_literal(c, True) is not False for c in conditions))
     )
 
 
@@ -1477,9 +1500,17 @@ def _hook(unit: Unit) -> bool:
 
 
 def _xunit(unit: Unit) -> bool:
-    """Whether a unit is an xunit-style setup that pytest runs: ``setup_module`` and the like."""
+    """Whether a unit is an xunit-style setup that pytest runs: ``setup_module`` and the like.
+
+    pytest runs one only in a test module it collects, not in a ``conftest.py`` or a ``qa/`` file.
+    """
     in_class = XUNIT_SETUPS.get(unit.qualname.rsplit(".", 1)[-1])
-    return unit.is_function and unit.collected and in_class == ("." in unit.qualname)
+    return (
+        unit.is_function
+        and unit.collected
+        and _collected(unit.path)
+        and in_class == ("." in unit.qualname)
+    )
 
 
 def _stops_tests(unit: Unit, was: Unit | None) -> str:
@@ -1547,6 +1578,7 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
     added_fixtures: list[Unit] = []
     lost: list[Unit] = []
     added_functions: list[Unit] = []
+    setups: dict[str, list[Finding]] = {}
     for change in changes:
         if change.old is None:
             # A new file has nothing to compare with, but a test moved into it is not a deletion.
@@ -1555,6 +1587,8 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             except (SyntaxError, ValueError):
                 continue
             added += [u for u in new_file.values() if u.is_test and _collected(change.path)]
+            # A skipping setup is no change to tests that are new, but it skips a test moved in.
+            setups[change.path] = _skipping({n: u for n, u in new_file.items() if _xunit(u)}, {})
             added_fixtures += [u for u in new_file.values() if _is_fixture(u)]
             added_functions += [u for u in new_file.values() if _in_qa(u)]
             if change.path.rsplit("/", 1)[-1] == "conftest.py":
@@ -1633,6 +1667,7 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
         else:
             pool.remove(match)
             findings += compare(unit, match)
+            findings += setups.get(match.path, [])
     # A marker on a class or module counts for each of its tests: the same line is reported once.
     unique: dict[tuple, Finding] = {}
     for finding in findings:

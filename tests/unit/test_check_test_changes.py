@@ -770,6 +770,83 @@ FLAGGED = {
         """,
         "skipif condition made always true",
     ),
+    "skipif with a second positional condition made true": (
+        """
+        @pytest.mark.skipif(False, False, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(False, True, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        "skipif condition made always true",
+    ),
+    "xfail with a second positional condition made to stop running": (
+        """
+        @pytest.mark.xfail(False, False, reason="slow", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(False, True, reason="slow", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail made not to run the test",
+    ),
+    "unittest skipIf made true with a reason": (
+        """
+        @unittest.skipIf(False, "slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @unittest.skipIf(True, "slow")
+        def test_fit():
+            assert fit()
+        """,
+        "skipIf condition made always true",
+    ),
+    "fixture decorator named like one a function of the file imports from elsewhere": (
+        """
+        from pytest import fixture
+
+        def helper():
+            from custom import fixture
+            return fixture
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from pytest import fixture
+
+        def helper():
+            from custom import fixture
+            return fixture
+
+        @fixture
+        def test_fit():
+            assert fit()
+        """,
+        "test no longer collected: it became a fixture",
+    ),
+    "skip called by a name a function imports": (
+        """
+        def test_fit():
+            from pytest import skip
+            assert fit()
+        """,
+        """
+        def test_fit():
+            from pytest import skip
+            skip("disabled")
+            assert fit()
+        """,
+        "pytest.skip() added",
+    ),
     "skipif condition replaced by true": (
         """
         @pytest.mark.skipif(sys.platform == "win32", reason="windows")
@@ -3347,6 +3424,18 @@ NOT_FLAGGED = {
             seed()
         """,
     ),
+    "skipif with a second positional condition kept false": (
+        """
+        @pytest.mark.skipif(False, False, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(False, sys.platform == "win32", reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+    ),
     "helper named like a setup that skips": (
         """
         def test_fit():
@@ -3573,6 +3662,40 @@ def test_a_class_renamed_and_skipped_is_flagged(check):
     found = check.analyze([check.Change(a, a, old, skipped)])
     assert [f.reason for f in found] == ["pytest.mark.skip added to a test that existed"]
     assert check.analyze([check.Change(a, a, old, renamed)]) == []
+
+
+SKIPPING_SETUP = "def setup_module():\n    pytest.skip('no gpu')\n\n"
+
+
+def test_a_test_moved_into_a_new_file_with_a_skipping_setup_is_flagged(check):
+    source = "def test_fit():\n    assert fit()\n"
+    a, b = "tests/unit/test_a.py", "tests/unit/test_b.py"
+    changes = [
+        check.Change(a, a, source, "x = 1\n"),
+        check.Change(b, b, None, SKIPPING_SETUP + source),
+    ]
+    found = check.analyze(changes)
+    assert [f.reason for f in found] == ["setup_module that skips tests added"]
+    assert found[0].path == b
+
+
+def test_a_new_file_with_a_skipping_setup_and_new_tests_is_not_flagged(check):
+    source = "def test_fit():\n    assert fit()\n"
+    a, b, c = "tests/unit/test_a.py", "tests/unit/test_b.py", "tests/unit/test_c.py"
+    changes = [
+        check.Change(a, a, source, "x = 1\n"),
+        check.Change(b, b, None, source),
+        check.Change(c, c, None, SKIPPING_SETUP + "def test_other():\n    assert other()\n"),
+    ]
+    assert check.analyze(changes) == []
+
+
+@pytest.mark.parametrize(
+    "path", ["tests/unit/conftest.py", "qa/check_fit.py", "tests/unit/helpers.py"]
+)
+def test_a_setup_that_skips_is_inert_where_pytest_collects_no_test_module(check, path):
+    assert reasons(check, "x = 1\n", "x = 1\n\n" + SKIPPING_SETUP, path) == []
+    assert reasons(check, None, "x = 1\n\n" + SKIPPING_SETUP, path) == []
 
 
 def test_a_test_moved_into_a_skipped_module_is_flagged(check):
