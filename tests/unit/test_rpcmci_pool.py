@@ -407,6 +407,35 @@ def test_a_cpu_worker_runs_pytorch_on_one_thread(worker_state, monkeypatch):
         torch.set_num_threads(torch_threads)
 
 
+@pytest.mark.parametrize("preference, threads", [("cpu", 1), ("numpy", 2)])
+def test_a_fit_in_this_process_runs_pytorch_on_the_threads_a_worker_does(
+    preference, threads, monkeypatch
+):
+    """A ``cpu`` fit in this process runs its starts on one PyTorch thread, as a ``cpu`` worker
+    does, and gives the thread count back; a ``numpy`` fit leaves PyTorch alone. The BLAS limit is
+    replaced here by one that changes nothing, as the worker test does, so that the PyTorch limit
+    is what is seen."""
+    torch = pytest.importorskip("torch")
+    monkeypatch.setattr(backend, "one_blas_thread", contextlib.nullcontext)
+    seen: list[int] = []
+    run_start = rp.run_start
+    monkeypatch.setattr(
+        rp,
+        "run_start",
+        lambda starts, a: seen.append(torch.get_num_threads()) or run_start(starts, a),
+    )
+    x, switches = series("sign", 300)
+    torch_threads = torch.get_num_threads()
+    try:
+        torch.set_num_threads(2)
+        with andrey.config(n_jobs=1, backend=preference):
+            rp.rpcmci(x, n_starts=3, max_transitions=switches)
+        assert seen == [threads] * 3
+        assert torch.get_num_threads() == 2
+    finally:
+        torch.set_num_threads(torch_threads)
+
+
 @pytest.mark.parametrize("scope", ["attribute", "context"])
 def test_the_pool_is_given_the_callers_tie_break_backend_and_environment(
     scope, in_process, monkeypatch

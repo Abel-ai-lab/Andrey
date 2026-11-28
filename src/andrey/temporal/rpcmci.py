@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Iterable
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from types import ModuleType
@@ -524,7 +525,10 @@ def rpcmci(
         },
     )
     runs = pooled_starts(starts, n_starts)
-    with backend.one_blas_thread():  # the regression costs then give the same bits on any host
+    with ExitStack() as limits:  # the regression costs then give the same bits on any host
+        if backend.config.backend == "cpu":  # PyTorch on one thread, as in a pooled worker
+            limits.enter_context(backend.one_torch_thread())
+        limits.enter_context(backend.one_blas_thread())
         if runs is None:
             runs = (run_start(starts, a) for a in range(n_starts))
         best, n_failed = best_start(runs, data.shape[0])
