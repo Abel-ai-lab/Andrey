@@ -314,13 +314,12 @@ names its pull request.
   `BaseException`, a `test_*` function that becomes a fixture, a `parametrize` with no case added,
   an `xfail` that gains `run=False`, a new `setup_module`, `setup_class`, `setup_method`, or
   `setup_function` that skips, and a function of `qa/` that is deleted or emptied. ([#1381])
-- `indep_test="kci"` runs faster: a query keeps the kernel of its first variable with the
-  conditioning set for the queries that share it, as it kept the second variable's, and the
-  skeleton searches of `pc`, `fci`, and the methods built on them evaluate a stack of queries one
-  conditioning set at a time, so each matrix is built once for the stack. A p-value is the same bit
-  for bit on one BLAS thread, which the skeleton scans use on fewer than 2,000 rows; `gfci`,
-  `boss_fci`, and `grasp_fci` also query the test outside that pin to derive separating sets, and
-  there a p-value can differ in its last digits. ([#1337])
+- `indep_test="kci"` runs faster, with the same output bit for bit: a query keeps the kernel of its
+  first variable with the conditioning set for the queries that share it, as it kept the second
+  variable's, and the skeleton searches of `pc`, `fci`, and the methods built on them evaluate a
+  stack of queries one conditioning set at a time, so each matrix is built once for the stack. The
+  test keeps up to 256 MB of each of three kinds of matrix, 768 MB in all instead of 512 MB.
+  ([#1337])
 
 ### Fixed
 

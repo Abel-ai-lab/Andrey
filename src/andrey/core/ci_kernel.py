@@ -32,13 +32,8 @@ __all__ = ["KCI", "RCoT"]
 # rows were measured to reject true independences more often than alpha.
 _RCOT_MIN_ROWS = 500
 
-# Each cache of RCoT's features, or all of KCI's matrices together, holds about this many bytes.
+# Each cache of RCoT's features or KCI's matrices holds about this many bytes.
 _CACHE_BYTES = 2**28
-
-# The kinds of n x n matrix that a KCI query with a conditioning set keeps, which share
-# ``_CACHE_BYTES`` equally: the set's residual maker, and the residualized kernels of ``x`` and
-# of ``y`` with the set.
-_KCI_MATRIX_KINDS = 3
 
 # Rows from which the skeleton scans run KCI on every BLAS thread. The gain depends on the cores a
 # shared node assigns: PC fits with 8 threads ran 0.42x to 1.56x the one-thread speed on 500 rows,
@@ -194,10 +189,10 @@ class KCI:
     4 of 40 fits passed a half-hour cap. A conditioning set costs an eigendecomposition of an
     ``n x n`` matrix the first time it is queried, and each variable costs two products of
     ``n x n`` matrices the first time it is queried with the set, as ``x`` and again as ``y``; the
-    test keeps up to 256 MB of these three kinds of matrix in all, at least one of each, and the
-    kernels of single variables only when two fit in 256 MB. So time grows as the cube of the
-    number of rows and memory as its square: thousands of rows are practical, tens of thousands
-    are not. The kernel widths follow the row count and the size of the
+    test keeps up to 256 MB of each of these three kinds of matrix, at least one, except the
+    kernels of single variables, which it keeps only when two fit. So time grows as the cube of
+    the number of rows and memory as its square: thousands of rows are practical, tens of
+    thousands are not. The kernel widths follow the row count and the size of the
     conditioning set, not the data. On simulated draws with up to three conditioning variables and
     500 rows, it rejected a true independence at rates between ``alpha`` and twice ``alpha``; a test
     that rejects too often makes PC and FCI keep edges.
@@ -231,10 +226,9 @@ class KCI:
         # R and R Ky R do not depend on x, so queries with the same conditioning set share them;
         # R Kxs R depends on x and the set only, so queries with the same x and set share it.
         entries = max(1, _CACHE_BYTES // (8 * self._n * self._n))
-        per_kind = max(1, entries // _KCI_MATRIX_KINDS)
-        self._resid = lru_cache(per_kind)(self._residual_maker)
-        self._resid_y = lru_cache(per_kind)(self._residualized_kernel)
-        self._resid_x = lru_cache(per_kind)(self._residualized_joint_kernel)
+        self._resid = lru_cache(entries)(self._residual_maker)
+        self._resid_y = lru_cache(entries)(self._residualized_kernel)
+        self._resid_x = lru_cache(entries)(self._residualized_joint_kernel)
         # An unconditional column kernel is shared across partners; it is cached only when two
         # kernels fit in _CACHE_BYTES.
         self._kernel = (
