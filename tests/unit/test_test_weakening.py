@@ -706,6 +706,82 @@ FLAGGED = {
         """,
         "parametrization of m removed",
     ),
+    "numeric parametrize case replaced": (
+        """
+        @pytest.mark.parametrize("n", [0, 1])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", [0, 2])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        "1 parametrize case(s) removed",
+    ),
+    "range of parametrize cases shifted": (
+        """
+        @pytest.mark.parametrize("seed", range(3))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        """
+        @pytest.mark.parametrize("seed", range(1, 4))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        "1 parametrize case(s) removed",
+    ),
+    "math.isclose loosened from its default": (
+        """
+        def test_fit():
+            assert math.isclose(a, b)
+        """,
+        """
+        def test_fit():
+            assert math.isclose(a, b, rel_tol=0.5)
+        """,
+        "rel_tol loosened",
+    ),
+    "raises match set to None": (
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match="specific"):
+                fit()
+        """,
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match=None):
+                fit()
+        """,
+        "pytest.raises lost its match",
+    ),
+    "skipif condition made true": (
+        """
+        @pytest.mark.skipif(False, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(True, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        "skipif condition made always true",
+    ),
+    "skipif condition replaced by true": (
+        """
+        @pytest.mark.skipif(sys.platform == "win32", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(condition=True, reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        "skipif condition made always true",
+    ),
     "file that does not parse": (
         """
         def test_fit():
@@ -1099,6 +1175,64 @@ NOT_FLAGGED = {
                 assert fit() == 3
         """,
     ),
+    "numeric parametrize case added": (
+        """
+        @pytest.mark.parametrize("n", [0, 1])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", [0, 1, 2])
+        def test_fit(n):
+            assert fit(n)
+        """,
+    ),
+    "range of parametrize cases written out": (
+        """
+        @pytest.mark.parametrize("seed", range(3))
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+        """
+        @pytest.mark.parametrize("seed", [0, 1, 2.0])
+        def test_fit(seed):
+            assert fit(seed)
+        """,
+    ),
+    "math.isclose tightened": (
+        """
+        def test_fit():
+            assert math.isclose(a, b, rel_tol=1e-6)
+        """,
+        """
+        def test_fit():
+            assert math.isclose(a, b)
+        """,
+    ),
+    "raises match kept": (
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match="specific"):
+                fit()
+        """,
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match="more specific"):
+                fit()
+        """,
+    ),
+    "skipif condition kept false": (
+        """
+        @pytest.mark.skipif(False, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(sys.platform == "win32", reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+    ),
 }
 
 
@@ -1222,6 +1356,47 @@ def test_a_parametrized_fixture_that_moved_is_not_deleted(check):
     assert check.analyze(moved) == []
     gone = [check.Change(a, a, fixture + test, test)]
     assert [f.reason for f in check.analyze(gone)] == ["parametrized fixture deleted"]
+
+
+def test_a_test_moved_out_of_the_test_folders_is_lost(check):
+    source = "def test_fit():\n    assert fit()\n"
+    old, new = "tests/unit/test_fit.py", "qa/test_fit.py"
+    found = check.analyze([check.Change(new, old, source, source)])
+    assert [(f.path, f.unit, f.reason) for f in found] == [
+        (old, "test_fit", f"test no longer collected: the file was renamed to {new}")
+    ]
+
+
+def test_a_parametrized_fixture_that_moved_and_lost_cases_is_flagged(check):
+    fixture = textwrap.dedent("""
+    @pytest.fixture(params=["a", "b", "c"])
+    def kind(request):
+        return request.param
+    """)
+    fewer = fixture.replace('["a", "b", "c"]', '["a"]')
+    test = "def test_fit(kind):\n    assert fit(kind)\n"
+    a, conftest = "tests/unit/test_a.py", "tests/unit/conftest.py"
+    moved = [
+        check.Change(a, a, fixture + test, test),
+        check.Change(conftest, conftest, None, fewer),
+    ]
+    assert [f.reason for f in check.analyze(moved)] == ["2 parametrize case(s) removed"]
+
+
+def test_a_parametrized_fixture_that_moved_with_its_cases_is_not_flagged(check):
+    fixture = textwrap.dedent("""
+    @pytest.fixture(params=["a", "b", "c"])
+    def kind(request):
+        return request.param
+    """)
+    more = fixture.replace('["a", "b", "c"]', '["a", "b", "c", "d"]')
+    test = "def test_fit(kind):\n    assert fit(kind)\n"
+    a, conftest = "tests/unit/test_a.py", "tests/unit/conftest.py"
+    moved = [
+        check.Change(a, a, fixture + test, test),
+        check.Change(conftest, conftest, None, more),
+    ]
+    assert check.analyze(moved) == []
 
 
 def test_a_flag_names_the_file_the_test_and_the_code(check):

@@ -84,6 +84,7 @@ POSITIONAL = {
 DEFAULTS = {
     "assert_allclose": {"rtol": 1e-7, "atol": 0.0},
     "isclose": {"rtol": 1e-5, "atol": 1e-8},
+    "math.isclose": {"rel_tol": 1e-9, "abs_tol": 0.0},
     "allclose": {"rtol": 1e-5, "atol": 1e-8},
     "assert_almost_equal": {"decimal": 7},
     "assert_array_almost_equal": {"decimal": 6},
@@ -107,6 +108,8 @@ ARITHMETIC = {
 MAX_LINES = 6
 # The file names pytest collects: its default ``python_files``, which pyproject.toml leaves unset.
 COLLECTED = ("test_*.py", "*_test.py")
+# The folders pytest collects from, the ``testpaths`` of pyproject.toml.
+TESTPATHS = ("tests",)
 
 Flag = Callable[..., None]
 
@@ -180,6 +183,19 @@ def _callee(node: ast.AST) -> str:
     return func.attr if isinstance(func, ast.Attribute) else ""
 
 
+def _tolerance_callee(call: ast.Call) -> str:
+    """Return the callee a call's tolerance knobs are read for: ``math.isclose`` apart from NumPy's."""
+    func = call.func
+    if (
+        isinstance(func, ast.Attribute)
+        and func.attr == "isclose"
+        and isinstance(func.value, ast.Name)
+        and func.value.id in {"math", "cmath"}
+    ):
+        return f"math.{func.attr}"
+    return _callee(call)
+
+
 def _number(node: ast.AST | None) -> float | None:
     """Return the value of a numeric literal or of arithmetic on literals, else None."""
     if isinstance(node, ast.Constant):
@@ -198,6 +214,19 @@ def _number(node: ast.AST | None) -> float | None:
             return None
         return float(value) if isinstance(value, int | float) else None
     return None
+
+
+class _Exact(ast.NodeTransformer):
+    """Rewrite a node with every number as a float, so ``1`` and ``1.0`` are one case."""
+
+    def visit_Constant(self, node: ast.Constant) -> ast.AST:
+        number = _number(node)
+        return node if number is None else ast.Constant(value=number, kind=None)
+
+
+def _case(node: ast.AST) -> str:
+    """Return the node with its numbers kept: one case of a parametrization before and after."""
+    return ast.dump(_Exact().visit(copy.deepcopy(node)))
 
 
 class _Mask(ast.NodeTransformer):
@@ -345,7 +374,7 @@ def _count_approx(node: ast.AST) -> int:
 
 
 def _call_knobs(call: ast.Call) -> list[Knob]:
-    name = _callee(call)
+    name = _tolerance_callee(call)
     given: dict[str, float] = {}
     opaque: set[str] = set()
     positional = POSITIONAL.get(name, {})
@@ -484,11 +513,17 @@ def _accepted(call: ast.Call) -> frozenset[str] | None:
     return frozenset(names) if first is not None and all(names) else None
 
 
+def _matches(call: ast.Call) -> bool:
+    """Whether a ``pytest.raises`` checks the message: it has a ``match`` that is not ``None``."""
+    return any(
+        k.arg == "match" and not (isinstance(k.value, ast.Constant) and k.value.value is None)
+        for k in call.keywords
+    )
+
+
 def _raises_reasons(before: ast.Call, after: ast.Call) -> list[str]:
     reasons = []
-    if any(k.arg == "match" for k in before.keywords) and not any(
-        k.arg == "match" for k in after.keywords
-    ):
+    if _matches(before) and not _matches(after):
         reasons.append("pytest.raises lost its match")
     if _first_name(after) in BROAD and _first_name(before) not in BROAD:
         reasons.append(f"pytest.raises widened to {_first_name(after)}")
@@ -541,22 +576,20 @@ def _integers(arguments: list[ast.expr]) -> list[int] | None:
     return None
 
 
-NUMBER = _key(ast.Constant(value=0))
-
-
 def _elements(
     node: ast.AST | None, constants: dict[str, ast.AST], depth: int = 0
 ) -> Counter[str] | None:
     """Return the cases a parametrize argument lists, when the source states them, else None.
 
-    Each case is its syntax tree without its numbers, so a case counts as one of its kind.
+    Each case is its syntax tree, numbers included: a seed, a bound, or a tolerance that changes is
+    a case removed and another added.
     """
     if isinstance(node, ast.List | ast.Tuple | ast.Set):
         if any(isinstance(element, ast.Starred) for element in node.elts):
             return None
-        return Counter(_key(element) for element in node.elts)
+        return Counter(_case(element) for element in node.elts)
     if isinstance(node, ast.Dict):
-        return Counter(_key(key) for key in node.keys if key is not None)
+        return Counter(_case(key) for key in node.keys if key is not None)
     if isinstance(node, ast.Name) and node.id in constants and depth < 2:
         return _elements(constants[node.id], constants, depth + 1)
     if isinstance(node, ast.Call) and _callee(node) in {"list", "tuple", "set"} and node.args:
@@ -564,7 +597,9 @@ def _elements(
     if isinstance(node, ast.Call) and _callee(node) == "range" and 1 <= len(node.args) <= 3:
         integers = _integers(node.args)
         try:
-            return Counter({NUMBER: len(range(*integers))}) if integers is not None else None
+            if integers is None:
+                return None
+            return Counter(_case(ast.Constant(value=i)) for i in range(*integers))
         except (ValueError, OverflowError):
             return None
     return None
@@ -650,8 +685,25 @@ def _check_findings(old: Unit, new: Unit, flag: Flag) -> None:
         flag(None, reason)
 
 
+def _skipifs(unit: Unit) -> list[tuple[ast.Call, bool]]:
+    """List the ``skipif`` markers of a unit in order, with whether the condition is a literal true."""
+    found = []
+    for node in sorted(unit.nodes, key=_position):
+        if isinstance(node, ast.Call) and _marker_kind(node.func) == "pytest.mark.skipif":
+            keywords = {k.arg: k.value for k in node.keywords}
+            condition = node.args[0] if node.args else keywords.get("condition")
+            found.append((node, isinstance(condition, ast.Constant) and bool(condition.value)))
+    return found
+
+
 def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -> None:
-    """Flag the skip, xfail, and release markers a unit gained, but not in an exempt constant."""
+    """Flag the skip, xfail, and release markers a unit gained, but not in an exempt constant.
+
+    A ``skipif`` that stays and whose condition becomes a literal true also skips the test.
+    """
+    for (_, was), (call, now) in zip(_skipifs(old), _skipifs(new)):
+        if now and not was:
+            flag(call, "skipif condition made always true", [], [_clip(_text(new, call))])
     before = _markers(old, exempt)
     for name, nodes in _markers(new, exempt).items():
         extra = len(nodes) - len(before.get(name, []))
@@ -716,8 +768,11 @@ def _body_key(unit: Unit) -> str:
 
 
 def _collected(path: str) -> bool:
-    """Whether pytest collects tests from a file of this name."""
-    return any(fnmatch.fnmatch(path.rsplit("/", 1)[-1], pattern) for pattern in COLLECTED)
+    """Whether pytest collects tests from a file: under its test folders, with a name it collects."""
+    name = path.rsplit("/", 1)[-1]
+    return any(path.startswith(f"{root}/") for root in TESTPATHS) and any(
+        fnmatch.fnmatch(name, pattern) for pattern in COLLECTED
+    )
 
 
 def _only_added_tests(old_units: dict[str, Unit], new_units: dict[str, Unit]) -> frozenset[str]:
@@ -735,12 +790,18 @@ def _only_added_tests(old_units: dict[str, Unit], new_units: dict[str, Unit]) ->
     return frozenset(constant for constant, added in users.items() if all(added))
 
 
+def _is_fixture(unit: Unit) -> bool:
+    """Whether a unit is a function with a parametrized fixture."""
+    return unit.is_function and any(n == ("params",) for n, _, _ in _parametrizations(unit))
+
+
 def analyze(changes: Sequence[Change]) -> list[Finding]:
     """Return the weakenings in the changed Python files of a pull request."""
     findings: list[Finding] = []
     deleted: list[tuple[Unit, str]] = []
     fixtures: list[Unit] = []
     added: list[Unit] = []
+    added_fixtures: list[Unit] = []
     names: set[str] = (
         set()
     )  # every function of the new files, to tell a moved fixture from a gone one
@@ -752,6 +813,7 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             except (SyntaxError, ValueError):
                 continue
             added += [u for u in new_file.values() if u.is_test]
+            added_fixtures += [u for u in new_file.values() if _is_fixture(u)]
             names.update(u.qualname.rsplit(".", 1)[-1] for u in new_file.values() if u.is_function)
             continue
         try:
@@ -778,16 +840,20 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 )
             elif unit.is_test:
                 deleted.append((unit, reason))
-            elif unit.is_function and any(n == ("params",) for n, _, _ in _parametrizations(unit)):
+            elif _is_fixture(unit):
                 fixtures.append(unit)
         added += [u for n, u in new_units.items() if n not in old_units and u.is_test]
+        added_fixtures += [u for n, u in new_units.items() if n not in old_units and _is_fixture(u)]
     for unit in fixtures:
-        if unit.qualname.rsplit(".", 1)[-1] not in names:
+        name = unit.qualname.rsplit(".", 1)[-1]
+        if name not in names:
             line = _position(unit.node)[0]
             reason = "parametrized fixture deleted"
             findings.append(
                 Finding(unit.path, line, unit.qualname, reason, _clip(_text(unit, unit.node)))
             )
+        elif len(same := [a for a in added_fixtures if a.qualname.rsplit(".", 1)[-1] == name]) == 1:
+            findings += compare(unit, same[0])
     for unit, reason in deleted:
         key = _body_key(unit)
         name = unit.qualname.rsplit(".", 1)[-1]
