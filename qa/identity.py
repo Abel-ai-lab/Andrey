@@ -26,10 +26,11 @@ of ICP and IGSP and the contexts of J-PCMCI+ with the columns, and maps each ans
 original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, every
-possible-d-sep search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, and every fit of
-Regime-PCMCI sent to the pool. Both report each refit whose answer differs from the first fit. A
-different worker count must not change a bit, so any difference fails it. A column order fails the
-check when a graph or a causal order differs (:data:`STRUCTURE`) or when an edge weight or
+possible-d-sep search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, every fit of
+Regime-PCMCI, and every regression of RESIT and of the exact search of CPCM sent to the pool. Both
+report each refit whose answer differs from the first fit. A different worker count must not change
+a bit, so any difference fails it. A column order fails the check when a graph or a causal order
+differs (:data:`STRUCTURE`) or when an edge weight or
 metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near zero). The last
 bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
 only by rounding is reported as information.
@@ -159,6 +160,13 @@ def _gnies(x: np.ndarray) -> StructureOutput:
     return andrey.gnies(samples, env)
 
 
+def _cpcm_graph(x: np.ndarray) -> StructureOutput:
+    """CPCM's graph search: the gaussian family on up to 4 variables, whose exact search fits
+    every variable on every set of the others, and the cheaper fixed-scale family above, which
+    keeps the corpus quick."""
+    return andrey.cpcm_graph(x, family="gaussian" if x.shape[1] <= 4 else "gaussian_fixed_scale")
+
+
 def _pcmci(x: np.ndarray) -> StructureOutput:
     """PCMCI with the gate adapter's settings; the adapter names the PC1 level ``pc_alpha``, as
     tigramite does."""
@@ -283,7 +291,7 @@ FITS: dict[str, Fit] = {
     "PNL": Fit(andrey.pnl),
     "LOCI": Fit(andrey.loci),
     "CPCM": Fit(functools.partial(andrey.cpcm, family="gaussian")),
-    "CPCMGraph": Fit(functools.partial(andrey.cpcm_graph, family="gaussian_fixed_scale")),
+    "CPCMGraph": Fit(_cpcm_graph),
     "SkewD": Fit(functools.partial(andrey.skewd, **qg.SKEWD_BUDGET)),
     "SkewDMV": Fit(functools.partial(andrey.skewd_mv, **qg.SKEWD_BUDGET)),
     "PCMCI": Fit(_pcmci),
@@ -581,8 +589,9 @@ FITS |= {name: Fit(_with_missing(search), shuffled=False) for name, search in EM
 #: ``GES-em``, GFCI's GES phase, the skeleton searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and
 #: RSMAX2's PC phase, the possible-d-sep searches of FCI, FCI-JCI, and GFCI, the full-graph
 #: searches of IAMB, Inter-IAMB, and MMPC, which MMHC and RSMAX2's restrict phase run, and the
-#: starts of Regime-PCMCI in worker processes, PNL's two directions on threads, and the lists of
-#: targets of :data:`TARGET_LISTS`, and the option fits of those methods.
+#: starts of Regime-PCMCI and the regressions of RESIT and of the exact search of CPCM, in worker
+#: processes, PNL's two directions on threads, and the lists of targets of :data:`TARGET_LISTS`, and
+#: the option fits of those methods.
 _WORKERS = (
     "PC",
     "FCI",
@@ -598,6 +607,8 @@ _WORKERS = (
     "MMPC",
     "MMHC",
     "RPCMCI",
+    "RESIT",
+    "CPCMGraph",
 )
 WORKER_METHODS = (
     *_WORKERS,
@@ -622,6 +633,7 @@ LARGER_DATASETS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "anm_er_n1000_d30": functools.partial(qg.regime_draws, "anm_er_n1000", 30, 1000),
     "anm_er_n1000_d12": functools.partial(qg.regime_draws, "anm_er_n1000", 12, 1000),
     "anm_er_n1000_d6": functools.partial(qg.regime_draws, "anm_er_n1000", 6, 1000),
+    "anm_er_n300_d4": functools.partial(qg.regime_draws, "anm_er_n1000", 4, 300),
     "score_paper_standardized_d15_er1": functools.partial(
         qg.order_draws, "score_paper_standardized", 15, "er1"
     ),
@@ -714,6 +726,12 @@ LARGER: dict[str, str] = {
 }
 
 
+#: A dataset beyond the larger one for a method whose fit depends on the number of variables: the
+#: exact search of CPCM, which runs up to 4 variables and fits every variable on every set of the
+#: others (on the workers, under the gaussian family, ``_cpcm_graph``), and which the gate's 5 and
+#: the larger 6 variables do not reach.
+EXACT_SEARCH_DATASETS: dict[str, tuple[str, ...]] = {"CPCMGraph": ("anm_er_n300_d4",)}
+
 #: The methods that learn unknown targets, outside the gate, with their datasets: the gate's smaller
 #: interventional dataset, whose environments are its target sets.
 UNKNOWN_TARGETS: dict[str, tuple[str, ...]] = dict.fromkeys(
@@ -729,8 +747,8 @@ EXPERIMENTAL: dict[str, tuple[str, ...]] = {
 
 
 def datasets(method: str) -> tuple[str, ...]:
-    """Return the datasets ``method`` is fitted on: its gate datasets, its larger dataset, then
-    the dataset of its path, when it has one."""
+    """Return the datasets ``method`` is fitted on: its gate datasets, its larger dataset, and any
+    of :data:`EXACT_SEARCH_DATASETS` and :data:`PATH_DATASETS`."""
     if method in OPTIONS:
         return (OPTIONS[method].dataset,)
     if method in EXPERIMENTAL:
@@ -740,7 +758,12 @@ def datasets(method: str) -> tuple[str, ...]:
     method = TARGET_LISTS.get(method, method)
     if method in UNKNOWN_TARGETS:
         return UNKNOWN_TARGETS[method]
-    return (*qg.SUPPORTED[method].datasets, LARGER[method], *PATH_DATASETS.get(method, ()))
+    return (
+        *qg.SUPPORTED[method].datasets,
+        LARGER[method],
+        *EXACT_SEARCH_DATASETS.get(method, ()),
+        *PATH_DATASETS.get(method, ()),
+    )
 
 
 @functools.cache
@@ -1557,13 +1580,15 @@ def header(
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
         # A refit on more workers sends every GES pass, every skeleton pass, every possible-d-sep
-        # search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, and every fit of Regime-PCMCI
-        # to the worker pool.
+        # search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, every fit of Regime-PCMCI, and
+        # every regression of RESIT and of the exact search of CPCM to the worker pool.
         "refit_ges_parallel_min_work": "0" if workers > 1 else None,
         "refit_skeleton_min_pool_queries": 0 if workers > 1 else None,
         "refit_possible_dsep_min_pool_subsets": 0 if workers > 1 else None,
         "refit_blanket_parallel_min_work": 0 if workers > 1 else None,
         "refit_rpcmci_parallel_min_work": 0 if workers > 1 else None,
+        "refit_resit_parallel_min_work": 0 if workers > 1 else None,
+        "refit_cpcm_parallel_min_work": 0 if workers > 1 else None,
         **({} if checkpoints is None else {"checkpoints": checkpoints}),
     }
 
@@ -1724,7 +1749,8 @@ def run(
     hashes each answer mapped back (:func:`unpermute`). ``workers`` above 1 refits
     :data:`WORKER_METHODS` on that many workers, with every GES pass, every skeleton pass of
     conditioning size two or more, every possible-d-sep search, every full-graph fit of IAMB,
-    Inter-IAMB, and MMPC, and every fit of Regime-PCMCI sent to the worker pool. A refit
+    Inter-IAMB, and MMPC, every fit of Regime-PCMCI, and every regression of RESIT and of the exact
+    search of CPCM sent to the worker pool. A refit
     differs when one of its
     :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
     difference is reported as ``(kind, description)``, naming the parts that changed, with the kind
@@ -1768,6 +1794,8 @@ def run(
                     _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_BLANKET_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_RPCMCI_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_RESIT_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_CPCM_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
             for permutation, n_workers, first, refit in refits:

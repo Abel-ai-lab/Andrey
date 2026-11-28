@@ -1848,8 +1848,8 @@ def cmd_calibrate(
         None,
         "--method",
         help=(
-            "Measure only this method (ges, skeleton, rcot, possible_dsep, blanket, or rpcmci); "
-            "repeatable. Default: all."
+            "Measure only this method (ges, skeleton, rcot, possible_dsep, blanket, rpcmci, resit, "
+            "or cpcm); repeatable. Default: all."
         ),
     ),
     as_json: bool = typer.Option(False, "--json", help="Use JSON even on a terminal."),
@@ -1857,11 +1857,12 @@ def cmd_calibrate(
     """Measure the worker-pool cutoffs on this machine and print the settings to use.
 
     Times serial runs against pooled ones for a few sizes, whole fits for GES, for the full-graph
-    search of IAMB, Inter-IAMB, and MMPC, and for Regime-PCMCI, single passes for the skeleton
-    search of PC, FCI, GFCI, and CD-NOD, with Fisher-z and with RCoT, and single searches for the
-    possible-d-separation step of FCI, FCI-JCI, and GFCI, and sets nothing. It takes a few minutes,
-    and longer when the pool never wins (the search then runs up to 256 variables, 800 for the
-    full-graph search of IAMB, Inter-IAMB, and MMPC, or 128 starts for Regime-PCMCI).
+    search of IAMB, Inter-IAMB, and MMPC, for Regime-PCMCI, for RESIT, and for the exact search of
+    CPCM, single passes for the skeleton search of PC, FCI, GFCI, and CD-NOD, with Fisher-z and with
+    RCoT, and single searches for the possible-d-separation step of FCI, FCI-JCI, and GFCI, and sets
+    nothing. It takes a few minutes, and longer when the pool never wins (the search then runs up to
+    256 variables, 800 for the full-graph search of IAMB, Inter-IAMB, and MMPC, 128 starts for
+    Regime-PCMCI, 20 for RESIT, and 4 for CPCM).
     """
     from andrey.core import backend
     from andrey.search import calibrate as cal

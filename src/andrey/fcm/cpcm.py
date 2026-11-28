@@ -471,6 +471,10 @@ class Residuals:
                 self._residuals[key] = residual
         return self._residuals[key]
 
+    def store(self, j: int, parents: tuple[int, ...], residual: np.ndarray) -> None:
+        """Keep the residual of column ``j`` on ``parents`` that :meth:`residual` made elsewhere."""
+        self._residuals[(j, tuple(sorted(parents)))] = residual
+
     def gram(self, j: int, parents: tuple[int, ...]) -> np.ndarray:
         key = (j, tuple(sorted(parents)))
         if key not in self._grams:
@@ -917,6 +921,9 @@ def search(
     """
     d = res.X.shape[1]
     if d <= EXACT_MAX:
+        from andrey.fcm._parallel import prefit
+
+        prefit(res)
         best, best_score = None, math.inf
         for dag in all_dags(d):
             value = score(res, dag, edge_penalty)
