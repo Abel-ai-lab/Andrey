@@ -1903,6 +1903,11 @@ def _bytes_differ(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return x != y
 
 
+def _at(stage: str, level: int | None) -> str:
+    """A stage with its level, when it has one."""
+    return stage if level is None else f"{stage} level {level}"
+
+
 def first_difference(before: Stages, after: Stages) -> Difference | None:
     """Walk two fits' labels in order to the first position where the stage, level, or piece, or
     the digest, differs; ``None`` when the fits agree."""
@@ -1917,8 +1922,8 @@ def first_difference(before: Stages, after: Stages) -> Difference | None:
                 side.record, side.stage, side.level, side.piece, "missing", None, lengths
             )
         if (a.stage, a.level, a.piece) != (b.stage, b.level, b.piece):
-            here = f"{a.stage} {a.piece}"
-            there = f"{b.stage} {b.piece}"
+            here = f"{_at(a.stage, a.level)} {a.piece}"
+            there = f"{_at(b.stage, b.level)} {b.piece}"
             return Difference(
                 a.record, a.stage, a.level, a.piece, "sequence", None, where=f"{here} -> {there}"
             )
@@ -1988,7 +1993,7 @@ def _describe(d: Difference) -> str:
 
 def _text(fingerprint: tuple) -> str:
     method, stage, level, piece, kind, index, before, after = fingerprint
-    at = stage if level is None else f"{stage} level {level}"
+    at = _at(stage, level)
     return f"{method} {at} {piece} {kind} {'-' if index is None else index} {before} {after}"
 
 

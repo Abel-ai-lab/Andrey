@@ -1356,6 +1356,17 @@ def test_an_array_of_more_than_two_dimensions_keeps_its_shape_as_a_piece() -> No
         assert [p.name for p in flat[0].pieces] == ["weights"]
 
 
+def test_a_sequence_difference_names_the_level_of_each_build() -> None:
+    skipping = _fit_record([("a", 1, {"total": 1.0})])
+    full = _fit_record([("a", 0, {"total": 1.0}), ("a", 1, {"total": 1.0})])
+    found = identity.first_difference(identity.stages_of(full), identity.stages_of(skipping))
+    assert found is not None and found.kind == "sequence"
+    assert found.where == "a level 0 total -> a level 1 total"
+    other = _fit_record([("b", None, {"total": 1.0})])
+    found = identity.first_difference(identity.stages_of(skipping), identity.stages_of(other))
+    assert found is not None and found.where == "a level 1 total -> b total"
+
+
 def test_the_report_gives_the_record_counts_of_both_fits_when_they_differ(capsys) -> None:
     one = _fit_record([("a", None, {"total": 1.0})])
     two = _fit_record([("a", None, {"total": 1.0}), ("a", None, {"total": 2.0})])
