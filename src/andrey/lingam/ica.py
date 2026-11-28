@@ -56,10 +56,11 @@ def _estimate_causal_order(
 ) -> list[int] | None:
     """Approximate a lower-triangular order: zero smallest entries until a strict order appears.
 
-    ``precedence`` reaches :func:`_search_causal_order`, so the order keeps it.
+    Entries of equal magnitude are zeroed in row-major order. ``precedence`` reaches
+    :func:`_search_causal_order`, so the order keeps it.
     """
     matrix = matrix.copy()
-    pos_list = np.argsort(np.abs(matrix), axis=None)
+    pos_list = np.argsort(np.abs(matrix), axis=None, kind="stable")
     pos_list = np.vstack(np.unravel_index(pos_list, matrix.shape)).T
     initial_zero_num = int(matrix.shape[0] * (matrix.shape[0] + 1) / 2)
 

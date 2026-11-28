@@ -13,6 +13,7 @@ from andrey.constraint._parallel_skeleton import (
     MIN_POOL_QUERIES,
     MIN_POOL_RCOT_WORK,
 )
+from andrey.constraint._parallel_targets import MIN_POOL_BLANKET_WORK
 from andrey.core.backend import GPU_THRESHOLDS
 from andrey.core.ci import MIN_SHARED_FACTOR_WORK
 from andrey.core.env import SEED_MAX
@@ -68,7 +69,10 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "the skeleton searches of PC, FCI, GFCI, BOSS-FCI, GRaSP-FCI, CD-NOD, and RSMAX2 "
             '(`restrict="pc"`) with `fisherz`, `student_t`, `normal_scores`, or `rcot`, and the '
             "possible-d-separation searches of FCI and GFCI with `fisherz`, `student_t`, or "
-            "`normal_scores` and of FCI-JCI with `fisherz` or `student_t`, and worker threads for "
+            "`normal_scores` and of FCI-JCI with `fisherz` or `student_t`, the full-graph search "
+            "of IAMB, Inter-IAMB, and MMPC (and the restrict phase of MMHC and RSMAX2 that reads "
+            "their sets) and a list of their targets with `fisherz`, `student_t`, or "
+            "`normal_scores` on complete data, and worker threads for "
             "the two directions of `pnl` and the searches of `skewd` and `skewd_mv`; `0` or `1` "
             "runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
@@ -136,6 +140,24 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one "
             "worker warns once on the default when a pass reaches a tenth of it; `andrey "
             "calibrate --method rcot` measures a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_BLANKET_PARALLEL_MIN_WORK",
+        values="integer (target and candidate pairs per full-graph fit)",
+        default=str(MIN_POOL_BLANKET_WORK),
+        effect=(
+            "Per-fit crossover gate for the parallel full-graph search of IAMB, Inter-IAMB, and "
+            "MMPC, and of the restrict phase of MMHC and RSMAX2 that reads their sets, with "
+            "`fisherz`, `student_t`, or `normal_scores` on complete data: the search of every "
+            "variable runs on the worker pool only when the data hold at least this many target "
+            "and candidate pairs, `d * (d - 1)` for `d` variables, else in-process. `0` sends "
+            "every fit to the pool. The default was measured on an Intel Xeon Gold 6542Y server "
+            "running Linux with 2, 4, and 8 workers. No effect unless the worker count (`n_jobs` / "
+            "`ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns once on the "
+            "default when it reaches a tenth of it; `andrey calibrate --method blanket` measures "
+            "a value for your machine."
         ),
         group="backend",
     ),

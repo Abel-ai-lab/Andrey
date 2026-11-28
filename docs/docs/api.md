@@ -652,8 +652,10 @@ IAMB and Inter-IAMB, the moral graph. A list of targets returns results in that 
 a call for that target alone. The three share one search and test setup across targets; MMPC learns
 a variable's set once for shared symmetry checks. With `andrey.config(n_jobs=...)` above 1 and a
 partial-correlation `indep_test` (`"fisherz"`, `"student_t"`, `"normal_scores"`), they split the
-targets over that many worker processes, with the same results for any number of workers. With
-missing values, they answer every target in the calling process. `icp` also takes a list of targets
+targets over that many worker processes, with the same results for any number of workers; without a
+target, the search of every variable goes to the workers when the data hold at least
+`ANDREY_BLANKET_PARALLEL_MIN_WORK` target and candidate pairs. With missing values, they answer
+every target in the calling process. `icp` also takes a list of targets
 and answers each in turn. On the command line, `'target=[a,b]'` names the columns by header or
 position, and the JSON result holds `multi: true` and `results`, one entry per target in the list's
 order, in place of `structure` and `metadata`. MMHC learns a skeleton with MMPC's
@@ -1631,7 +1633,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT, possible-d-separation) for this machine, as settings to export |
+| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT, possible-d-separation, full-graph IAMB, Inter-IAMB, and MMPC) for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or

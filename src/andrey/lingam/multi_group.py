@@ -73,7 +73,7 @@ def _find_shared_causal_order(
 
     Mirrors :func:`pwling.find_causal_order` but sums the candidate scores across groups (each
     weighted by ``n_g / total_n``; :func:`pwling.pruned_scores` for ``"pwling"``) and residualizes
-    every group independently against the pick.
+    every group, centered once first, independently against the pick.
     Ties are broken by :func:`~andrey.core.ties.tie_ranks` of the stacked input groups. Columns
     that are copies in any group form one copy group (:func:`pwling.copy_groups`), scored by its
     representative and followed directly by the other copies. With ``precedence``, as for
@@ -87,6 +87,8 @@ def _find_shared_causal_order(
     # Copy + float64 so the in-place residual write-back never truncates.
     residualized = [np.array(X, dtype=np.float64) for X in groups]
     ranks = tie_ranks(np.vstack(groups))
+    for X in residualized:  # centered once, as in :func:`pwling.find_causal_order`
+        pwling.center_columns(X)
     hint: dict[int, float] = {}
 
     while remaining:

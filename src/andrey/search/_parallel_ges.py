@@ -40,7 +40,7 @@ from typing import Protocol
 
 import numpy as np
 
-from andrey.core import _bitset, env
+from andrey.core import _bitset, _checkpoint, env
 from andrey.core.knowledge import Constraints, admits
 from andrey.core.orient import cpdag_of_pdag, orient_out_of
 from andrey.core.score import BICScore, LocalScore
@@ -894,6 +894,10 @@ def run_ges(
             else:
                 moved = insert(adj.copy(), x, y, T)
                 adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
+                if adj is not moved:
+                    continue  # a rejected move changes nothing, so it records nothing
+            if (take := _checkpoint.TAKE.get()) is not None:
+                take("ges.forward", move=(x, y, T), key=key, cpdag=adj)
         excluded.clear()  # forward and backward moves share the key shape
         while True:  # backward phase
             state = neighborhood_state(adj)
@@ -919,6 +923,10 @@ def run_ges(
             else:
                 moved = delete(adj.copy(), x, y, H)
                 adj = _admitted(moved, adj, constraints, excluded, key, bool(sources))
+                if adj is not moved:
+                    continue  # a rejected move changes nothing, so it records nothing
+            if (take := _checkpoint.TAKE.get()) is not None:
+                take("ges.backward", move=(x, y, H), key=key, cpdag=adj)
     finally:
         if lazy is not None:
             lazy.close()

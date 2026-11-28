@@ -17,7 +17,7 @@ correlation-matrix bytes, one shared copy where :class:`~andrey.search._parallel
 one (via :meth:`~andrey.core.ci.PartialCorrelationTest.from_corr` of the parent's test class), and
 pin BLAS to one thread, so every process feeds identical float64 into the same closed forms and the
 skeleton is bit-identical to the serial oracle. A worker rebuilds the start-of-size neighborhood
-from the adjacency snapshot the task carries and delegates to the shared
+from the bit-packed adjacency snapshot the task carries and delegates to the shared
 :func:`~andrey.constraint._skeleton.scan_pairs`.
 
 FCI's possible-d-sep step sends a search of at least :data:`MIN_POOL_DSEP_SUBSETS` subsets, or the
@@ -122,13 +122,14 @@ def _init_worker(
 
 
 def _scan_task(payload: tuple) -> list[Removal]:
-    """Worker side of one chunk: rebuild the snapshot neighborhood, scan the chunk's pairs."""
-    pairs, adj_mask, size, alpha, record_pvalues, run_token = payload
+    """Worker side of one chunk: rebuild the snapshot neighborhood from its bit-packed adjacency
+    (one row at a time, so no ``d`` x ``d`` array is held), scan the chunk's pairs."""
+    pairs, adj_bits, size, alpha, record_pvalues, run_token = payload
     if run_token != _WORKER_TOKEN:
         raise RuntimeError("skeleton worker pool reused across runs (corr/token mismatch)")
     assert _WORKER_TEST is not None  # _init_worker runs before any task
-    d = adj_mask.shape[0]
-    neighbors = [np.flatnonzero(adj_mask[i]) for i in range(d)]
+    d = adj_bits.shape[0]
+    neighbors = [np.flatnonzero(np.unpackbits(row, count=d)) for row in adj_bits]
     return scan_pairs(_WORKER_TEST, pairs, neighbors, size, alpha, record_pvalues=record_pvalues)
 
 
@@ -220,7 +221,9 @@ class SkeletonWorkerPool:
         """Scan ``pairs`` at conditioning ``size`` across the worker pool; return all removals.
 
         ``neighbors`` is the start-of-size snapshot and ``adj_mask`` the boolean adjacency it was
-        read from, which the workers rebuild it from. ``weights`` holds each pair's test count
+        read from. The tasks carry it packed to one bit per entry, which the workers rebuild the
+        snapshot from; ``adj_mask`` is read here and not kept. ``weights`` holds each pair's test
+        count
         (:func:`~andrey.constraint._skeleton.pair_queries`) when the caller has taken it for the
         pass, and is counted here otherwise. The removals come in the order
         :func:`~andrey.constraint._skeleton.scan_pairs` gives them, each with its pair's largest
@@ -237,11 +240,12 @@ class SkeletonWorkerPool:
         if queries < self._min_queries:
             return None
         pool, token = self._ensure()
+        adj_bits = np.packbits(adj_mask, axis=1)
         # Contiguous chunks collected in submission order keep the serial scan's pair order.
         futures = [
             pool.submit(
                 _scan_task,
-                ([pairs[i] for i in chunk], adj_mask, size, alpha, record_pvalues, token),
+                ([pairs[i] for i in chunk], adj_bits, size, alpha, record_pvalues, token),
             )
             for chunk in _balanced_chunks(weights, self._workers)
         ]

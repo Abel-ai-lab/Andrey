@@ -57,7 +57,7 @@ from andrey.constraint._skeleton import (
     scan_conditioning_sets,
     subset_rows,
 )
-from andrey.core import ARROW, NULL, TAIL, backend
+from andrey.core import ARROW, NULL, TAIL, _checkpoint, backend
 from andrey.core.ci import CITest, PartialCorrelationTest, make_indep_test, pins_blas
 from andrey.core.ci_missing import (
     NOT_TESTED,
@@ -285,6 +285,8 @@ def markov_blanket(
         blanket.extend(sorted(stay, key=lambda x: ranks[x]))
         if interleaved and stay:
             _shrink(test, target, alpha, blanket, required, sepsets)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.grow", target=target, members=blanket)
     if not interleaved:
         _shrink(test, target, alpha, blanket, required, sepsets)
     if sepsets is not None:
@@ -296,6 +298,8 @@ def markov_blanket(
         blanket = [x for x in blanket if support[x]]
     if undecided:
         _count_beside_undecided(test, target, blanket, required, max_depth, undecided)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.shrink", target=target, members=blanket, sepsets=sepsets)
     return blanket
 
 
@@ -608,6 +612,8 @@ def parents_children(
         del open_[best]
         admit(best, open_)
         weakest = open_
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.grow", target=target, members=members)
     for x in list(members):
         if x in required:
             continue
@@ -623,6 +629,8 @@ def parents_children(
                 break
     if undecided:
         _count_beside_undecided(test, target, members, required, max_depth, undecided)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("blanket.shrink", target=target, members=members, sepsets=sepsets)
     return members
 
 
@@ -1143,9 +1151,15 @@ class LocalSearch:
 
     def structure(self, method: str, structure: str) -> np.ndarray:
         """Every variable's set by the learner ``method`` joined into the graph ``structure``
-        names, as an endpoint-mark matrix (:func:`local_structure`)."""
+        names, as an endpoint-mark matrix (:func:`local_structure`).
+
+        With more than one worker, a large enough fit makes the variables' runs on the worker
+        processes (:func:`~andrey.constraint._parallel_targets.pooled_runs`), and the sets and bits
+        are the ones a single process gives.
+        """
         learner = LEARNERS[method]
         name = method if learner.pc is None else learner.pc
+        self._make_runs(name)
         sets = self._sets(lambda i: self.run(name, i)[0])
         if learner.kind == "pc":
             skeleton, blankets = sets & sets.T, reach(sets)
@@ -1162,11 +1176,24 @@ class LocalSearch:
             mb = self._sets(lambda i: self.local(method, i)[1] or [])
             blankets = mb & mb.T
             skeleton = blankets if structure == "moral" else sets & sets.T
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("blanket.structure", sets=sets, skeleton=skeleton)
         if structure != "cpdag":
             return np.where(skeleton, TAIL, NULL).astype(np.int8)
         return blanket_cpdag(
             self.test, skeleton, blankets, self.alpha, self.max_depth, self.constraints
         )
+
+    def _make_runs(self, method: str) -> None:
+        """Make every run of ``method`` the search has not made, on the worker pool when the fit
+        is large enough (:func:`~andrey.constraint._parallel_targets.pooled_runs`); otherwise
+        :meth:`run` makes each when it is read."""
+        from andrey.constraint._parallel_targets import pooled_runs
+
+        targets = [t for t in range(self.d) if (method, t) not in self._runs]
+        runs = pooled_runs(self, method, targets)
+        if runs is not None:
+            self._runs.update(zip(((method, t) for t in targets), runs, strict=True))
 
     def _sets(self, members: Callable[[int], list[int]]) -> np.ndarray:
         """``[i, j]`` when ``j`` is in ``members(i)``, a boolean ``(d, d)`` matrix."""
