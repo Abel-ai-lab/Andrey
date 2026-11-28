@@ -60,6 +60,7 @@ def record(module, name):
 record(anm_module, "anm")
 record(loci_module, "fit_direction")
 record(pnl_module, "_run_tasks")
+record(pnl_module, "_device_tests")
 record(calm_module, "_optimize_gated_dag")
 statistic_pvalue = ci_kernel.KCI._statistic_pvalue
 

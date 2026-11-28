@@ -18,7 +18,7 @@ Spirtes, and Ramsey (2016) does.
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from contextlib import ExitStack, contextmanager
 from itertools import combinations
 from typing import TYPE_CHECKING
 
@@ -50,6 +50,8 @@ from andrey.search.ges import ges
 from andrey.search.grasp import grasp
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from andrey.core.knowledge import Constraints
 
 #: The pattern edges the test phase may remove: every one, or those in a triangle of the pattern.
@@ -331,8 +333,9 @@ def fci_from_pattern(
     Andrews, and Spirtes (2025) does. ``max_depth``, ``constraints``, ``workers`` (a worker count),
     ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`. The whole test phase
     runs with BLAS limited to one thread, the separating sets, the collider votes, and the
-    orientation rules included, for a test built on matrix algebra
-    (:func:`~andrey.core.ci.pins_blas`), so the machine's thread count does not change its p-values.
+    orientation rules included, and torch too under the ``cpu`` backend, for a test built on matrix
+    algebra (:func:`~andrey.core.ci.pins_blas`), so the machine's thread count does not change its
+    p-values.
 
     ``edge_removal="triangles"`` tests only the pattern's edges that lie in a triangle of the
     pattern, whose ends share a neighbor in it, as Section 5 of Ogarrio, Spirtes, and Ramsey (2016)
@@ -361,7 +364,7 @@ def fci_from_pattern(
     test = make_indep_test(
         indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
     )
-    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+    with _one_thread(test):
         support = pattern != NULL
         confounded = None if constraints is None else constraints.confounded
         if confounded is not None:
@@ -437,6 +440,18 @@ def fci_from_pattern(
         )
 
         return GraphStructure.from_numpy(marks, kind="pag")
+
+
+@contextmanager
+def _one_thread(test: CITest) -> Generator[None]:
+    """Limit BLAS to one thread for a test that :func:`~andrey.core.ci.pins_blas` pins, and torch
+    too when the ``cpu`` backend runs its kernels in torch; any other test keeps every thread."""
+    with ExitStack() as limits:
+        if pins_blas(test):
+            if backend.config.backend == "cpu":
+                limits.enter_context(backend.one_torch_thread())
+            limits.enter_context(backend.one_blas_thread())
+        yield
 
 
 def _derive_sepsets(
