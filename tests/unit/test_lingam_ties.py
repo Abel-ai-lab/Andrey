@@ -4,7 +4,7 @@ Two columns that are interchangeable in the sample have mathematically equal sco
 only by rounding, and the rounding depends on the CPU's BLAS kernel. A test cannot switch kernels,
 so it checks the invariant that rules out a kernel-dependent pick: reordering the columns reorders
 the causal order and changes nothing else. Continuous data without ties give the orders of a plain
-argmax of the scores.
+argmax of the scores. ICA-LiNGAM's search zeroes weights of equal magnitude in row-major order.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import pytest
 import andrey
 from andrey.data.scm import sample_scm
 from andrey.lingam import direct, multi_group, pwling
+from andrey.lingam.ica import _estimate_causal_order
 
 # Ranks / 8 of two columns with the same values, whose sample is invariant to swapping them.
 _SWAP_PAIR_N8 = np.array([[5, 4], [4, 6], [2, 8], [3, 5], [7, 2], [1, 7], [6, 3], [8, 1]]) / 8
@@ -241,3 +242,11 @@ def test_copy_adjacency_follows_columns(copy: str) -> None:
         relabeled[np.ix_(perm, perm)] = B_perm
         np.testing.assert_array_equal(relabeled != 0, B != 0, err_msg=str(perm))
         np.testing.assert_allclose(relabeled, B, atol=1e-9, err_msg=str(perm))
+
+
+@pytest.mark.parametrize("sign", [1.0, -1.0])
+def test_ica_zeroes_weights_of_equal_magnitude_in_row_major_order(sign: float) -> None:
+    """Of two equal weights that form a cycle, the one in the lower row goes first, so the other
+    stays as the edge, whatever order NumPy's sort puts equal values in."""
+    weights = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, sign, 0.0]])
+    assert _estimate_causal_order(weights, np.arange(3)) == [0, 1, 2]
