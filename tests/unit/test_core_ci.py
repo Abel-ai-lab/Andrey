@@ -11,6 +11,7 @@ direct scipy computation.
 
 from __future__ import annotations
 
+import math
 import re
 import sys
 import warnings
@@ -684,15 +685,72 @@ def _eigenvalue_checks(monkeypatch) -> list[np.ndarray]:
     return seen
 
 
+def _second_order_reference(corr, lo, hi, s1, s2):
+    """The second-order partial correlation of ``lo`` and ``hi`` given ``s1`` and ``s2`` by the
+    first-order recursion in plain floats, or ``None`` when the bound on the inverse of the block,
+    ``g + (1 + 2 g) / lambda``, is not below 1e3."""
+    c = corr.tolist()
+    d1 = 1.0 - c[s1][s2] * c[s1][s2]
+    ax, ay = 1.0 - c[lo][s1] * c[lo][s1], 1.0 - c[hi][s1] * c[hi][s1]
+    if not (d1 > 0.0 and ax > 0.0 and ay > 0.0):
+        return None
+    rxy1 = (c[lo][hi] - c[lo][s1] * c[hi][s1]) / math.sqrt(ax * ay)
+    rx21 = (c[lo][s2] - c[lo][s1] * c[s1][s2]) / math.sqrt(ax * d1)
+    ry21 = (c[hi][s2] - c[hi][s1] * c[s1][s2]) / math.sqrt(ay * d1)
+    bx, by = 1.0 - rx21 * rx21, 1.0 - ry21 * ry21
+    if not (bx > 0.0 and by > 0.0):
+        return None
+    r = (rxy1 - rx21 * ry21) / math.sqrt(bx * by)
+    pxx, pyy = ax * bx, ay * by
+    smallest = pxx * pyy * (1.0 - r * r) / (pxx + pyy)
+    if not smallest > 0.0:
+        return None
+    g = 2.0 / d1
+    return r if g + (1.0 + 2.0 * g) / smallest < 1e3 else None
+
+
+def _partial_correlation_reference(corr, lo, hi, cond):
+    """The partial correlation of one canonical query as the shipped arithmetic gives it, restated
+    from its documentation on public NumPy: the second-order recursion for two conditioners, else
+    the last row of the Cholesky factor of ``[*S, lo, hi]``, settled when the factor of the block
+    less ``BOUND_MARGIN * SINGULAR_RTOL * k`` on the diagonal exists; a block neither settles takes
+    the inverse."""
+    if len(cond) == 2:
+        r = _second_order_reference(corr, lo, hi, *cond)
+        if r is not None:
+            return r
+    else:
+        order = [*cond, lo, hi]
+        block = corr[np.ix_(order, order)]
+        try:
+            low = np.linalg.cholesky(block)
+            tau = ci.BOUND_MARGIN * ci.SINGULAR_RTOL * len(order)
+            shifted = np.linalg.cholesky(block - tau * np.eye(len(order)))
+        except np.linalg.LinAlgError:
+            pass
+        else:
+            if shifted[-1, -1] > 0.0 and low[-1, -1] > 0.0:
+                l21, l22 = low[-1, -2].item(), low[-1, -1].item()
+                return l21 / math.sqrt(l21 * l21 + l22 * l22)
+    order = [lo, hi, *cond]
+    inv = np.linalg.inv(corr[np.ix_(order, order)])
+    return -inv[0, 1] / math.sqrt(abs(inv[0, 0] * inv[1, 1]))
+
+
 def _eigenvalues_first(corr, x, y, conditions):
-    """Whether the eigenvalue test rejects some query row, else the rows' partial correlations."""
+    """Whether the eigenvalue test rejects some query row, else the rows' partial correlations as
+    :func:`_partial_correlation_reference` gives them, each from its own row."""
     var = np.column_stack([np.minimum(x, y), np.maximum(x, y), np.sort(conditions, axis=1)])
     stack = corr[var[:, :, None], var[:, None, :]]
     w = np.linalg.eigvalsh(stack)
     if (w[:, 0] <= w[:, -1] * 1e-12).any():
         return True, None
-    inv = np.linalg.inv(stack)
-    r = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
+    r = np.array(
+        [
+            _partial_correlation_reference(corr, int(row[0]), int(row[1]), row[2:].tolist())
+            for row in var
+        ]
+    )
     return False, np.clip(r, -ci.ONE_MINUS_EPS, ci.ONE_MINUS_EPS)
 
 
@@ -818,6 +876,273 @@ def test_guard_decides_by_eigenvalues_whatever_the_inversion_returns(monkeypatch
     monkeypatch.setattr(np.linalg, "inv", lambda a: exact_inv(a + 1e-14 * np.eye(a.shape[-1])))
     with pytest.raises(ValueError, match="singular"):
         ci._invert_nonsingular(singular)
+
+
+# ---- the inverse-free partial correlations -----------------------------------------------
+
+
+def _scm_queries(size: int, n: int, seed: int, d: int = 30):
+    """``n`` canonical queries of ``size`` conditioners over ``d`` columns: ``(lo, hi, conds)``."""
+    rng = np.random.default_rng(seed)
+    rows = np.array([rng.permutation(d)[: size + 2] for _ in range(n)])
+    lo, hi = np.minimum(rows[:, 0], rows[:, 1]), np.maximum(rows[:, 0], rows[:, 1])
+    return lo, hi, np.sort(rows[:, 2:], axis=1)
+
+
+@pytest.fixture(scope="module")
+def scm_columns():
+    return andrey.data.sample_scm(graph="erdos_renyi", d=30, n=800, seed=3, density=4.0).data
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [2, 3, 4, 6, 9])
+def test_inverse_free_partial_correlations_match_the_inverse_within_rounding(
+    test_class, size, scm_columns
+):
+    # The second-order recursion and the Cholesky factor give the partial correlation the inverse
+    # gives, to rounding: the settled blocks of well-conditioned data have an inverse of 2-norm
+    # below 1e3, so the difference stays within about 1e3 times the unit roundoff. No decision at
+    # the usual levels changes.
+    test = test_class(scm_columns)
+    lo, hi, conds = _scm_queries(size, 3000, size)
+    r, p = test._canonical_statistic_pvalues(lo, hi, conds)
+    var = np.column_stack([lo, hi, conds])
+    inv = np.linalg.inv(test._corr[var[:, :, None], var[:, None, :]])
+    want = np.clip(
+        -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1])), -ci.ONE_MINUS_EPS, 1.0
+    )
+    assert np.abs(r - want).max() < 1e-12
+    want_p = np.asarray(test._pvalue(want, test._degrees_of_freedom(size)))
+    assert np.abs(p - want_p).max() < 1e-10
+    for alpha in (0.01, 0.05, 0.1):
+        assert ((p > alpha) == (want_p > alpha)).all()
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [2, 3, 5])
+def test_every_path_and_every_cut_returns_the_same_bits(test_class, size, scm_columns, monkeypatch):
+    # One query has one answer: alone, in a stack of any size, or in any batch, whichever side of
+    # the row loop's limit the stack falls, and whether or not NumPy's private Cholesky gufunc
+    # serves the factors.
+    test = test_class(scm_columns)
+    lo, hi, conds = _scm_queries(size, 70, 10 + size)
+    r, p = test._canonical_statistic_pvalues(lo, hi, conds)
+    for rows in (1, 2, ci.SECOND_ORDER_LOOP_ROWS, ci.SECOND_ORDER_LOOP_ROWS + 1, 33):
+        for start in range(0, 70, rows):
+            cut = slice(start, start + rows)
+            got_r, got_p = test._canonical_statistic_pvalues(lo[cut], hi[cut], conds[cut])
+            np.testing.assert_array_equal(got_r, r[cut])
+            np.testing.assert_array_equal(got_p, p[cut])
+    for i in range(0, 70, 3):
+        assert test.statistic_pvalue(lo[i], hi[i], conds[i].tolist()) == (r[i], p[i])
+    np.testing.assert_array_equal(test.statistic_pvalues(hi, lo, conds[:, ::-1])[1], p)
+    sets = [c for c in conds.tolist() if 0 not in c and 1 not in c]
+    assert len(sets) > 20
+    pair = test.batched_call(0, 1, sets)
+    assert pair == [test(0, 1, c) for c in sets]
+    np.testing.assert_array_equal(
+        pair,
+        test._canonical_pvalues(np.zeros(len(sets), int), np.ones(len(sets), int), np.array(sets)),
+    )
+    monkeypatch.setattr(ci, "_CHOLESKY_LO", None)
+    for rows in (1, 70):
+        for start in range(0, 70, rows):
+            cut = slice(start, start + rows)
+            np.testing.assert_array_equal(
+                test._canonical_statistic_pvalues(lo[cut], hi[cut], conds[cut])[0], r[cut]
+            )
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [2, 3, 4])
+def test_a_block_the_certificates_reject_takes_the_inverse_whatever_its_neighbors(test_class, size):
+    # Three diagonal blocks of a correlation matrix: healthy, one whose smallest eigenvalue lies
+    # between the eigenvalue threshold and the certificates' (accepted by the guard, but settled by
+    # neither the recursion nor the Cholesky factor), and healthy again. The rejected block's
+    # partial correlation is the inverse's bits, on the scalar path and in any stack, and a healthy
+    # block's bits do not depend on whether a rejected one is in its stack.
+    k = size + 2
+    corr = np.zeros((3 * k, 3 * k))
+    for block, smallest in enumerate((0.5, 1e-10, 0.4)):
+        corr[block * k : (block + 1) * k, block * k : (block + 1) * k] = _equicorrelation(
+            k, smallest
+        )
+    test = test_class.from_corr(corr, 200)
+    queries = [[b * k + j for j in range(k)] for b in range(3)]
+    rows = np.array(queries)
+    x, y, conditions = rows[:, 0], rows[:, 1], rows[:, 2:]
+    r, p = test.statistic_pvalues(x, y, conditions)
+    for i, query in enumerate(queries):
+        alone = test.statistic_pvalues(x[i : i + 1], y[i : i + 1], conditions[i : i + 1])
+        assert (alone[0][0], alone[1][0]) == (r[i], p[i])
+        assert test.statistic_pvalue(query[0], query[1], query[2:]) == (r[i], p[i])
+    inv = np.linalg.inv(corr[np.ix_(queries[1], queries[1])])
+    want = -inv[0, 1] / math.sqrt(abs(inv[0, 0] * inv[1, 1]))
+    assert r[1] == np.clip(want, -ci.ONE_MINUS_EPS, ci.ONE_MINUS_EPS)
+    for i in (0, 2):
+        assert r[i] == _partial_correlation_reference(corr, *queries[i][:2], queries[i][2:])
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [2, 3])
+@pytest.mark.parametrize("smallest", [1e-3, 1e-6, 1e-8, 1e-10, 1e-12, 1e-13])
+def test_singular_decisions_are_the_eigenvalues_on_every_path(test_class, size, smallest):
+    # The recursion and the Cholesky factor settle only blocks the eigenvalue test accepts, so a
+    # block raises exactly when its smallest eigenvalue is at most 1e-12 of its largest -- on the
+    # scalar path, alone in a stack, and next to healthy blocks -- as it did with the inverse.
+    k = size + 2
+    corr = np.zeros((2 * k, 2 * k))
+    corr[:k, :k] = _equicorrelation(k, 0.5)
+    corr[k:, k:] = _equicorrelation(k, smallest)
+    test = test_class.from_corr(corr, 200)
+    healthy, edge = list(range(k)), list(range(k, 2 * k))
+    w = np.linalg.eigvalsh(corr[k:, k:])
+    singular = w[0] <= w[-1] * 1e-12
+
+    def stack(*queries):
+        rows = np.array(queries)
+        return test.statistic_pvalues(rows[:, 0], rows[:, 1], rows[:, 2:])
+
+    for queries in ([edge], [healthy, edge], [edge, healthy, healthy]):
+        if singular:
+            with pytest.raises(ci.SingularCorrelationError):
+                stack(*queries)
+        else:
+            stack(*queries)
+    if singular:
+        with pytest.raises(ci.SingularCorrelationError):
+            test.statistic_pvalue(edge[0], edge[1], edge[2:])
+    else:
+        test.statistic_pvalue(edge[0], edge[1], edge[2:])
+    stack(healthy, healthy)
+
+
+def _decision_by_eigenvalues(block: np.ndarray) -> bool:
+    """Whether the eigenvalue test finds ``block`` singular: its smallest eigenvalue is at most
+    ``SINGULAR_RTOL`` times its largest."""
+    w = np.linalg.eigvalsh(block)
+    return bool(w[0] <= w[-1] * ci.SINGULAR_RTOL)
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [3, 4, 6, 30, 31])
+@pytest.mark.parametrize(
+    "smallest", [1e-3, 1e-8, 1e-10, 3e-11, 1e-11, 3e-12, 1e-12, 5e-13, 2e-13, 1e-13, 1e-14, 1e-16]
+)
+def test_the_certificates_never_move_a_singular_decision_from_the_eigenvalues(
+    test_class, size, smallest
+):
+    # Sweeps the smallest eigenvalue across the three shifts of the factor (the bound's, the pass
+    # certificate's and the singular certificate's) for blocks of three or more conditioners, and
+    # asks the scalar path, the stack alone, and the stack beside healthy blocks for the same
+    # decision as the eigenvalue test, with the error of the inverse path.
+    k = size + 2
+    corr = np.zeros((2 * k, 2 * k))
+    corr[:k, :k] = _equicorrelation(k, 0.5)
+    corr[k:, k:] = _equicorrelation(k, smallest)
+    test = test_class.from_corr(corr, 400)
+    healthy, edge = list(range(k)), list(range(k, 2 * k))
+    singular = _decision_by_eigenvalues(corr[k:, k:])
+    refused = None
+    if singular:
+        with pytest.raises(ci.SingularCorrelationError) as reference:
+            test._invert(corr[np.ix_(edge, edge)][None])
+        refused = reference.value
+
+    def stack(*queries):
+        rows = np.array(queries)
+        return test.statistic_pvalues(rows[:, 0], rows[:, 1], rows[:, 2:])
+
+    for call in (
+        lambda: stack(edge),
+        lambda: stack(healthy, edge),
+        lambda: stack(edge, healthy, healthy),
+        lambda: test.statistic_pvalue(edge[0], edge[1], edge[2:]),
+    ):
+        if singular:
+            with pytest.raises(ci.SingularCorrelationError) as info:
+                call()
+            assert str(info.value) == str(refused)
+            assert getattr(info.value, "groups", None) == getattr(refused, "groups", None)
+        else:
+            assert np.isfinite(np.asarray(call()[0])).all()
+    assert np.isfinite(stack(healthy, healthy)[0]).all()
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [3, 5])
+def test_a_block_with_a_missing_correlation_gets_what_the_inverse_path_gives(test_class, size):
+    # A NaN fails every shifted factor, as a singular block does, but it is not certified singular:
+    # the block is left to the inverse and the eigenvalue test, which either way raise or return
+    # what they did before the factor (here, on every path, the same as a stack of the inverse).
+    k = size + 2
+    corr = _equicorrelation(k, 0.5)
+    corr[0, 2] = corr[2, 0] = np.nan
+    test = test_class.from_corr(corr, 400)
+    query = list(range(k))
+    reference = _inverted_or_error(ci._invert_nonsingular, corr[None])
+    for call in (
+        lambda: test.statistic_pvalue(query[0], query[1], query[2:]),
+        lambda: test.statistic_pvalues(
+            np.array([query[0]]), np.array([query[1]]), np.array([query[2:]])
+        ),
+    ):
+        try:
+            got = call()
+        except (ValueError, np.linalg.LinAlgError) as error:
+            assert isinstance(reference, tuple)
+            assert isinstance(error, reference[0])
+        else:
+            assert not isinstance(reference, tuple)
+            assert np.isnan(np.asarray(got[0])).all()
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_a_block_that_is_not_a_correlation_matrix_is_left_to_the_eigenvalue_test(test_class):
+    # The singular certificate needs a largest eigenvalue of at least 1, as a diagonal of 1 gives.
+    # A matrix scaled to a diagonal of 1e-3 and a smallest eigenvalue of 1e-14 of it is singular
+    # by the eigenvalue test on every path, and one scaled to 1e-3 with a smallest eigenvalue of
+    # 1e-10 of it is not, though both fail the shifted factor of 1e-13.
+    k = 5
+    for scaled, smallest in ((1e-3, 1e-14), (1e-3, 1e-10)):
+        corr = scaled * _equicorrelation(k, smallest)
+        test = test_class.from_corr(corr, 400)
+        singular = _decision_by_eigenvalues(corr)
+        for call in (
+            lambda: test.statistic_pvalue(0, 1, (2, 3, 4)),
+            lambda: test.statistic_pvalues(
+                np.array([0, 0]), np.array([1, 1]), np.array([[2, 3, 4]] * 2)
+            ),
+        ):
+            if singular:
+                with pytest.raises(ci.SingularCorrelationError):
+                    call()
+            else:
+                call()
+
+
+def test_the_public_cholesky_route_gives_the_gufunc_its_bits(monkeypatch):
+    # The factors of a stack in which a matrix is not positive definite: NaN for that matrix alone,
+    # on either route, and the other matrices' factors are the same bits as when they are alone.
+    gufunc = ci._private_cholesky()
+    rng = np.random.default_rng(0)
+    good = [np.cov(rng.standard_normal((30, k)), rowvar=False) for k in (4, 4, 4)]
+    stack = np.stack(
+        [
+            good[0],
+            np.array([[1.0, 2.0], [2.0, 1.0]]).repeat(2, 0).repeat(2, 1) - 3 * np.eye(4),
+            good[2],
+        ]
+    )
+    want = np.stack(
+        [np.linalg.cholesky(good[0]), np.full((4, 4), np.nan), np.linalg.cholesky(good[2])]
+    )
+    with np.errstate(all="ignore"):
+        for private in (gufunc, None):
+            monkeypatch.setattr(ci, "_CHOLESKY_LO", private)
+            np.testing.assert_array_equal(ci._cholesky_lower(stack), want)
+            np.testing.assert_array_equal(ci._cholesky_lower(stack[0]), want[0])
+            assert np.isnan(ci._cholesky_lower(stack[1])).all()
 
 
 def _absolute_value_bound(inv: np.ndarray, limit: float) -> np.ndarray:

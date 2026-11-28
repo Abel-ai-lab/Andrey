@@ -24,7 +24,7 @@ import pytest
 
 import andrey
 from andrey.constraint import _skeleton
-from andrey.core import backend, ci_missing, mixed, score, score_delta
+from andrey.core import backend, ci, ci_missing, mixed, score, score_delta
 from andrey.core.ci import make_indep_test
 from andrey.search import operators
 
@@ -57,6 +57,8 @@ MODULE_CACHES = {
     "andrey.core.backend._thread_pools": "the number of imported modules",
     "andrey.core.backend.torch": "whether torch is installed",
     "andrey.core.backend._torch_is_cpu_build": "whether torch is installed, and its build",
+    "andrey.core.ci._shift": "k, margin",
+    "andrey.core.ci._shifts": "k",
     "andrey.core.ci_missing._apart": "k",
     "andrey.core.ci_regression._lean_kernels": "whether the installed scikit-learn has the kernels",
     "andrey.core.mixed._triangle": "d",
@@ -75,6 +77,8 @@ def test_every_module_level_cache_is_listed():
 ARGUMENT_CACHES = [
     pytest.param(score.ebic_penalty, (2, 10, 0.5), {0: 3, 1: 12, 2: 1.0}, id="ebic_penalty"),
     pytest.param(_skeleton._combination_table, (6, 2), {0: 7, 1: 3}, id="combination_table"),
+    pytest.param(ci._shift, (3, 10.0), {0: 4, 1: 0.1}, id="shift"),
+    pytest.param(ci._shifts, (3,), {0: 4}, id="shifts"),
     pytest.param(ci_missing._apart, (4,), {0: 5}, id="apart"),
     pytest.param(mixed._triangle, (3,), {0: 4}, id="triangle"),
     pytest.param(operators._position_plan, (3,), {0: 4}, id="position_plan"),

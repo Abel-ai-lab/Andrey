@@ -36,8 +36,9 @@ p-values is asked one query at a time and its candidates are ranked by p-value, 
 A partial correlation is the correlation of the residuals of ``x`` and ``y`` after a least-squares
 fit on the conditioning columns. The partial-correlation tests, ``"student_t"``
 (:class:`~andrey.core.ci.StudentT`) and ``"fisherz"`` (:class:`~andrey.core.ci.FisherZ`), take it
-from the inverse of the ``[x, y, *S]`` correlation submatrix; when that submatrix is singular to
-working precision, as lagged copies of a strongly autocorrelated series can make it,
+from the ``[x, y, *S]`` correlation submatrix, by the closed form for two conditioners and the
+Cholesky factor for more, or by its inverse where it is nearly singular; when that submatrix is
+singular to working precision, as lagged copies of a strongly autocorrelated series can make it,
 :class:`DesignTest` takes it from the residuals of the design instead (:func:`design_test`).
 
 References
@@ -677,7 +678,7 @@ def pcmci(
         rows=rows,
     )
     ranks = tie_ranks(data, categorical).tolist()
-    with backend.one_blas_thread():  # the stacked inversions then give the same bits on any host
+    with backend.one_blas_thread():  # the stacked kernels then give the same bits on any host
         parents = tuple(
             pc1(test, n_vars, j, tau_max, pc_alpha, ranks, constraints, max_depth)
             for j in range(n_vars)
