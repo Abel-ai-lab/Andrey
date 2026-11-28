@@ -248,6 +248,12 @@ names its pull request.
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
+- `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, and `longitudinal_lingam` run faster,
+  with the same output bit for bit: the least-squares fits of their adaptive Lasso weights and
+  refits solve a finite float64 design with the steps of scikit-learn's `LinearRegression`
+  (centering, `scipy.linalg.lstsq` with its `tol` as `cond`, and its intercept) without the
+  estimator's input checks, and any other input still goes through it. `bottom_up_parce_lingam`,
+  `varma_lingam`, and `rcd` fit the same way and return the same output bit for bit. ([#1359])
 - `iamb`, `inter_iamb`, and `mmpc` without a target, and the restrict phase of `mmhc` and `rsmax2`
   that reads their sets, make the search of every variable on the `andrey.config(n_jobs=...)`
   worker processes with `fisherz`, `student_t`, or `normal_scores` on complete data, so they run
@@ -3277,6 +3283,7 @@ First alpha release.
 [#1351]: https://github.com/Abel-ai-lab/Andrey/pull/1351
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
+[#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371
