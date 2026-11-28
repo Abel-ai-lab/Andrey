@@ -289,6 +289,12 @@ names its pull request.
   and flags a change to the script or to its workflow job, it is a required check, `.github/` and
   the script have code owners, and it fails until a maintainer sets the label
   `test-change-approved`. ([#1358])
+- For contributors, the `check-test-changes` job also flags a `conftest.py` that sets
+  `collect_ignore` or `collect_ignore_glob`, a `__test__ = False` added to a module or a function, a
+  string `skipif` or `xfail` condition made `True`, a `pytest.raises` widened from `Exception` to
+  `BaseException`, a `test_*` function that becomes a fixture, a `parametrize` with no case added,
+  an `xfail` that gains `run=False`, a new `setup_module`, `setup_class`, `setup_method`, or
+  `setup_function` that skips, and a function of `qa/` that is deleted or emptied. ([#1381])
 
 ### Fixed
 
@@ -3318,3 +3324,4 @@ First alpha release.
 [#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371
 [#1378]: https://github.com/Abel-ai-lab/Andrey/pull/1378
+[#1381]: https://github.com/Abel-ai-lab/Andrey/pull/1381
