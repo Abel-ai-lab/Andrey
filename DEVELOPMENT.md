@@ -424,8 +424,8 @@ fails one that changes anything under `src/` or whose `main` is not at `<x.y.z>`
 request runs the quality gate (`qa/README.md`), also required, once for the whole release.
 
 Pull-request CI (`.github/workflows/ci.yml`, [Testing](docs/docs/ci.md)) runs lint, types, the
-weakened-test check ([AI tools](#ai-tools)), the unit tests, the cheap recovery checks, and the fast
-consistency tests; on a pull request into a
+check of changes to tests ([AI tools](#ai-tools)), the unit tests, the cheap recovery checks, and
+the fast consistency tests; on a pull request into a
 release or topic branch it deselects the heavy accuracy checks with `-m "not release"`. The release
 pull request into `main` runs every test, the `release`-marked ones included, and so do CI's other
 triggers: a push to `main`, a manual run, and the tag's site deploy.
@@ -466,12 +466,11 @@ Every pull request has exactly one type label, which also gives its section in t
 Two optional flags put a change first: `highlight` lists it under Highlights and `breaking` under
 Breaking. A third, `release`, marks a release's pull request and the issue that tracks its
 checklist; the release notes leave the release pull request out. A fourth, `test-change-approved`,
-records a maintainer's approval of the pull request's weakened tests ([AI tools](#ai-tools)); it is
-not a type label. Every pull request also has a
-milestone, the release it ships in. A maintainer sets the labels and the milestone when the pull
-request is opened or reviewed, and a `feature` or `bug` pull request adds a bullet under
-`## [Unreleased]` in `CHANGELOG.md` that ends with a link to it, `([#<number>])`, defined at the
-end of the file.
+records a maintainer's approval of the pull request's changes to tests ([AI tools](#ai-tools)); it
+is not a type label. Every pull request also has a milestone, the release it ships in. A maintainer
+sets the labels and the milestone when the pull request is opened or reviewed, and a `feature` or
+`bug` pull request adds a bullet under `## [Unreleased]` in `CHANGELOG.md` that ends with a link to
+it, `([#<number>])`, defined at the end of the file.
 
 `CHANGELOG.md` is the record of each release. Before the release pull request merges, the
 maintainer (or an agent) lists the milestone's pull requests with
@@ -512,9 +511,9 @@ contributors:
 - **Numbers and references are never generated.** A benchmark number comes from a recorded run, and
   a reference is cited only after it has been opened and found to support the claim; the author
   answers for it.
-- **A weakened test needs a maintainer's approval.** A test or a baseline is never changed to make a
-  check pass. The `test-weakening` job of a pull request into a release or topic branch runs
-  `scripts/test_weakening.py`, which compares the base and the head of `tests/` and `qa/` by their
+- **A change that skips, loosens, or removes a test needs a maintainer's approval.** A test or a
+  baseline is never changed to make a check pass. The `check-test-changes` job of a pull request into a release or topic branch runs
+  `scripts/check_test_changes.py`, which compares the base and the head of `tests/` and `qa/` by their
   syntax trees, function by function, and flags a removed `assert`, `assert_*` call, or
   `pytest.raises`; a looser tolerance or bound (a larger `rtol`, `atol`, `abs`, or `rel`, a smaller
   `decimal` or `places`, a looser number in a comparison, an exact comparison turned into
@@ -527,14 +526,14 @@ contributors:
   approves the head it was set after: a push withdraws it, and a maintainer removes it and sets it
   again after reading the new flags. The job runs the copy of the script that the base branch has,
   not the pull request's, and a change to the script or to the workflow job that runs it is flagged
-  too, so a pull request cannot weaken the check it is judged by. The job is a required status
+  too, so a pull request cannot loosen the check it is judged by. The job is a required status
   check, and `.github/` and the script have code owners (`.github/CODEOWNERS`); a workflow change
   elsewhere that stops the job from running is for the code owner asked to read it. A change to the
   pytest options of `pyproject.toml` that choose the tests or judge them (`addopts`, `testpaths`,
   `filterwarnings`, and the like) is flagged too. An added test, a tightened tolerance, and a test
   that only moved or was renamed are not flagged, and the release pull request into `main` is not
   read, since each of its changes passed the check in its own pull request. A person's approval is
-  what the label records, so an agent never sets it. Run `uv run python scripts/test_weakening.py
+  what the label records, so an agent never sets it. Run `uv run python scripts/check_test_changes.py
   --base origin/release/<x.y.z>` before opening the pull request to see the flags. A pass is
   necessary and not sufficient: the check cannot see an assertion rewritten to a weaker one, a
   tolerance passed through a variable, a check that moved into a helper, or an existing test pointed
@@ -545,7 +544,7 @@ contributors:
   ([The blog](docs/DEVELOPMENT.md#the-blog)). Every post and every release card has one.
 
 Not acceptable: a change nobody reviewed, a number or a reference an AI tool made up, a test or a
-gate weakened so that a change passes, and a post or a card whose statement is missing or untrue. A
+gate skipped, loosened, or removed so that a change passes, and a post or a card whose statement is missing or untrue. A
 maintainer may close a pull request that shows one of these without a full review.
 
 These rules follow published ones. The

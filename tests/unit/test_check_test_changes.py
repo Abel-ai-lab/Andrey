@@ -1,4 +1,4 @@
-"""The weakened-test check flags each kind of weakening and passes added and tightened tests."""
+"""The check of test changes flags each skipped, loosened, or removed test and passes the rest."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ PATH = "tests/unit/test_example.py"
 @pytest.fixture(scope="module")
 def check():
     spec = importlib.util.spec_from_file_location(
-        "test_weakening", ROOT / "scripts/test_weakening.py"
+        "check_test_changes", ROOT / "scripts/check_test_changes.py"
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -1587,7 +1587,7 @@ FLAGGED = {
 
 
 @pytest.mark.parametrize("name", FLAGGED)
-def test_each_weakening_is_flagged(check, name):
+def test_each_change_that_skips_loosens_or_removes_a_test_is_flagged(check, name):
     old, new, expected = FLAGGED[name]
     found = reasons(check, old, new)
     assert any(expected in reason for reason in found), found
@@ -3194,7 +3194,7 @@ def test_a_change_outside_tests_and_qa_is_not_read(check, repo):
     assert check.main(["--base", "main"]) == 0
 
 
-# The check and the workflow job that runs it are guarded: a pull request cannot weaken the check
+# The check and the workflow job that runs it are guarded: a pull request cannot loosen the check
 # it is judged by without a maintainer reading the change.
 
 WORKFLOW = textwrap.dedent("""
@@ -3206,17 +3206,17 @@ WORKFLOW = textwrap.dedent("""
           - name: ty
             run: ty check
       # A required check, by its name.
-      test-weakening:
+      check-test-changes:
         if: github.event_name == 'pull_request'
         runs-on: ubuntu-24.04
         steps:
           - uses: actions/checkout@v7
-          - name: Weakened tests need a maintainer's approval
+          - name: Changes that skip, loosen, or remove a test need approval
             # Judges the pull request's tests.
             if: github.base_ref != 'main'
             run: |
-              git show HEAD^1:scripts/test_weakening.py > "$RUNNER_TEMP/test_weakening.py"
-              python -I "$RUNNER_TEMP/test_weakening.py" --base HEAD^1
+              git show HEAD^1:scripts/check_test_changes.py > "$RUNNER_TEMP/check_test_changes.py"
+              python -I "$RUNNER_TEMP/check_test_changes.py" --base HEAD^1
       other:
         steps:
           - run: echo hi
@@ -3224,7 +3224,7 @@ WORKFLOW = textwrap.dedent("""
 PYPROJECT = '[project]\nname = "x"\n\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n'
 CHECK = "print('the check')\n"
 WORKFLOW_FILE = ".github/workflows/ci.yml"
-CHECK_FILE = "scripts/test_weakening.py"
+CHECK_FILE = "scripts/check_test_changes.py"
 
 
 @pytest.fixture
@@ -3241,19 +3241,21 @@ def guarded(repo):
 GUARDED = {
     "the check edited": {CHECK_FILE: "import sys\nsys.exit(0)\n"},
     "the step edited": {WORKFLOW_FILE: WORKFLOW.replace("--base HEAD^1", "--base HEAD")},
-    "the step renamed": {WORKFLOW_FILE: WORKFLOW.replace("Weakened tests", "Tests")},
+    "the step renamed": {
+        WORKFLOW_FILE: WORKFLOW.replace("Changes that skip, loosen, or remove a test", "Tests")
+    },
     "the step condition edited": {
         WORKFLOW_FILE: WORKFLOW.replace("github.base_ref != 'main'", "false")
     },
     "the step pointed at the pull request's copy": {
-        WORKFLOW_FILE: WORKFLOW.replace('"$RUNNER_TEMP/test_weakening.py"', CHECK_FILE)
+        WORKFLOW_FILE: WORKFLOW.replace('"$RUNNER_TEMP/check_test_changes.py"', CHECK_FILE)
     },
-    "the step removed": {WORKFLOW_FILE: WORKFLOW.replace("test_weakening", "other")},
+    "the step removed": {WORKFLOW_FILE: WORKFLOW.replace("check_test_changes", "other")},
     "the job condition edited": {
         WORKFLOW_FILE: WORKFLOW.replace("github.event_name == 'pull_request'", "false")
     },
     "the job runner edited": {WORKFLOW_FILE: WORKFLOW.replace("ubuntu-24.04", "macos-14")},
-    "the job renamed": {WORKFLOW_FILE: WORKFLOW.replace("  test-weakening:", "  test-tests:")},
+    "the job renamed": {WORKFLOW_FILE: WORKFLOW.replace("  check-test-changes:", "  check-tests:")},
     "the job removed": {
         WORKFLOW_FILE: WORKFLOW[: WORKFLOW.index("  # A required check")]
         + WORKFLOW[WORKFLOW.index("  other:") :]
@@ -3281,8 +3283,8 @@ def test_a_change_to_the_check_or_its_step_needs_approval(check, guarded, capsys
     assert check.main(["--base", "main"]) == 1
     output = capsys.readouterr().out
     assert "1 flagged change(s)" in output
-    assert "weakened-test check" in output
-    assert "title=Weakened test::" in output
+    assert "this check changed" in output
+    assert "title=Test change needs approval::" in output
 
 
 @pytest.mark.parametrize(
@@ -3313,7 +3315,7 @@ def test_deleting_the_check_needs_approval(check, guarded, capsys):
     (guarded / CHECK_FILE).unlink()
     commit(guarded)
     assert check.main(["--base", "main"]) == 1
-    assert f"{CHECK_FILE}: the weakened-test check was deleted" in capsys.readouterr().out
+    assert f"{CHECK_FILE}: this check was deleted" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("name", NOT_GUARDED)
@@ -3344,18 +3346,27 @@ def test_a_pull_request_that_adds_the_check_and_its_step_is_not_flagged(check, r
 def test_the_job_of_this_repository_runs_the_check_of_the_base_branch(check):
     text = (ROOT / WORKFLOW_FILE).read_text()
     [(_, job)] = check.workflow_jobs(text)
-    assert job.startswith("  test-weakening:")
-    assert 'git show HEAD^1:scripts/test_weakening.py > "$detector"' in job
+    assert job.startswith("  check-test-changes:")
+    assert 'git show HEAD^1:scripts/check_test_changes.py > "$detector"' in job
     assert 'python -I "$detector"' in job
-    assert "python scripts/test_weakening.py" not in job
+    assert "python scripts/check_test_changes.py" not in job
+
+
+def test_the_job_of_this_repository_falls_back_to_the_script_under_its_old_name(check):
+    """A base from before the rename has the script as ``scripts/test_weakening.py``."""
+    text = (ROOT / WORKFLOW_FILE).read_text()
+    [(_, job)] = check.workflow_jobs(text)
+    new, old = "HEAD^1:scripts/check_test_changes.py", "HEAD^1:scripts/test_weakening.py"
+    assert 'git show HEAD^1:scripts/test_weakening.py > "$detector"' in job
+    assert job.index(new) < job.index(old)
 
 
 def test_the_job_of_this_repository_is_a_gated_check_that_reports_on_every_pull_request(check):
     workflow = yaml.safe_load((ROOT / WORKFLOW_FILE).read_text())
-    job = workflow["jobs"]["test-weakening"]
+    job = workflow["jobs"]["check-test-changes"]
     assert "needs" not in job
     assert "base_ref" not in job["if"]
-    assert "test-weakening" in workflow["jobs"]["ci-gate"]["needs"]
+    assert "check-test-changes" in workflow["jobs"]["ci-gate"]["needs"]
     assert [s["if"] for s in job["steps"] if "if" in s] == ["github.base_ref != 'main'"]
 
 
@@ -3376,8 +3387,8 @@ def test_a_flagged_change_fails_without_the_label(check, repo, monkeypatch, caps
     output = capsys.readouterr().out
     assert "tests/unit/test_a.py:1: test_a: 2 assertions removed" in output
     assert (
-        "::error file=tests/unit/test_a.py,line=1,title=Weakened test::2 assertions removed"
-        in output
+        "::error file=tests/unit/test_a.py,line=1,"
+        "title=Test change needs approval::2 assertions removed" in output
     )
     assert "test-change-approved" in output
     assert "::warning" not in output
@@ -3411,7 +3422,7 @@ def test_a_label_set_before_the_head_changed_does_not_approve(
     assert check.main(argv) == 1
     output = capsys.readouterr().out
     assert "::warning::The label test-change-approved was set before" in output
-    assert "title=Weakened test::2 assertions removed" in output
+    assert "title=Test change needs approval::2 assertions removed" in output
 
 
 def test_a_pull_request_needs_the_time_of_its_last_head_change(check, repo, capsys):

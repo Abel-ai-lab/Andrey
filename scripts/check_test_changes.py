@@ -1,4 +1,4 @@
-"""Flag a pull request that weakens a test, so that a person approves the change.
+"""Flag a pull request that skips, loosens, or removes an existing test, for a person to approve.
 
 A change that must make a check pass can drop an assertion, loosen a tolerance, skip the test, or
 record the new output as the baseline, and each of these passes the check without making the code
@@ -47,12 +47,12 @@ maintainer removes the label and sets it again after reading the new flags. It e
 cannot decide.
 
 CI runs the copy of this script that the base branch has, never the pull request's own, so a pull
-request cannot weaken the check it is judged by: it flags a change to this file, and to the
-workflow job that runs it, like any other weakening. The workflow file itself is the pull
+request cannot loosen the check it is judged by: it flags a change to this file, and to the
+workflow job that runs it, like any other change to a test. The workflow file itself is the pull
 request's, so a change to the rest of it that stops the job is for a reviewer to catch: the job is
 a required status check, and ``.github/`` and this script have code owners.
 
-    python3 scripts/test_weakening.py --base HEAD^1 --pr 123 --since 2026-11-20T12:00:00Z
+    python3 scripts/check_test_changes.py --base HEAD^1 --pr 123 --since 2026-11-20T12:00:00Z
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ from typing import Any, NamedTuple
 LABEL = "test-change-approved"
 ROOTS = ("tests", "qa")
 # This script and the workflow whose job runs it: a change to either needs the label too.
-DETECTOR = "scripts/test_weakening.py"
+DETECTOR = "scripts/check_test_changes.py"
 WORKFLOW = ".github/workflows/ci.yml"
 # The pytest options (``pyproject.toml``) that choose which tests run, and how a failure counts.
 PYTEST_OPTIONS = (
@@ -1146,7 +1146,7 @@ def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
 
 
 def compare(old: Unit, new: Unit, exempt: frozenset[str] = frozenset()) -> list[Finding]:
-    """Return the weakenings in ``new`` against the same unit ``old``.
+    """Return the changes in ``new`` that skip, loosen, or remove what the same unit ``old`` runs.
 
     ``exempt`` names the module constants whose markers are not read: those only added tests use.
     """
@@ -1253,7 +1253,7 @@ def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Findin
 
 
 def analyze(changes: Sequence[Change]) -> list[Finding]:
-    """Return the weakenings in the changed Python files of a pull request."""
+    """Return the changes that skip, loosen, or remove a test in the changed Python files."""
     findings: list[Finding] = []
     deleted: list[tuple[Unit, str]] = []
     fixtures: list[Unit] = []
@@ -1489,7 +1489,7 @@ def workflow_jobs(workflow: str) -> list[tuple[int, str]]:
 def guard_findings(base: str, head: str, root: str) -> list[Finding]:
     """Flag a change to this script or to the workflow job that runs it.
 
-    CI runs the copy of this script on the base branch, so a pull request cannot weaken the check
+    CI runs the copy of this script on the base branch, so a pull request cannot loosen the check
     it is judged by without a maintainer reading the change. A file the base does not have yet is
     not a change.
     """
@@ -1497,9 +1497,9 @@ def guard_findings(base: str, head: str, root: str) -> list[Finding]:
     findings = []
     if _exists(root, merge_base, DETECTOR):
         if not _exists(root, head, DETECTOR):
-            findings.append(Finding(DETECTOR, 0, "", "the weakened-test check was deleted"))
+            findings.append(Finding(DETECTOR, 0, "", "this check was deleted"))
         elif _show(root, head, DETECTOR) != _show(root, merge_base, DETECTOR):
-            findings.append(Finding(DETECTOR, 0, "", "the weakened-test check changed"))
+            findings.append(Finding(DETECTOR, 0, "", "this check changed"))
     changed = [
         key
         for key in PYTEST_OPTIONS
@@ -1518,7 +1518,7 @@ def guard_findings(base: str, head: str, root: str) -> list[Finding]:
         after = workflow_jobs(text)
         if before and [job for _, job in before] != [job for _, job in after]:
             line = after[0][0] if after else 0
-            reason = "the workflow job that runs the weakened-test check changed or was removed"
+            reason = "the workflow job that runs this check changed or was removed"
             findings.append(Finding(WORKFLOW, line, "", reason))
     return findings
 
@@ -1580,13 +1580,15 @@ def main(argv: Sequence[str] = ()) -> int:
         changes, findings = load(args.base, args.head, root)
         findings = [*analyze(changes), *findings, *guard_findings(args.base, args.head, root)]
         if not findings:
-            print(f"No weakened test between {args.base} and {args.head}.")
+            print(
+                f"No change between {args.base} and {args.head} skips, loosens, or removes a test."
+            )
             return 0
         print(f"{len(findings)} flagged change(s) in tests/ and qa/:\n\n{report(findings)}\n")
         applied = label_applied(args.repo, args.pr, args.label) if args.pr else None
         since = _time(args.since) if args.since else None
     except (subprocess.CalledProcessError, OSError, ValueError) as error:
-        print(f"::error::The weakened-test check could not run: {error} {_detail(error)}")
+        print(f"::error::The check of test changes could not run: {error} {_detail(error)}")
         return 2
     if applied is not None and since is not None:
         if applied > since:
@@ -1598,11 +1600,11 @@ def main(argv: Sequence[str] = ()) -> int:
         )
     for finding in findings:
         location = f"file={finding.path},line={max(finding.line, 1)}"
-        print(f"::error {location},title=Weakened test::{finding.reason}")
+        print(f"::error {location},title=Test change needs approval::{finding.reason}")
     print(
-        f"::error::The pull request weakens tests or re-records baselines. A maintainer who has "
-        f"read the flags above approves it by setting the label {args.label} (remove it first if "
-        f"it is set), after the last push; then re-run this job."
+        "::error::The pull request skips, loosens, or removes tests, or re-records baselines. A "
+        f"maintainer who has read the flags above approves it by setting the label {args.label} "
+        "(remove it first if it is set), after the last push; then re-run this job."
     )
     return 1
 
