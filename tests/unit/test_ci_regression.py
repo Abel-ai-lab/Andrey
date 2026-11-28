@@ -488,6 +488,29 @@ def test_the_lean_mean_cv_error_equals_the_sklearn_loop(kind, monkeypatch):
     assert min(reached) < 2 * cr._WARM_START_ROUNDS
 
 
+def test_the_lean_search_resumes_each_fold_every_ten_rounds(monkeypatch):
+    """Where a warm-start refit resumes, the lean loop sums the grown rounds again: each fold, once
+    at each multiple of 10 rounds the search reaches."""
+    monkeypatch.setattr(cr, "_MEAN_CV_ROUNDS", 80)
+    kernels = cr._lean_kernels()
+    assert kernels is not None
+    resumed: dict[int, list[int]] = {}
+    resume = cr._Boosted.resume
+
+    def record(self, kernels):
+        resumed.setdefault(id(self), []).append(self.grown)
+        resume(self, kernels)
+
+    monkeypatch.setattr(cr._Boosted, "resume", record)
+    features, target, folds = _mean_cv_case("smooth")
+    _, rounds = cr._lean_mean_cv_error(features, target, folds, 0.1, 1, kernels)
+    last = min(rounds - 1 + cr._BOOST_PATIENCE, cr._MEAN_CV_ROUNDS - 1)
+    assert last >= 3 * cr._WARM_START_ROUNDS
+    expected = list(range(cr._WARM_START_ROUNDS, last + 1, cr._WARM_START_ROUNDS))
+    assert len(resumed) == 10
+    assert all(grown == expected for grown in resumed.values())
+
+
 def test_wgcm_boosting_selection_equals_the_sklearn_loop(monkeypatch):
     """The learning rate, depth, and rounds that the lean search picks, and the predictor fitted
     with them, equal the loop over scikit-learn's fits, on a case of tied splits."""

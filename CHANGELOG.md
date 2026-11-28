@@ -276,8 +276,8 @@ names its pull request.
   return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
   there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
   free cores. ([#1369])
-- The `gcm` and `wgcm` tests, and the `pcm` test with `regression="boosting"`, grow the boosted trees
-  of their cross-validation folds in a lean loop over scikit-learn's decision trees, not in a
+- The `gcm` and `wgcm` tests, and the `pcm` test with `regression="boosting"`, grow the boosted
+  trees of their cross-validation folds in a lean loop over scikit-learn's decision trees, not in a
   gradient-boosting fit per fold, so the methods that take them as `indep_test` run faster, with the
   same output bit for bit on every platform: each prediction keeps the arithmetic it had, and the
   loop uses scikit-learn's compiled staged prediction only after a check at its first use that it
