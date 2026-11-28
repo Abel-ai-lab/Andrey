@@ -115,38 +115,55 @@ cases = {
 for name in ("gfci", "boss_fci", "grasp_fci"):
     cases[name] = lambda name=name: getattr(andrey, name)(kci_data, indep_test="kci")
 
+andrey.ges(chain)  # a score search first, the order in which the BLAS limit alone missed torch
 outputs, seen = {}, {}
 for name, fit in cases.items():
+    if sys.argv[1:] and name not in sys.argv[1:]:
+        continue
     inside.clear()
     trace.clear()
     outputs[name] = digest(fit())
     seen[name] = (list(inside), list(trace))
-with andrey.config(n_jobs=2):
-    outputs["pnl_two_workers"] = digest(andrey.pnl(post))
+if not sys.argv[1:]:
+    with andrey.config(n_jobs=2):
+        outputs["pnl_two_workers"] = digest(andrey.pnl(post))
 pickle.dump((counts(), outputs, seen), sys.stdout.buffer)
 """
 
 
-def _child(threads: int):
-    """The threads the child started with, its output bits per case, and what it saw per case."""
-    env = {**os.environ}
-    for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
-        env[name] = str(threads)
+def _child(env_threads: dict[str, int], *cases: str):
+    """The threads the child started with, its output bits per case, and what it saw per case.
+
+    ``env_threads`` sets the child's thread variables; the child fits ``cases``, or every case."""
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if name not in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+    }
+    env.update({name: str(count) for name, count in env_threads.items()})
     proc = subprocess.run(
-        [sys.executable, "-c", _CHILD], capture_output=True, env=env, timeout=1200, check=False
+        [sys.executable, "-c", _CHILD, *cases],
+        capture_output=True,
+        env=env,
+        timeout=1200,
+        check=False,
     )
     assert proc.returncode == 0, proc.stderr.decode()
     return pickle.loads(proc.stdout)
 
 
+def _threads(count: int) -> dict[str, int]:
+    return dict.fromkeys(("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"), count)
+
+
 @pytest.fixture(scope="module")
 def one_thread():
-    return _child(1)
+    return _child(_threads(1))
 
 
 @pytest.fixture(scope="module")
 def many_threads():
-    started, outputs, seen = _child(MANY_THREADS)
+    started, outputs, seen = _child(_threads(MANY_THREADS))
     if started[0] <= 1 and started[2] <= 1:
         pytest.skip("this build runs no BLAS or torch pool on more than one thread")
     return started, outputs, seen
@@ -173,6 +190,12 @@ def test_a_fit_sees_one_blas_thread_and_calm_one_torch_thread(name, many_threads
         assert (blas, openmp) == (1, 1)
         if name.startswith("calm"):
             assert torch_threads == 1
+
+
+def test_calm_sees_one_torch_thread_when_only_mkl_has_many():
+    """The BLAS limit alone leaves torch's threads where ``MKL_NUM_THREADS`` alone puts them."""
+    _, _, seen = _child({"MKL_NUM_THREADS": MANY_THREADS}, "calm")
+    assert {threads for _, threads in seen["calm"][0]} == {(1, 1, 1)}
 
 
 @pytest.mark.parametrize("name", GFCI_FAMILY)
