@@ -233,7 +233,8 @@ def anm(
     depend on the units of either variable. The regression is a Gaussian process with a scaled RBF
     kernel plus a white-noise term, its hyperparameters fitted by maximum marginal likelihood. The
     HSIC test uses Gaussian kernels and a gamma approximation of its null distribution. The fit is
-    deterministic. Each direction is fitted on its rows sorted by its cause, then its effect, so the
+    deterministic and runs on one BLAS thread, so the machine's thread count does not change its
+    result. Each direction is fitted on its rows sorted by its cause, then its effect, so the
     result does not depend on the order of the rows, and a table whose rows stay the same when its
     two columns swap gives no edge.
 
@@ -278,7 +279,10 @@ def anm(
     """
     from andrey.irregular.anm import anm as _native
 
-    return fit_pair("anm", data, _native, alpha, standardize=True)
+    # One BLAS thread: a threaded product rounds differently from a serial one, so the result
+    # would depend on the machine's thread count.
+    with one_blas_thread():
+        return fit_pair("anm", data, _native, alpha, standardize=True)
 
 
 @method_spec("pnl")
@@ -393,12 +397,10 @@ def pnl(
     rounding.
 
     On the CPU, ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``) fits the two
-    directions on two threads, each limited to one BLAS thread; with one worker the BLAS threads
-    are not limited. On a machine with several cores the fits then round differently, so the
-    p-values and statistics with one worker and with several can differ in their last digits, and
-    the direction can differ when the two p-values nearly tie. Each thread holds three ``n x n``
-    float64 matrices; when the threads asked for would hold more than 4 GiB, fewer run, with a
-    ``PerformanceWarning``.
+    directions on two threads. The fits and the tests run on one BLAS thread with any number of
+    workers, so the p-values and statistics do not depend on the worker count or on the machine's
+    BLAS thread count. Each thread holds three ``n x n`` float64 matrices; when the threads asked
+    for would hold more than 4 GiB, fewer run, with a ``PerformanceWarning``.
 
     **Missing values.** A ``NaN`` in ``data`` marks a missing value. Both tests use test-wise
     deletion, keeping rows where both columns are observed; ``metadata["rows_tested"]`` gives their
@@ -553,7 +555,8 @@ def loci(
     makes it strictly concave [1]_. Projected Newton steps [4]_ maximize it until the mean
     objective changes by less than ``1e-6`` in a full step, or for at most 100 steps; the paper
     takes a closed-form step in ``w_1`` and L-BFGS steps in ``w_2`` in turn, which approach the
-    same maximum in many more steps. The fit draws no random numbers, so it is deterministic. Each
+    same maximum in many more steps. The fit draws no random numbers, so it is deterministic, and
+    it runs on one BLAS thread, so the machine's thread count does not change its result. Each
     direction is fitted on its rows sorted by its cause, then its effect, so the result does not
     depend on the order of the rows, and a table whose rows stay the same when its two columns swap
     gives no edge.
@@ -615,15 +618,18 @@ def loci(
 
     X, labels, rows = _pair_matrix("loci", data, standardize=True)
     (x, y), (y_backward, x_backward) = direction_tables(X)
-    ll_forward, residual_forward = fit_direction(x, y)
-    ll_backward, residual_backward = fit_direction(y_backward, x_backward)
-    extra = {"log_likelihoods": {"forward": ll_forward, "backward": ll_backward}, **rows}
-    if criterion == "likelihood":
-        return likelihood_output(ll_forward, ll_backward, labels=labels, extra=extra)
-    # The paper leaves the HSIC test's bandwidth, null approximation, and variance open; the
-    # comment in hsic_median_statistic_log_p names the source of each choice.
-    stat_forward, log_p_forward = hsic_median_statistic_log_p(x, residual_forward)
-    stat_backward, log_p_backward = hsic_median_statistic_log_p(y_backward, residual_backward)
+    # One BLAS thread: a threaded product rounds differently from a serial one, so the result
+    # would depend on the machine's thread count.
+    with one_blas_thread():
+        ll_forward, residual_forward = fit_direction(x, y)
+        ll_backward, residual_backward = fit_direction(y_backward, x_backward)
+        extra = {"log_likelihoods": {"forward": ll_forward, "backward": ll_backward}, **rows}
+        if criterion == "likelihood":
+            return likelihood_output(ll_forward, ll_backward, labels=labels, extra=extra)
+        # The paper leaves the HSIC test's bandwidth, null approximation, and variance open; the
+        # comment in hsic_median_statistic_log_p names the source of each choice.
+        stat_forward, log_p_forward = hsic_median_statistic_log_p(x, residual_forward)
+        stat_backward, log_p_backward = hsic_median_statistic_log_p(y_backward, residual_backward)
     return pairwise_output(
         math.exp(log_p_forward),
         math.exp(log_p_backward),

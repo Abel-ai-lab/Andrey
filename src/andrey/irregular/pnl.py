@@ -281,7 +281,6 @@ def _device_tests(
     sums = []  # per task: statistic, the cause's trace and sum of squares, the disturbance's
     with contextlib.ExitStack() as stack:
         if workers > 1:
-            stack.enter_context(backend.one_blas_thread())
             pool = stack.enter_context(ThreadPoolExecutor(max_workers=workers))
             fitted = pool.map(standardized_disturbance, ordered)
         else:
@@ -333,31 +332,31 @@ def _ordered_tests(
     """Return ``{(cause, effect): (statistic, log_p)}`` for the distinct ``tasks``.
 
     On ``numpy`` the tasks, sorted by cause, are cut into ``workers`` contiguous runs, one per
-    worker thread (:func:`_thread_count` lowers the number of threads to fit a memory budget), each
-    on one BLAS thread. A task's result does not depend on the number of workers, except that the
-    fits' last digits can: a lone worker's fits run on every BLAS thread. On a torch device,
-    :func:`_device_tests` runs them.
+    worker thread (:func:`_thread_count` lowers the number of threads to fit a memory budget). On
+    a torch device, :func:`_device_tests` runs them. Every fit and test runs on one BLAS thread,
+    and on the torch ``cpu`` device one torch thread, so a task's result depends on neither the
+    number of workers nor the machine's thread count.
     """
     ordered = sorted(dict.fromkeys(tasks))
-    if dev != "numpy":
-        return dict(zip(ordered, _device_tests(columns, ordered, workers, dev), strict=True))
-    n = next(iter(columns.values())).standardized.shape[0]
-    threads = _thread_count(n, min(workers, len(ordered)))
-    runs = [
-        [ordered[k] for k in part]
-        for part in np.array_split(np.arange(len(ordered)), max(1, threads))
-        if part.size
-    ]
-    if len(runs) <= 1:
-        results = [_run_tasks(columns, ordered)]
-    else:
-        with backend.one_blas_thread(), ThreadPoolExecutor(max_workers=len(runs)) as pool:
-            results = list(pool.map(lambda run: _run_tasks(columns, run), runs))
-    return {
-        task: result
-        for run, run_results in zip(runs, results, strict=True)
-        for task, result in zip(run, run_results, strict=True)
-    }
+    one_torch_thread = backend.one_torch_thread() if dev == "cpu" else contextlib.nullcontext()
+    with one_torch_thread, backend.one_blas_thread():
+        if dev != "numpy":
+            tests = _device_tests(columns, ordered, workers, dev)
+        else:
+            n = next(iter(columns.values())).standardized.shape[0]
+            threads = _thread_count(n, min(workers, len(ordered)))
+            runs = [
+                [ordered[k] for k in part]
+                for part in np.array_split(np.arange(len(ordered)), max(1, threads))
+                if part.size
+            ]
+            if len(runs) <= 1:
+                tests = _run_tasks(columns, ordered)
+            else:
+                with ThreadPoolExecutor(max_workers=len(runs)) as pool:
+                    parts = pool.map(lambda run: _run_tasks(columns, run), runs)
+                    tests = [test for part in parts for test in part]
+    return dict(zip(ordered, tests, strict=True))
 
 
 def pnl(
@@ -402,8 +401,8 @@ def pnl_pairs(
     defaults to every ``i < j`` in lexicographic order. ``n_jobs`` worker threads share the
     ordered pairs (``None`` reads ``andrey.config`` and ``ANDREY_N_JOBS``, ``-1`` uses every
     usable core); each holds three ``n x n`` float64 matrices, so a count whose matrices would
-    pass 4 GiB is lowered, with a warning. With one worker the BLAS threads are not limited, so
-    its last digits can differ from the several-worker rows'.
+    pass 4 GiB is lowered, with a warning. Every fit and test runs on one BLAS thread, so a row
+    depends on neither the worker count nor the machine's thread count.
     """
     arr = np.asarray(data, dtype=np.float64)
     if arr.ndim != 2:
