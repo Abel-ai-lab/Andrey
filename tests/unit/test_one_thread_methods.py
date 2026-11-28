@@ -26,7 +26,10 @@ _CHILD = r"""
 import pickle, sys, warnings
 warnings.filterwarnings("ignore")
 import numpy as np
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None
 from threadpoolctl import threadpool_info
 import andrey
 import andrey.data
@@ -40,7 +43,7 @@ def counts():
     return (
         max((p["num_threads"] for p in pools if p["user_api"] == "blas"), default=1),
         max((p["num_threads"] for p in pools if p["user_api"] == "openmp"), default=1),
-        torch.get_num_threads(),
+        1 if torch is None else torch.get_num_threads(),
     )
 
 
@@ -115,6 +118,8 @@ cases = {
 }
 for name in ("gfci", "boss_fci", "grasp_fci"):
     cases[name] = lambda name=name: getattr(andrey, name)(kci_data, indep_test="kci")
+if torch is None:  # CALM needs torch
+    cases = {name: fit for name, fit in cases.items() if not name.startswith("calm")}
 
 andrey.ges(chain)  # a score search first, the order in which the BLAS limit alone missed torch
 outputs, seen = {}, {}
@@ -184,6 +189,8 @@ GFCI_FAMILY = ["gfci", "boss_fci", "grasp_fci"]
 
 @pytest.mark.parametrize("name", FITS)
 def test_a_fit_sees_one_blas_thread_and_calm_one_torch_thread(name, many_threads):
+    if name.startswith("calm"):
+        pytest.importorskip("torch")
     inside = many_threads[2][name][0]
     assert inside
     # Where the library has no pool to count, the count is 1. Only CALM computes in torch.
@@ -195,6 +202,7 @@ def test_a_fit_sees_one_blas_thread_and_calm_one_torch_thread(name, many_threads
 
 def test_calm_sees_one_torch_thread_when_only_mkl_has_many():
     """The BLAS limit alone leaves torch's threads where ``MKL_NUM_THREADS`` alone puts them."""
+    pytest.importorskip("torch")
     _, _, seen = _child({"MKL_NUM_THREADS": MANY_THREADS}, "calm")
     assert {threads for _, threads in seen["calm"][0]} == {(1, 1, 1)}
 

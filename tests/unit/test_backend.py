@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import subprocess
 import sys
+import threading
 import types
 
 import numpy as np
@@ -525,6 +526,38 @@ def test_one_torch_thread_limits_inside_and_restores_after_even_on_an_error():
         with pytest.raises(RuntimeError, match="stop"):
             with backend.one_torch_thread():
                 raise RuntimeError("stop")
+        assert torch.get_num_threads() == 3
+    finally:
+        torch.set_num_threads(before)
+
+
+def test_one_torch_thread_blocks_in_two_threads_share_one_limit():
+    torch = pytest.importorskip("torch")
+    before = torch.get_num_threads()
+    torch.set_num_threads(3)
+    first_in, second_in, first_out = (threading.Event() for _ in range(3))
+    seen = {}
+
+    def first():
+        with backend.one_torch_thread():
+            first_in.set()
+            assert second_in.wait(timeout=60)
+        first_out.set()
+
+    def second():
+        assert first_in.wait(timeout=60)
+        with backend.one_torch_thread():
+            second_in.set()
+            assert first_out.wait(timeout=60)
+            seen["after the first ended"] = torch.get_num_threads()
+
+    try:
+        threads = [threading.Thread(target=first), threading.Thread(target=second)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=120)
+        assert seen == {"after the first ended": 1}
         assert torch.get_num_threads() == 3
     finally:
         torch.set_num_threads(before)

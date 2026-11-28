@@ -331,11 +331,11 @@ def fci_from_pattern(
     :func:`gfci`) runs the possible-d-separation step between the two, after a first collider pass
     that sets the arrowheads its sets read; ``None`` leaves the step out, as Algorithm 5 of Ramsey,
     Andrews, and Spirtes (2025) does. ``max_depth``, ``constraints``, ``workers`` (a worker count),
-    ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`. The whole test phase
-    runs with BLAS limited to one thread, the separating sets, the collider votes, and the
-    orientation rules included, and torch too under the ``cpu`` backend, for a test built on matrix
-    algebra (:func:`~andrey.core.ci.pins_blas`), so the machine's thread count does not change its
-    p-values.
+    ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`. The test is built from
+    the data on one BLAS thread, and the whole test phase runs with BLAS limited to one thread, the
+    separating sets, the collider votes, and the orientation rules included, and torch too under
+    the ``cpu`` backend, for a test built on matrix algebra (:func:`~andrey.core.ci.pins_blas`), so
+    the machine's thread count does not change its p-values.
 
     ``edge_removal="triangles"`` tests only the pattern's edges that lie in a triangle of the
     pattern, whose ends share a neighbor in it, as Section 5 of Ogarrio, Spirtes, and Ramsey (2016)
@@ -361,9 +361,10 @@ def fci_from_pattern(
         untested = outside_triangles(pattern != NULL)
         keep = untested if keep is None else keep | untested
 
-    test = make_indep_test(
-        indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
-    )
+    with backend.one_blas_thread():  # the test computes its correlations or kernels from the data
+        test = make_indep_test(
+            indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
+        )
     with _one_thread(test):
         support = pattern != NULL
         confounded = None if constraints is None else constraints.confounded
