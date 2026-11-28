@@ -57,17 +57,17 @@ requested backend uses `auto`, without a warning.
   target they send the search of every variable to them, as do MMHC and RSMAX2 for a restrict phase
   that reads those sets, only when the data hold enough variables to repay them. `rpcmci` runs its
   starts on them, one per task, only when the fit holds enough starts and time steps to repay them,
-  with the same result for any number of workers, whichever worker finishes first. `andrey.bootstrap`
-  fits one resample per worker, with the same result at any number. `1` (the default) and `0` run
-  serially; `-1` uses every usable core. `pnl` runs on one BLAS thread with any number of workers,
-  so its p-values and statistics do not depend on the worker count or on the machine's BLAS thread
-  count. Each `pnl` thread holds three n x n float64 matrices; when the threads you ask for would
-  hold more than 4 GiB, fewer run, with a `PerformanceWarning`. `skewd` runs its two directions and
-  their searches on the threads, and `skewd_mv` its conditional models and their searches; every
-  search draws from its own random stream, so the results are the same bit for bit with any number
-  of workers. Like `pnl`, both run on one BLAS thread with any number of workers, so their results
-  do not depend on the BLAS thread count either; the limit applies to the whole process while a fit
-  runs.
+  with the same result for any number of workers, whichever worker finishes first.
+  `andrey.bootstrap` fits one resample per worker, with the same result at any number. `1` (the
+  default) and `0` run serially; `-1` uses every usable core. `pnl` runs on one BLAS thread with
+  any number of workers, so its p-values and statistics do not depend on the worker count or on
+  the machine's BLAS thread count. Each `pnl` thread holds three n x n float64 matrices; when the
+  threads you ask for would hold more than 4 GiB, fewer run, with a `PerformanceWarning`. `skewd`
+  runs its two directions and their searches on the threads, and `skewd_mv` its conditional models
+  and their searches; every search draws from its own random stream, so the results are the same
+  bit for bit with any number of workers. Like `pnl`, both run on one BLAS thread with any number
+  of workers, so their results do not depend on the BLAS thread count either; the limit applies to
+  the whole process while a fit runs.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
@@ -86,10 +86,12 @@ requested backend uses `auto`, without a warning.
   the fit stay in the calling process.
 - `ANDREY_RPCMCI_PARALLEL_MIN_WORK`: `rpcmci` runs its starts on the workers only when
   `n_starts * n_regimes * T` for a series of `T` time steps is at least this. The default is
-  `@RPCMCI_DEFAULT@`, measured on @MACHINE@ running Linux with 2, 4, and 8 workers; `0` always uses
-  them. The length of the series, the number of regimes, and the number of starts all set what a
-  start costs, so one value serves them all; more variables make a start cost more, so the pool
-  repays itself sooner.
+  `150000`, measured on an AMD EPYC 9534 server running Linux with 2, 4, and 8 workers; `0` always
+  uses them. A start costs more than in proportion to `T`, so the workers repay themselves from
+  about 27,000 for a series of 2,400 steps and from about 108,000 for one of 150 steps, with 2
+  workers and less with more. The default is above both, so no fit runs slower than on one process,
+  and a long series gains from a smaller value. More variables or lags make a start cost more, so
+  the workers repay themselves sooner.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
   far more than a Fisher's z test and its cost grows with the rows. The default is `2000000`,

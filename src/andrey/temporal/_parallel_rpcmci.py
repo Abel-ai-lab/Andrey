@@ -30,8 +30,12 @@ if TYPE_CHECKING:
 #: the worker pool; a smaller fit runs them in the caller's process.
 #: ``ANDREY_RPCMCI_PARALLEL_MIN_WORK`` overrides it (0 sends every fit to the pool), and a fit with
 #: workers warns once on the default when it nears it; ``andrey calibrate --method rpcmci``
-#: measures the value for a machine. @RPCMCI_DEFAULT_COMMENT@
-MIN_POOL_RPCMCI_WORK: int = 20_000
+#: measures the value for a machine. The default is measured on an AMD EPYC 9534 server with 2, 4,
+#: and 8 workers: the first pool of a process takes about 1.4 s and each later one about 0.05 s,
+#: and a fit in a fresh process ran faster on the pool than in the calling process from about
+#: 27,000 for a series of 2,400 steps to about 108,000 for one of 150 steps with 2 workers, from
+#: less with more. The default is above them, so no fit runs slower than in the calling process.
+MIN_POOL_RPCMCI_WORK: int = 150_000
 
 #: The environment variables a start reads besides the ones ``andrey.config`` holds: the
 #: covariance's GPU cutoff and its calibration. A worker the forkserver started earlier does not see
