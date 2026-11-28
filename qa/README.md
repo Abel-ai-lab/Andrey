@@ -76,11 +76,13 @@ GRaSP-FCI, and RSMAX2 by conditioning size, then its collider, Meek, possible-d-
 rounds; each applied move of GES, AGES, XGES, GIES, GnIES, HC, and Tabu, and of the greedy step of
 MMHC and RSMAX2; each target's grown and shrunk set of IAMB, Inter-IAMB, and MMPC; each round of
 structural EM; and each solve, dual step, path step, or outer round of NOTEARS, DYNOTEARS, DAGMA,
-and CALM. The other methods keep the whole-output hash alone. Each stage passes the state to the
-private sink `andrey.core._checkpoint.TAKE`, which is unset outside the harness: a stage then costs
-one read of a context variable and builds nothing, so the manifest of a run without the mode has
-the same rows as before. The harness exits with an error when the imported Andrey has no such
-sink, so a run against an older build fails instead of recording nothing.
+and CALM. GES, XGES, GIES, structural EM, and CALM end with a stage that holds the total, the
+likelihoods, or the objective they return. The other methods keep the whole-output hash alone.
+Each stage passes the state to the private sink `andrey.core._checkpoint.TAKE`, which is unset
+outside the harness: a stage then costs one read of a context variable and builds nothing, so the
+manifest of a run without the mode has the same rows as before. The harness exits with an error when
+the imported Andrey has no such sink, so a run against an older build fails instead of recording
+nothing.
 
 A row of a manifest with checkpoints has two more fields, `checkpoints`, the digest of the fit's
 stages in order, and `checkpoint_records`, their number. The pieces' bytes go to

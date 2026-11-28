@@ -1168,6 +1168,8 @@ def xges(
             search.extend(X.shape[0])
         adj = search.g.marks()
         total = recompute_objective(adj, score, d)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("xges.total", total=total)
     if constraints is not None:
         adj = mpdag(adj, constraints)
     return to_structure(adj, kind="cpdag"), total

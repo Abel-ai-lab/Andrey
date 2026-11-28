@@ -61,6 +61,7 @@ import struct
 import subprocess
 import sys
 import zipfile
+import zlib
 from collections import Counter, defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from contextlib import contextmanager
@@ -1383,6 +1384,11 @@ def _load(npz: Any, name: str, i: int) -> np.ndarray:
     return npz[f"{name}/{i}"]
 
 
+#: What reading a sidecar raises when it is not an archive, is cut short, lacks a member, or holds a
+#: member that does not decompress.
+SIDECAR_ERRORS = (ValueError, OSError, EOFError, KeyError, zipfile.BadZipFile, zlib.error)
+
+
 # ==================================================================================================
 # The run and the manifest
 # ==================================================================================================
@@ -1945,16 +1951,21 @@ def report_checkpoints(
     """Print, for each row in both manifests whose checkpoints differ and whose output differs, the
     first stage and piece that differ; the rows grouped by fingerprint and by stage; and, as
     information, the rows whose output is equal. Later stages follow from the first and are not
-    reported. The exit status of the compare does not read it."""
+    reported. A sidecar piece that cannot be read ends the report with a line saying so. The exit
+    status of the compare does not read it."""
     empty = Stages([], lambda i: np.empty(0, dtype=np.int64))
     found, equal = [], []
-    for key in sorted(old.keys() & new.keys(), key=str):
-        a, b = old[key], new[key]
-        if a.get("checkpoints") == b.get("checkpoints"):
-            continue
-        difference = first_difference(stages[0].get(key, empty), stages[1].get(key, empty))
-        if difference is not None:
-            (equal if a["hash"] == b["hash"] else found).append((key, a, difference))
+    try:
+        for key in sorted(old.keys() & new.keys(), key=str):
+            a, b = old[key], new[key]
+            if a.get("checkpoints") == b.get("checkpoints"):
+                continue
+            difference = first_difference(stages[0].get(key, empty), stages[1].get(key, empty))
+            if difference is not None:
+                (equal if a["hash"] == b["hash"] else found).append((key, a, difference))
+    except SIDECAR_ERRORS as error:
+        print(f"checkpoints not compared: a sidecar piece cannot be read ({error!r})")
+        return
     for key, a, d in found:
         n = a.get("checkpoint_records", 0)
         label = " ".join(map(str, key))
@@ -2012,7 +2023,7 @@ def _sidecar_stages(
         before, after = (
             read_stages(s, m["rows"]) for s, m in zip(sidecars, manifests, strict=True)
         )
-    except (ValueError, OSError, EOFError, zipfile.BadZipFile) as error:
+    except SIDECAR_ERRORS as error:
         print(f"checkpoints not compared: {error}")
         return None
     return before, after

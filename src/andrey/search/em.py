@@ -375,6 +375,8 @@ def structural_em(
             take("em.round", k, mean=mean, cov=cov, marks=marks, precision=precision)
     with backend.one_blas_thread():
         loglik.append(expected_moments(plan, mean, precision)[2])
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("em.loglik", log_likelihood=np.asarray(loglik))
     if changed[-1]:
         _log.warning(
             "structural EM: the graph still changed in the last of %d rounds, so EM has not "

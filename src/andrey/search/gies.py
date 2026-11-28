@@ -1046,4 +1046,6 @@ def search_class(
             if not changed:
                 break
         total = recompute_objective(search.adj, score, n)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("gies.total", total=total)
     return search.adj, total

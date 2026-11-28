@@ -9,6 +9,7 @@ import pkgutil
 import re
 import struct
 import sys
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
@@ -856,8 +857,8 @@ FAMILY_STAGES: dict[str, tuple[str, set[str]]] = {
     "GFCI": ("asia_gauss", {"ges.forward", "skeleton.end", "gfci.sepsets", "fci.rules"}),
     "GES": ("linear_gauss_er_d20", {"ges.forward", "ges.backward"}),
     "AGES": ("ages_paper_qs0.3_qw0.3_n10000", {"ages.forward", "ages.backward"}),
-    "XGES": ("asia_gauss", {"xges.move", "xges.branch", "xges.accept"}),
-    "GIES": ("interventional_gauss_er_d20", {"gies.step"}),
+    "XGES": ("asia_gauss", {"xges.move", "xges.branch", "xges.accept", "xges.total"}),
+    "GIES": ("interventional_gauss_er_d20", {"gies.step", "gies.total"}),
     "HC": ("asia_gauss", {"hc.climb"}),
     "Tabu": ("asia_gauss", {"tabu.move"}),
     "IAMB": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
@@ -865,7 +866,7 @@ FAMILY_STAGES: dict[str, tuple[str, set[str]]] = {
     "MMPC": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
     "NOTEARS": ("notears_paper_raw_d10", {"notears.solve", "notears.dual"}),
     "DAGMA": ("notears_paper_raw_d10", {"dagma.stage"}),
-    "GES-em": ("linear_gauss_er_d10", {"em.round", "ges.forward"}),
+    "GES-em": ("linear_gauss_er_d10", {"em.round", "em.loglik", "ges.forward"}),
 }
 
 
@@ -997,6 +998,36 @@ def test_ges_records_its_recomputed_total_once_after_the_search(x: np.ndarray) -
     stages = [r.stage for r in recorder.records]
     assert stages.count("ges.total") == 1 and stages[-1] == "ges.total"
     assert float(recorder.records[-1].pieces[0].array[0]) == out.metadata["score"]
+
+
+@pytest.mark.parametrize("name", ["XGES", "GIES"])
+def test_xges_and_gies_end_with_the_recomputed_total_they_return(name: str) -> None:
+    dataset, _ = FAMILY_STAGES[name]
+    out, _, records = _fit_on(name, dataset, checkpoints=True)
+    assert [r.stage for r in records].count(f"{name.lower()}.total") == 1
+    assert records[-1].stage == f"{name.lower()}.total"
+    assert float(records[-1].pieces[0].array[0]) == out.metadata["score"]
+
+
+def test_structural_em_ends_with_every_likelihood_it_reports() -> None:
+    dataset, _ = FAMILY_STAGES["GES-em"]
+    out, _, records = _fit_on("GES-em", dataset, checkpoints=True)
+    assert [r.stage for r in records].count("em.loglik") == 1 and records[-1].stage == "em.loglik"
+    assert records[-1].pieces[0].array.tolist() == out.metadata["em"]["log_likelihood"]
+
+
+@pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
+def test_calm_records_its_returned_support_and_objective_after_the_rounds(x: np.ndarray) -> None:
+    pytest.importorskip("torch")
+    with identity.checkpointing(True) as recorder:
+        out = andrey.calm(x, seed=0, max_iter=2, subproblem_iter=60)
+    last = recorder.records[-1]
+    support, weighted, objective = last.pieces
+    assert last.stage == "calm.result"
+    assert (support.name, weighted.name, objective.name) == ("support", "weighted", "objective")
+    assert float(objective.array[0]) == out.metadata["objective"]
+    assert np.array_equal(weighted.array, np.asarray(out.weighted_adjacency).ravel())
+    assert np.array_equal(support.array != 0, weighted.array != 0)
 
 
 @pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
@@ -1479,6 +1510,38 @@ def test_compare_goes_on_without_checkpoints_when_a_sidecar_cannot_be_read(
     out = capsys.readouterr().out
     assert "checkpoints not compared:" in out and "first checkpoint difference" not in out
     assert "0 with a different graph, 0 with only different bits" in out
+
+
+@pytest.mark.parametrize("damage", ["missing", "corrupt"])
+def test_compare_goes_on_without_checkpoints_when_a_piece_of_a_sidecar_cannot_be_read(
+    tmp_path, monkeypatch, capsys, damage: str
+) -> None:
+    base, _, other = _checkpointed_pc_manifests(tmp_path, monkeypatch)
+    sidecar = tmp_path / identity.sidecar_name(other)
+    with zipfile.ZipFile(sidecar) as archive:
+        members = {i.filename: archive.read(i.filename) for i in archive.infolist()}
+        spans = {i.filename: (i.header_offset, i.compress_size) for i in archive.infolist()}
+    pieces = [name for name in members if not name.endswith("labels.npy")]
+    assert pieces
+    if damage == "missing":
+        with zipfile.ZipFile(sidecar, "w") as archive:
+            for name in members.keys() - set(pieces):
+                archive.writestr(name, members[name])
+    else:
+        raw = bytearray(sidecar.read_bytes())
+        for name in pieces:
+            offset, size = spans[name]
+            name_length, extra_length = struct.unpack_from("<HH", raw, offset + 26)
+            start = offset + 30 + name_length + extra_length
+            for i in range(start, start + size):
+                raw[i] ^= 0xFF
+        sidecar.write_bytes(bytes(raw))
+    capsys.readouterr()
+    assert identity.main(["--compare", str(base), str(other)]) == 1
+    out = capsys.readouterr().out
+    assert "checkpoints not compared: a sidecar piece cannot be read" in out
+    assert "first checkpoint difference" not in out
+    assert "1 with a different graph" in out
 
 
 def test_a_piece_that_changes_dtype_differs_at_its_first_element() -> None:
