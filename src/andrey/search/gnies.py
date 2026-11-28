@@ -32,7 +32,7 @@ from collections.abc import Callable, Iterable, Sequence
 
 import numpy as np
 
-from andrey.core import GraphStructure, backend, score_delta
+from andrey.core import GraphStructure, _checkpoint, backend, score_delta
 from andrey.core.knowledge import Constraints, mpdag
 from andrey.core.orient import to_structure
 from andrey.core.score import ZERO_RESIDUAL, BICScore, _solve, check_columns, ebic_penalty
@@ -377,6 +377,8 @@ def gnies(
                     break
                 current = step
                 adj, total = runs[current]
+                if (take := _checkpoint.TAKE.get()) is not None:
+                    take("gnies.targets", targets=sorted(current), total=total)
     if math.isinf(total):
         raise ValueError(
             "gnies: no graph with the required edges has a finite score under the targets "

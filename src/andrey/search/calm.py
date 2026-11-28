@@ -26,7 +26,7 @@ from typing import Any
 import numpy as np
 
 from andrey.constraint.blanket import blanket_graph
-from andrey.core import GraphStructure
+from andrey.core import GraphStructure, _checkpoint
 from andrey.core.ci import FisherZ
 from andrey.core.knowledge import Constraints
 from andrey.core.orient import to_structure
@@ -183,7 +183,7 @@ def _optimize_gated_dag(
 
     params = (weight, logit)
     rho, h_val = rho_init, hard_h()
-    for _outer in range(max_outer):
+    for outer in range(max_outer):
         moments = [(torch.zeros_like(p), torch.zeros_like(p)) for p in params]
         prev = float("inf")
         for step in range(subproblem_iter):
@@ -204,6 +204,15 @@ def _optimize_gated_dag(
                 break
             prev = cur
         h_val = hard_h()
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take(
+                "calm.outer",
+                outer,
+                rho=rho,
+                h=h_val,
+                weight=weight.detach().cpu().numpy(),
+                logit=logit.detach().cpu().numpy(),
+            )
         if h_val <= h_tol or rho >= rho_max:
             break
         rho *= rho_mult
@@ -324,6 +333,8 @@ def calm(
     dag = to_structure(endpoint_marks(support), kind="dag", labels=labels)
     objective = 0.5 * float(np.sum(np.log(np.clip(resid_var, 1e-12, None))))
     objective += lambda1 * float(support.sum())
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("calm.result", support=support, weighted=weighted, objective=objective)
     return CalmResult(
         weighted_adjacency=weighted, dag=dag, h_final=float(h_final), objective=objective
     )

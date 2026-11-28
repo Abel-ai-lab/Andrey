@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from andrey.core import _checkpoint
 from andrey.core.ties import tie_ranks
 from andrey.search.continuous import (
     Canonical,
@@ -116,9 +117,18 @@ def dynotears(
     )
     support = np.concatenate((contemporaneous.astype(bool)[None], lagged))
     weights = np.where(support, stacked, 0.0)
-    return DynotearsResult(
+    result = DynotearsResult(
         weights=weights[:, back][:, :, back],
         support=support[:, back][:, :, back],
         h_final=float(h_final),
         edges_removed=removed,
     )
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take(
+            "dynotears.result",
+            support=result.support,
+            weights=result.weights,
+            h_final=result.h_final,
+            edges_removed=result.edges_removed,
+        )
+    return result
