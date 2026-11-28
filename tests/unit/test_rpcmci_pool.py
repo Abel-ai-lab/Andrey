@@ -326,7 +326,11 @@ def test_an_error_in_a_start_is_the_error_of_one_process(pools, monkeypatch):
     monkeypatch.setenv(VARIABLE, "0")
     pooled = error(2)
     assert pools
-    assert type(pooled) is type(serial) and str(pooled) == str(serial)
+    # The message ends with the tests each process has registered, which tests may add to.
+    assert type(pooled) is type(serial) is NotImplementedError
+    assert (
+        str(pooled).split(";")[0] == str(serial).split(";")[0] == "unknown indep_test 'not_a_test'"
+    )
 
 
 def test_the_error_of_the_first_start_in_order_is_raised(in_process, monkeypatch):
