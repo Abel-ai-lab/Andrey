@@ -9,9 +9,10 @@ the sample correlation matrix once, then answers each query from the conditioned
 correlation of columns ``x`` and ``y`` given ``condition_set``. Empty and single-element
 conditioning sets -- the bulk of a constraint-based search -- use the closed-form (first-order)
 partial correlation and need no matrix at all; a set of two takes the second-order closed form, and
-larger sets the Cholesky factor of the correlation submatrix. A submatrix that neither shows to be
-well conditioned goes to its inverse, which the eigenvalues check for singularity. numpy float64 is
-the oracle. A query is canonicalized (``x``, ``y`` ordered, the
+larger sets the Cholesky factor of the correlation submatrix. A submatrix whose factor shows it well
+conditioned is answered without the eigenvalue check, and one whose factor shows it singular raises
+at once; any other goes to its inverse, which the eigenvalues check for singularity. numpy float64
+is the oracle. A query is canonicalized (``x``, ``y`` ordered, the
 conditioning set sorted unique) so its p-value does not depend on argument order, and nothing is
 memoized: a test object holds the correlation matrix and the sample size, whatever it is asked.
 The scalar path, the batched path (:meth:`~PartialCorrelationTest.batched_call`), the all-pairs

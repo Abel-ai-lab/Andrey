@@ -241,9 +241,9 @@ names its pull request.
   two from the second-order closed form, and of three or more from the Cholesky factor of the
   correlation submatrix, in place of its inverse, so the constraint-based and time-series methods
   that take them as `indep_test` run faster, among them `pc`, `fci`, `iamb`, `inter_iamb`, `mmpc`,
-  `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`. A submatrix that is not clearly well
-  conditioned still takes the inverse and its eigenvalue test, so the same queries raise the
-  singular-correlation error. The partial correlations and p-values differ from the inverse's in
+  `pcmci`, `pcmciplus`, `lpcmci`, and `jpcmciplus`. A submatrix that its factor shows neither well
+  conditioned nor singular still takes the inverse and its eigenvalue test, so the same queries
+  raise the singular-correlation error. The partial correlations and p-values differ from the inverse's in
   their last digits, with no decision of the identity corpus or the quality gate changed, and a
   query has the same answer on every call path. ([#1346])
 - `dagma`, and `notears` with `robust=True`, take each Adam step from the gradient of the loss and
