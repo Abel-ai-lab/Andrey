@@ -25,6 +25,7 @@ import os
 import sys
 import threading
 from collections import Counter
+from collections.abc import Generator
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -616,6 +617,27 @@ def one_blas_thread() -> contextlib.AbstractContextManager:
     later, such as torch's, is limited too, even when other modules were removed meanwhile.
     """
     return _thread_pools(frozenset(sys.modules)).limit(limits=1)
+
+
+@contextlib.contextmanager
+def one_torch_thread() -> Generator[None]:
+    """Run torch's CPU operations on one thread inside a ``with`` block, and restore its count.
+
+    :func:`one_blas_thread` does not always reach torch's thread pool, which depends on which
+    libraries were loaded first and on ``MKL_NUM_THREADS``, so a fit that computes in torch also
+    sets torch's own count. Enter this block first, so that the count it restores is the one torch
+    had before any limit, and :func:`one_blas_thread` inside it. Without torch it does nothing.
+    """
+    t = torch()
+    if t is None:
+        yield
+        return
+    before = t.get_num_threads()
+    t.set_num_threads(1)
+    try:
+        yield
+    finally:
+        t.set_num_threads(before)
 
 
 # ---- tensor transfer (torch backends) -----------------------------------------------------------

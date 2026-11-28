@@ -18,6 +18,7 @@ Spirtes, and Ramsey (2016) does.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from itertools import combinations
 from typing import TYPE_CHECKING
 
@@ -42,7 +43,7 @@ from andrey.constraint.fci import (
 from andrey.constraint.fci_jci import mark_index
 from andrey.constraint.pc import adjacency_search, check_knowledge_cycle, knowledge_masks
 from andrey.core import ARROW, NULL, TAIL, GraphStructure, backend
-from andrey.core.ci import CITest, make_indep_test
+from andrey.core.ci import CITest, make_indep_test, pins_blas
 from andrey.core.orient import from_structure
 from andrey.search.boss import boss
 from andrey.search.ges import ges
@@ -328,7 +329,10 @@ def fci_from_pattern(
     :func:`gfci`) runs the possible-d-separation step between the two, after a first collider pass
     that sets the arrowheads its sets read; ``None`` leaves the step out, as Algorithm 5 of Ramsey,
     Andrews, and Spirtes (2025) does. ``max_depth``, ``constraints``, ``workers`` (a worker count),
-    ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`.
+    ``seed``, and ``_ambiguous`` act on the test phase as for :func:`gfci`. The whole test phase
+    runs with BLAS limited to one thread, the separating sets, the collider votes, and the
+    orientation rules included, for a test built on matrix algebra
+    (:func:`~andrey.core.ci.pins_blas`), so the machine's thread count does not change its p-values.
 
     ``edge_removal="triangles"`` tests only the pattern's edges that lie in a triangle of the
     pattern, whose ends share a neighbor in it, as Section 5 of Ogarrio, Spirtes, and Ramsey (2016)
@@ -357,79 +361,82 @@ def fci_from_pattern(
     test = make_indep_test(
         indep_test, X, categorical=categorical, seed=seed, degrees_of_freedom=degrees_of_freedom
     )
-    support = pattern != NULL
-    confounded = None if constraints is None else constraints.confounded
-    if confounded is not None:
-        support = support | confounded
-    skeleton, sepsets, _ = adjacency_search(
-        test,
-        X.shape[1],
-        alpha,
-        support=support,
-        keep=keep,
-        max_depth=max_depth,
-        workers=workers,
-    )
-    derived = _derive_sepsets(
-        pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order
-    )
-    if confounded is not None:  # a confounded pair stays adjacent, so it has no separating set
-        derived = {pair: found for pair, found in derived.items() if not confounded[pair]}
-    sepsets.update(derived)
+    with backend.one_blas_thread() if pins_blas(test) else nullcontext():
+        support = pattern != NULL
+        confounded = None if constraints is None else constraints.confounded
+        if confounded is not None:
+            support = support | confounded
+        skeleton, sepsets, _ = adjacency_search(
+            test,
+            X.shape[1],
+            alpha,
+            support=support,
+            keep=keep,
+            max_depth=max_depth,
+            workers=workers,
+        )
+        derived = _derive_sepsets(
+            pattern, test, alpha, max_depth=max_depth, in_column_order=in_column_order
+        )
+        if confounded is not None:  # a confounded pair stays adjacent, so it has no separating set
+            derived = {pair: found for pair, found in derived.items() if not confounded[pair]}
+        sepsets.update(derived)
 
-    marks = circle_pag(skeleton)
-    knowledge_marks(marks, constraints)
-    if possible_dsep is None:
-        if constraints is not None:
-            check_knowledge_cycle((marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T)
-    else:
+        marks = circle_pag(skeleton)
+        knowledge_marks(marks, constraints)
+        if possible_dsep is None:
+            if constraints is not None:
+                check_knowledge_cycle(
+                    (marks == TAIL) & (marks.T == ARROW), closing=(marks == ARROW).T
+                )
+        else:
+            if context is not None:
+                mark_index(marks, context, confounded_index)
+            orient_colliders(marks, sepsets, pattern=pattern)
+            marks = possible_dsep_step(
+                marks,
+                X,
+                test,
+                alpha,
+                sepsets,
+                possible_dsep=possible_dsep,
+                indep_test=indep_test,
+                degrees_of_freedom=degrees_of_freedom,
+                categorical=categorical,
+                seed=seed,
+                max_depth=max_depth,
+                constraints=constraints,
+                keep=untested,
+                workers=workers,
+            )
         if context is not None:
             mark_index(marks, context, confounded_index)
-        orient_colliders(marks, sepsets, pattern=pattern)
-        marks = possible_dsep_step(
+        ambiguous = (
+            frozenset(
+                triple
+                for triple in vote_triples(
+                    marks, test, alpha, sepsets, collider_rule, max_depth=max_depth
+                )
+                if _adjacent(pattern, triple[0], triple[2])
+            )
+            if collider_rule != "sepsets"
+            else frozenset()
+        )
+        if _ambiguous is not None:
+            _ambiguous.update(ambiguous)
+        orient_colliders(marks, sepsets, ambiguous, pattern=pattern)
+        fci_orient(
             marks,
-            X,
             test,
             alpha,
             sepsets,
-            possible_dsep=possible_dsep,
-            indep_test=indep_test,
-            degrees_of_freedom=degrees_of_freedom,
-            categorical=categorical,
-            seed=seed,
+            ambiguous,
             max_depth=max_depth,
-            constraints=constraints,
-            keep=untested,
-            workers=workers,
+            in_column_order=in_column_order,
+            selection_bias=context is None,
         )
-    if context is not None:
-        mark_index(marks, context, confounded_index)
-    ambiguous = (
-        frozenset(
-            triple
-            for triple in vote_triples(
-                marks, test, alpha, sepsets, collider_rule, max_depth=max_depth
-            )
-            if _adjacent(pattern, triple[0], triple[2])
-        )
-        if collider_rule != "sepsets"
-        else frozenset()
-    )
-    if _ambiguous is not None:
-        _ambiguous.update(ambiguous)
-    orient_colliders(marks, sepsets, ambiguous, pattern=pattern)
-    fci_orient(
-        marks,
-        test,
-        alpha,
-        sepsets,
-        ambiguous,
-        max_depth=max_depth,
-        in_column_order=in_column_order,
-        selection_bias=context is None,
-    )
 
-    return GraphStructure.from_numpy(marks, kind="pag")
+        return GraphStructure.from_numpy(marks, kind="pag")
 
 
 def _derive_sepsets(

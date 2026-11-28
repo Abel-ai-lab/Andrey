@@ -514,6 +514,22 @@ def test_one_blas_thread_limits_inside_and_restores_after():
         assert counts() == before
 
 
+def test_one_torch_thread_limits_inside_and_restores_after_even_on_an_error():
+    torch = pytest.importorskip("torch")
+    before = torch.get_num_threads()
+    torch.set_num_threads(3)
+    try:
+        with backend.one_torch_thread():
+            assert torch.get_num_threads() == 1
+        assert torch.get_num_threads() == 3
+        with pytest.raises(RuntimeError, match="stop"):
+            with backend.one_torch_thread():
+                raise RuntimeError("stop")
+        assert torch.get_num_threads() == 3
+    finally:
+        torch.set_num_threads(before)
+
+
 def test_nested_one_blas_thread_blocks_restore_the_count_of_the_outer_one():
     from threadpoolctl import threadpool_info, threadpool_limits
 
