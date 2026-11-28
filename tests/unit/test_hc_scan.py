@@ -18,7 +18,13 @@ import pytest
 
 import andrey
 from andrey.core.score import BICScore, make_score
-from andrey.core.score_delta import DeltaBICScore, FullScoreDelta, add_deltas, remove_deltas
+from andrey.core.score_delta import (
+    DeltaBICScore,
+    FullScoreDelta,
+    add_deltas,
+    make_delta,
+    remove_deltas,
+)
 from andrey.core.ties import EPS_IMPROVE, KEY_DP, tie_ranks
 from andrey.search.hc import MoveScanner, _key_after, apply_move, hc
 from andrey.search.tabu import tabu
@@ -65,6 +71,127 @@ def _reference_scan(score, adj_int, parents_of, d, floor, tabu, ranks):
             elif not adj_int[v] >> u & 1 and not reaches(v, u):
                 offer(add[v][u], u, v, 0, "add")
     return best
+
+
+def _fresh_deltas(score, v, parents, d):
+    """The add deltas and the remove deltas at target ``v`` with ``parents``, from ``score`` alone.
+
+    An add delta is ``inf`` for ``v`` and its parents, a remove delta for every other column.
+    """
+    if isinstance(score, BICScore):
+        return add_deltas(score, v, parents), remove_deltas(score, v, parents)
+    base = score.score(v, parents)
+    add, remove = np.full(d, np.inf), np.full(d, np.inf)
+    for u in range(d):
+        if u != v and u not in parents:
+            add[u] = score.score(v, sorted([*parents, u])) - base
+    for u in parents:
+        remove[u] = score.score(v, [p for p in parents if p != u]) - base
+    return add, remove
+
+
+def _reachable(adj_int, d):
+    """``reach[x, y]``: a directed path leads from ``x`` to ``y``."""
+    reach = np.zeros((d, d), dtype=bool)
+    for x in range(d):
+        seen, todo = 0, adj_int[x]
+        while todo:
+            lsb = todo & -todo
+            todo ^= lsb
+            if not seen & lsb:
+                seen |= lsb
+                todo |= adj_int[lsb.bit_length() - 1]
+        reach[x] = [seen >> y & 1 for y in range(d)]
+    return reach
+
+
+def _reference_scan_under_rules(
+    score,
+    adj_int,
+    parents_of,
+    d,
+    floor,
+    tabu,
+    ranks,
+    *,
+    fresh=None,
+    forbidden=None,
+    required=None,
+    max_parents=None,
+):
+    """Every legal move with delta below ``floor``, rescanned u-major, v-minor.
+
+    ``forbidden[v, u]`` bars an edge ``u -> v`` no add or reverse makes, ``required[v, u]`` one no
+    move removes or reverses, and ``max_parents`` caps the parents of a node that an add or a
+    reverse would give one. ``fresh`` is the add and remove deltas of every target, from
+    :func:`_fresh_deltas`.
+    """
+    fresh = fresh or [_fresh_deltas(score, v, parents_of[v], d) for v in range(d)]
+    add = [f[0] for f in fresh]
+    remove = [f[1] for f in fresh]
+    reach = _reachable(adj_int, d)
+    inv_n = 1.0 / score.n
+    best = None
+
+    def offer(value, u, v, rank, op):
+        nonlocal best
+        if value < floor and _key_after(adj_int, (op, u, v)) not in tabu:
+            cand = (round(value * inv_n, KEY_DP), u, v, rank, (op, u, v))
+            key = (cand[0], ranks[u], ranks[v], rank)
+            if best is None or key < (best[0], ranks[best[1]], ranks[best[2]], best[3]):
+                best = cand
+
+    def barred(rules, v, u):
+        return rules is not None and rules[v, u]
+
+    def full(v):
+        return max_parents is not None and len(parents_of[v]) >= max_parents
+
+    for u in range(d):
+        for v in range(d):
+            if u == v:
+                continue
+            if adj_int[u] >> v & 1:
+                if barred(required, v, u):
+                    continue
+                offer(remove[v][u], u, v, 0, "remove")
+                others = adj_int[u] & ~(1 << v)
+                blocked = any(others >> c & 1 and reach[c, v] for c in range(d))
+                if not (blocked or barred(forbidden, u, v) or full(u)):
+                    covered = parents_of[v] == sorted([*parents_of[u], u])
+                    with np.errstate(invalid="ignore"):
+                        value = add[u][v] + remove[v][u]
+                    offer(0.0 if covered and np.isfinite(value) else value, u, v, 1, "reverse")
+            elif not adj_int[v] >> u & 1 and not reach[v, u] and not barred(forbidden, v, u):
+                if not full(v):
+                    offer(add[v][u], u, v, 0, "add")
+    return best
+
+
+def _reference_table(fresh, adj_int, parents_of, d, forbidden, required, max_parents):
+    """The move table a scanner holds, built from scratch, and the cells it leaves unchecked.
+
+    Cell ``[v, u]`` is the add or remove delta of ``u -> v``, ``inf`` where ``v -> u`` exists, the
+    delta is NaN, a forbidden edge would be added, a required edge would be removed, or a full
+    parent set would take an add. A scanner drops an add that closes a cycle (``v`` reaches ``u``)
+    only when it is that row's lowest, so those cells are left out.
+    """
+    parent = np.zeros((d, d), dtype=bool)
+    for v in range(d):
+        parent[v, parents_of[v]] = True
+    reach = _reachable(adj_int, d)
+    table = np.empty((d, d))
+    for v in range(d):
+        row = np.where(parent[v], fresh[v][1], fresh[v][0])
+        row[parent[:, v] | reach[v] | np.isnan(row)] = np.inf
+        if forbidden is not None:
+            row[forbidden[v] & ~parent[v]] = np.inf
+        if required is not None:
+            row[required[v]] = np.inf
+        if max_parents is not None and len(parents_of[v]) >= max_parents:
+            row[~parent[v]] = np.inf
+        table[v] = row
+    return table, ~reach
 
 
 def _data(seed: int, n: int, d: int) -> np.ndarray:
@@ -118,6 +245,118 @@ def test_scanner_picks_as_full_rescan(seed: int) -> None:
         elif move is not None:
             apply_move(adj_int, parents_of, move[4])
     assert sum(len(p) for p in parents_of.values()) > 0
+
+
+def _rules(d):
+    """Edges the knowledge requires (``0 -> 1``, ``2 -> 3``, ``1 -> 3``) and forbids (``5 -> 0``,
+    ``6 -> 0``, ``7 -> 4``), as ``[v, u]`` matrices."""
+    required = np.zeros((d, d), dtype=bool)
+    for u, v in ((0, 1), (2, 3), (1, 3)):
+        required[v, u] = True
+    forbidden = np.zeros((d, d), dtype=bool)
+    for u, v in ((5, 0), (6, 0), (7, 4)):
+        forbidden[v, u] = True
+    return forbidden, required
+
+
+def _with_nan_scores(score):
+    """``score`` with a NaN for about one parent set in eleven, by target and set."""
+    real = score.score
+
+    def one(v, parents):
+        return (
+            math.nan if (v * 31 + sum(parents) * 7 + len(parents)) % 11 == 0 else real(v, parents)
+        )
+
+    score.score = one
+    score.score_many = lambda v, sets: [one(v, parents) for parents in sets]
+    return score
+
+
+@pytest.mark.parametrize("seed", range(3))
+@pytest.mark.parametrize(
+    ("score_func", "rules", "max_parents", "nan"),
+    [
+        ("bic", False, None, False),
+        ("bic", True, 2, False),
+        ("bdeu", False, None, False),
+        ("discrete_bic", True, None, False),
+        ("bdeu", True, 3, True),
+    ],
+    ids=["bic", "bic rules", "bdeu", "discrete bic rules", "bdeu nan rules"],
+)
+def test_scanner_keeps_every_delta_exactly(seed, score_func, rules, max_parents, nan) -> None:
+    """Along a walk, each call's table holds the deltas a scan from scratch computes, to the bit.
+
+    The scanner keeps no table of remove deltas of its own: the move table holds each one at its
+    edge, so a row rebuilt for new reach or a changed neighbor must find it there, a held tabu move
+    must leave it unchanged, and the reverse scores must read it. Besides the picks, which match a
+    full rescan under the same rules, every cell of the table that no cycle check has left behind
+    equals the cell built from scratch. The scores include NaN deltas, a required edge, a full
+    parent set, and a forbidden edge.
+    """
+    d = 9
+    x = _data(seed, 400, d) if score_func == "bic" else _categorical(seed, 800, d)
+    scores = [make_score(score_func, x) for _ in range(2)]
+    if nan:
+        scores = [_with_nan_scores(score) for score in scores]
+    scored, reference = scores
+    forbidden, required = _rules(d) if rules else (None, None)
+    ranks = tie_ranks(x)
+    scanner = MoveScanner(
+        make_delta(scored),
+        d,
+        ranks=ranks,
+        forbidden=forbidden,
+        required=required,
+        max_parents=max_parents,
+    )
+    adj_int: list[int] = [0] * d
+    parents_of: dict[int, list[int]] = {i: [] for i in range(d)}
+    for v, u in zip(*np.nonzero(required)) if rules else ():
+        apply_move(adj_int, parents_of, ("add", int(u), int(v)))
+    rng = np.random.default_rng(seed)
+    kwargs = {"forbidden": forbidden, "required": required, "max_parents": max_parents}
+    recent: list[tuple[int, ...]] = []
+    held = {"remove": 0, "add": 0, "reverse": 0}
+    for step in range(90):
+        recent = [*recent[-5:], tuple(adj_int)]
+        tabu = set(recent)
+        fresh = [_fresh_deltas(reference, v, parents_of[v], d) for v in range(d)]
+        table, checked = _reference_table(
+            fresh, adj_int, parents_of, d, forbidden, required, max_parents
+        )
+        want = None
+        for floor in (-EPS_IMPROVE, math.inf):
+            args = (reference, adj_int, parents_of, d, floor)
+            want = _reference_scan_under_rules(*args, tabu, ranks, fresh=fresh, **kwargs)
+            free = _reference_scan_under_rules(*args, set(), ranks, fresh=fresh, **kwargs)
+            assert scanner.best(adj_int, parents_of, floor=floor, tabu=tabu) == want
+            if free != want and free is not None:
+                held[free[4][0]] += 1
+            got = scanner._single
+            np.testing.assert_array_equal(
+                got[checked].view(np.uint64), table[checked].view(np.uint64)
+            )
+        edges = [(u, v) for v in range(d) for u in parents_of[v] if not rules or not required[v, u]]
+        reach = _reachable(adj_int, d)
+        adds = [
+            (u, v)
+            for u, v in itertools.permutations(range(d), 2)
+            if not (adj_int[u] >> v & 1 or adj_int[v] >> u & 1 or reach[v, u])
+            and not (rules and forbidden[v, u])
+            and (max_parents is None or len(parents_of[v]) < max_parents)
+            and np.isfinite(fresh[v][0][u])
+        ]
+        if step >= 20 and step % 4 == 2 and edges:
+            u, v = edges[rng.integers(len(edges))]
+            apply_move(adj_int, parents_of, ("remove", u, v))
+        elif step >= 20 and step % 4 == 0 and adds:  # the worst add: the best move then undoes it
+            u, v = max(adds, key=lambda edge: fresh[edge[1]][0][edge[0]])
+            apply_move(adj_int, parents_of, ("add", u, v))
+        elif want is not None:
+            apply_move(adj_int, parents_of, want[4])
+    assert held["remove"] > 0, held
 
 
 @pytest.mark.parametrize("seed", range(8))

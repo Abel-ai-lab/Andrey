@@ -106,6 +106,11 @@ names its pull request.
   knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
   which took memory quadratic in the number of variables; the trees of a search share one tuple of
   the variables. Results are unchanged, bit for bit. ([#1274])
+- The move scan of `hc`, `tabu`, `mmhc`, and `rsmax2` holds one table less, quadratic in the number
+  of variables: it no longer keeps the deltas of removing each edge in a second table, and reads
+  each from the table of single-edge moves, where it already sits. A fit's peak memory falls only
+  where the scan sets it, as with many variables and few rows. Results are unchanged, bit for bit.
+  ([#1370])
 - With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
   searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
   targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
@@ -3284,3 +3289,4 @@ First alpha release.
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
 [#1369]: https://github.com/Abel-ai-lab/Andrey/pull/1369
+[#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
