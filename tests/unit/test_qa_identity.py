@@ -1769,3 +1769,28 @@ def test_regime_pcmci_is_refitted_on_workers_through_the_pool(monkeypatch) -> No
     assert findings == []
     assert {r["workers"] for r in rows} == {1, 2}
     assert started == [2, 2]  # one pool for each of the two series
+
+
+@pytest.mark.parametrize(
+    "name, dataset", [("RESIT", "anm_er_n1000_d5"), ("CPCMGraph", "anm_er_n300_d4")]
+)
+def test_the_fcm_regressions_are_refitted_on_workers_through_the_pool(
+    name, dataset, monkeypatch
+) -> None:
+    """The refit sends every regression to the pool, so the check compares pooled fits, not serial
+    ones. CPCM's is the exact search, up to 4 variables, which no gate dataset reaches."""
+    from andrey.fcm import _parallel as fcm_pool
+
+    assert name in identity.WORKER_METHODS
+    assert dataset in identity.datasets(name)
+    assert identity.draws(dataset)[0].data.shape[1] <= (4 if name == "CPCMGraph" else 5)
+    started: list[int] = []
+    real = fcm_pool.ProcessPoolExecutor
+    monkeypatch.setattr(
+        fcm_pool, "ProcessPoolExecutor", lambda *a, **k: started.append(1) or real(*a, **k)
+    )
+    monkeypatch.setattr(identity, "datasets", lambda method: (dataset,))
+    rows, findings = identity.run([name], seeds=1, workers=2)
+    assert findings == []
+    assert {r["workers"] for r in rows} == {1, 2}
+    assert started

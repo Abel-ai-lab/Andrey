@@ -25,6 +25,7 @@ from andrey.core.missing_groups import (
     MIN_COLUMNS,
     MIN_GAIN,
 )
+from andrey.fcm._parallel import MIN_POOL_CPCM_WORK, MIN_POOL_RESIT_WORK
 from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
 from andrey.temporal._parallel_rpcmci import MIN_POOL_RPCMCI_WORK
@@ -73,7 +74,9 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "`normal_scores` and of FCI-JCI with `fisherz` or `student_t`, the full-graph search "
             "of IAMB, Inter-IAMB, and MMPC (and the restrict phase of MMHC and RSMAX2 that reads "
             "their sets) and a list of their targets with `fisherz`, `student_t`, or "
-            "`normal_scores` on complete data, the starts of `rpcmci`, and worker threads for "
+            "`normal_scores` on complete data, the starts of `rpcmci`, the regressions of RESIT's "
+            "causal order and edge removal and of the exact search of CPCM (up to 4 variables), "
+            "and worker threads for "
             "the two directions of `pnl` and the searches of `skewd` and `skewd_mv`; `0` or `1` "
             "runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
@@ -175,6 +178,41 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "`ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns once on the "
             "default when it reaches a tenth of it; `andrey calibrate --method rpcmci` measures "
             "a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_RESIT_PARALLEL_MIN_WORK",
+        values="integer (causal-order regressions times rows per RESIT fit)",
+        default=str(MIN_POOL_RESIT_WORK),
+        effect=(
+            "Per-fit crossover gate for RESIT's worker pool: the regressions and tests of its "
+            "causal order and edge removal run on the worker pool only when the regressions of "
+            "the causal order times the data's rows, `(d * (d + 1) / 2 - 1) * n` for `d` "
+            "variables and `n` rows, reach this value, else in-process. `0` sends every fit with "
+            "more than 2 variables to the pool. The default was measured on an AMD EPYC 9534 "
+            "server running Linux with 2, 4, and 8 workers. No effect unless the worker count "
+            "(`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns "
+            "once on the default when it reaches a tenth of it; `andrey calibrate --method "
+            "resit` measures a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_CPCM_PARALLEL_MIN_WORK",
+        values="integer (exact-search fits times rows per `cpcm_graph` fit)",
+        default=str(MIN_POOL_CPCM_WORK),
+        effect=(
+            "Per-fit crossover gate for the worker pool of the exact search of `cpcm_graph` (3 "
+            "or 4 variables): its fits of every column under the `gaussian`, `gamma`, or `gumbel` "
+            "family on every set of the others run on the worker pool only when those fits times "
+            "the data's rows, `d * (2 ** (d - 1) - 1) * n` for `d` variables of those families "
+            "and `n` rows, reach this value, else in-process, as do the fits under any other "
+            "family. `0` sends every such fit to the pool. The default was measured on "
+            "an AMD EPYC 9534 server running Linux with 2, 4, and 8 workers. No effect unless "
+            "the worker count (`n_jobs` / `ANDREY_N_JOBS`) is above 1. A fit with more than "
+            "one worker warns once on the default when it reaches a tenth of it; `andrey "
+            "calibrate --method cpcm` measures a value for your machine."
         ),
         group="backend",
     ),

@@ -320,6 +320,15 @@ names its pull request.
   `BaseException`, a `test_*` function that becomes a fixture, a `parametrize` with no case added,
   an `xfail` that gains `run=False`, a new `setup_module`, `setup_class`, `setup_method`, or
   `setup_function` that skips, and a function of `qa/` that is deleted or emptied. ([#1381])
+- `resit` and the exact search of `cpcm_graph` (3 or 4 variables) run their regressions on the
+  `andrey.config(n_jobs=...)` worker processes, so they run faster with more than one worker, with
+  the same graph, causal order, and scores bit for bit at any number of workers. A `resit` fit uses
+  the workers only when its causal order holds at least `ANDREY_RESIT_PARALLEL_MIN_WORK`
+  regressions times rows; the exact search sends the fits of the columns under the `"gaussian"`,
+  `"gamma"`, or `"gumbel"` family, the families whose fits cost more than starting the workers, and
+  only when those fits times rows reach `ANDREY_CPCM_PARALLEL_MIN_WORK`.
+  `andrey calibrate --method resit` and `--method cpcm` measure the values for a machine, and a fit
+  with more than one worker warns once when it nears a default. ([#1385])
 
 ### Fixed
 
@@ -3354,3 +3363,4 @@ First alpha release.
 [#1383]: https://github.com/Abel-ai-lab/Andrey/pull/1383
 [#1381]: https://github.com/Abel-ai-lab/Andrey/pull/1381
 [#1384]: https://github.com/Abel-ai-lab/Andrey/pull/1384
+[#1385]: https://github.com/Abel-ai-lab/Andrey/pull/1385
