@@ -1159,3 +1159,139 @@ def test_mark_pairs_use_the_array_lookup_up_to_the_entry_cutoff_only(monkeypatch
         calls.clear()
         g._mark_pairs()
         assert calls == ([edges + 1] if 2 * edges <= structure._NUMPY_PARTNER_ENTRIES else [])
+
+
+# ---- a column index outside range(n) --------------------------------------------------------
+
+
+_RANGE_MESSAGE = r"column indices must lie in range\({n}\), got values from {low} to {high}"
+
+
+def _kind_store(kind, n=6):
+    """A random valid ``(n, n)`` matrix of ``kind`` with at least one edge, and its CSR store."""
+    M = _random_marks(np.random.default_rng(7), n, kind, 0.7, loops=kind == "digraph")
+    assert M.any()
+    return M, _csr(M)
+
+
+@pytest.mark.parametrize("kind", _KINDS)
+def test_a_column_index_outside_the_range_raises_a_value_error(kind):
+    n = 6
+    _, (indptr, indices, marks) = _kind_store(kind, n)
+    for position in range(indices.size):
+        for bad in (n, n + 1, n + 2, -1, -n, np.iinfo(np.int32).max, np.iinfo(np.int32).min):
+            damaged = indices.copy()
+            damaged[position] = bad
+            with pytest.raises(ValueError, match="column indices must lie in range"):
+                GraphStructure._from_csr(n, indptr, damaged, marks, kind=kind)
+
+
+def test_the_error_gives_the_range_and_the_values_found():
+    expected = _RANGE_MESSAGE.format(n=3, low=5, high=5)
+    with pytest.raises(ValueError, match=expected):
+        GraphStructure._from_csr(3, [0, 1, 1, 1], [5], [TAIL], kind="dag")
+    expected = _RANGE_MESSAGE.format(n=3, low=-1, high=9)
+    with pytest.raises(ValueError, match=expected):
+        GraphStructure._from_csr(3, [0, 2, 2, 2], [-1, 9], [TAIL, TAIL], kind="pag")
+    expected = _RANGE_MESSAGE.format(n=0, low=0, high=0)  # no node can be named
+    with pytest.raises(ValueError, match=expected):
+        GraphStructure._from_csr(0, [0], [0], [TAIL], kind="dag")
+
+
+@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("as_list", [False, True], ids=["int64 array", "list"])
+def test_an_index_that_the_int32_cast_would_wrap_into_range_raises(kind, as_list):
+    # 2**32 + 1 is 1 in int32, a valid column of a two-node graph
+    for wide in (2**32 + 1, 1 - 2**32, 2**70):
+        indices = [wide] if as_list or wide == 2**70 else np.array([wide], dtype=np.int64)
+        with pytest.raises(ValueError, match="column indices must lie in range"):
+            GraphStructure._from_csr(2, [0, 1, 1], indices, [TAIL], kind=kind)
+
+
+@pytest.mark.parametrize("kind", _KINDS)
+def test_a_store_with_no_entries_and_an_empty_list_builds(kind):
+    for n in (0, 1, 4):
+        g = GraphStructure._from_csr(n, [0] * (n + 1), [], [], kind=kind)
+        assert g.n_nodes == n and len(g.to_edges()) == 0
+
+
+@pytest.mark.parametrize("kind", _KINDS)
+def test_a_store_with_every_index_in_range_builds_as_it_always_did(kind):
+    from andrey.core.structure import _try_compact
+
+    rng = np.random.default_rng(8)
+    dtypes = (np.int64, np.int32, np.int8)
+    built = 0
+    for n in (0, 1, 2, 5, 12):
+        for valid in (True, False):
+            for how in (None, "half", "null", "duplicate", "unsorted", "bad_mark"):
+                M = _random_marks(rng, n, kind, 0.4, loops=kind == "digraph", valid=valid)
+                store = _csr(M)
+                if how == "bad_mark":
+                    if store[2].size:
+                        store[2][int(rng.integers(store[2].size))] = 5
+                elif how is not None:
+                    store = _damage(rng, store, how)
+                g = GraphStructure._from_csr(n, *store, kind=kind)
+                compact = _try_compact(n, *store, kind)
+                want = compact or tuple(np.asarray(a, dt) for a, dt in zip(store, dtypes))
+                assert g._layout == ("sym" if compact is None else "compact")
+                for got, expected in zip((g._indptr, g._indices, g._marks), want):
+                    assert got.dtype == expected.dtype and np.array_equal(got, expected)
+                # the lists of a JSON file build the same store
+                assert GraphStructure._from_csr(n, *(a.tolist() for a in store), kind=kind) == g
+                built += 1
+    assert built
+
+
+def test_the_first_and_the_last_node_are_in_range():
+    g = GraphStructure._from_csr(4, [0, 1, 1, 1, 1], [3], [TAIL], kind="pag")
+    assert g._indices.tolist() == [3]
+    g = GraphStructure._from_csr(4, [0, 1, 1, 1, 2], [0, 3], [TAIL, TAIL], kind="pag")
+    assert g._indices.tolist() == [0, 3]
+
+
+def _saved_graph(tmp_path, kind, fmt):
+    M, _ = _kind_store(kind)
+    path = tmp_path / f"{kind}.{fmt}"
+    g = GraphStructure.from_numpy(M, kind=kind, allow_self_loops=True)
+    StructureOutput.new(g).save(path, fmt=fmt)
+    return path
+
+
+@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("bad", [6, 8, -1])
+def test_a_saved_json_with_an_index_out_of_range_raises_on_load(tmp_path, kind, bad):
+    path = _saved_graph(tmp_path, kind, "json")
+    assert StructureOutput.load(path).structure.n_nodes == 6
+    doc = json.loads(path.read_text())
+    doc["indices"][len(doc["indices"]) // 2] = bad
+    path.write_text(json.dumps(doc))
+    with pytest.raises(ValueError, match="column indices must lie in range"):
+        StructureOutput.load(path)
+
+
+@pytest.mark.parametrize("kind", _KINDS)
+@pytest.mark.parametrize("bad", [6, 8, -1])
+def test_a_saved_npz_with_an_index_out_of_range_raises_on_load(tmp_path, kind, bad):
+    path = _saved_graph(tmp_path, kind, "npz")
+    assert StructureOutput.load(path).structure.n_nodes == 6
+    with np.load(path, allow_pickle=False) as npz:
+        arrays = dict(npz)
+    arrays["indices"] = arrays["indices"].copy()
+    arrays["indices"][arrays["indices"].size // 2] = bad
+    np.savez(path, **arrays)
+    with pytest.raises(ValueError, match="column indices must lie in range"):
+        StructureOutput.load(path)
+
+
+@pytest.mark.parametrize("bad", [3, -1])
+def test_a_saved_lag_graph_with_an_index_out_of_range_raises_on_load(tmp_path, bad):
+    path = tmp_path / "temporal.json"
+    lags = [directed([(0, 1)], 3), directed([(1, 2)], 3)]
+    StructureOutput.new(TemporalStructure.from_lag_graphs(lags)).save(path)
+    doc = json.loads(path.read_text())
+    doc["lags"][1]["indices"][0] = bad
+    path.write_text(json.dumps(doc))
+    with pytest.raises(ValueError, match="column indices must lie in range"):
+        StructureOutput.load(path)
