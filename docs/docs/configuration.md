@@ -57,15 +57,15 @@ requested backend uses `auto`, without a warning.
   target they send the search of every variable to them, as do MMHC and RSMAX2 for a restrict phase
   that reads those sets, only when the data hold enough variables to repay them. `andrey.bootstrap`
   fits one resample per worker, with the same result at any number. `1` (the default) and `0` run
-  serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads unlimited and
-  with several limits each thread to one, so on a machine with several cores its p-values and
-  statistics can differ in the last digits between one worker and several. Each `pnl` thread holds
-  three n x n float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run,
-  with a `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
-  and `skewd_mv` its conditional models and their searches; every search draws from its own random
-  stream, so the results are the same bit for bit with any number of workers. Unlike `pnl`, both run
-  on one BLAS thread with any number of workers, so their results do not depend on the BLAS thread
-  count either; the limit applies to the whole process while a fit runs.
+  serially; `-1` uses every usable core. `pnl` runs on one BLAS thread with any number of workers,
+  so its p-values and statistics do not depend on the worker count or on the machine's BLAS thread
+  count. Each `pnl` thread holds three n x n float64 matrices; when the threads you ask for would
+  hold more than 4 GiB, fewer run, with a `PerformanceWarning`. `skewd` runs its two directions and
+  their searches on the threads, and `skewd_mv` its conditional models and their searches; every
+  search draws from its own random stream, so the results are the same bit for bit with any number
+  of workers. Like `pnl`, both run on one BLAS thread with any number of workers, so their results
+  do not depend on the BLAS thread count either; the limit applies to the whole process while a fit
+  runs.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
