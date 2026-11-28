@@ -437,8 +437,8 @@ def regime_draws(kind: str, n_steps: int, n_vars: int) -> tuple[qg.Draw, ...]:
     return tuple(out)
 
 
-#: The datasets the gate does not draw: those of the option fits, of :data:`EXPERIMENTAL`, and of the
-#: fits on a path the gate's datasets do not reach.
+#: The datasets the gate does not draw: those of the option fits, of :data:`EXPERIMENTAL`, and of
+#: the fits on a path the gate's datasets do not reach.
 OPTION_DRAWS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "cohorts_d14_n2000": functools.partial(cohort_draws, 2000),
     "gapped_series_d6_n600": functools.partial(gapped_series_draws, 6, 600),
