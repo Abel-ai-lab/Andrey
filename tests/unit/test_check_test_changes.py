@@ -1713,6 +1713,22 @@ FLAGGED = {
         """,
         "test no longer collected: it became a fixture",
     ),
+    "test made a fixture through an alias of pytest": (
+        """
+        import pytest as pt
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        import pytest as pt
+
+        @pt.fixture
+        def test_fit():
+            assert fit()
+        """,
+        "test no longer collected: it became a fixture",
+    ),
     "empty parametrization added": (
         """
         def test_fit(n):
@@ -3070,6 +3086,54 @@ NOT_FLAGGED = {
             return load()
         """,
     ),
+    "test given a decorator named fixture of another module": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @custom.fixture
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "__test__ = False set while a test runs": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            helper.__test__ = False
+            assert fit()
+        """,
+    ),
+    "parametrize called on another object": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            helper.parametrize("x", [])
+            assert fit()
+        """,
+    ),
+    "setup_method that skips in a class pytest does not collect": (
+        """
+        class Helper:
+            def run(self):
+                return 1
+        """,
+        """
+        class Helper:
+            def setup_method(self, method):
+                pytest.skip("slow")
+
+            def run(self):
+                return 1
+        """,
+    ),
     "parametrization with a case added": (
         """
         def test_fit(n):
@@ -3560,6 +3624,18 @@ FLAGGED_AT = {
         CONFTEST,
         "collect_ignore or collect_ignore_glob entry added",
     ),
+    "entry of collect_ignore replaced by index": (
+        'collect_ignore = ["a.py"]\n',
+        'collect_ignore = ["a.py"]\ncollect_ignore[0] = "test_live.py"\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "function of qa deleted while a method of that name is added": (
+        "def main():\n    run()\n    return 0\n",
+        "class Check:\n    def main(self):\n        stop()\n        return 1\n",
+        QA,
+        "function of qa/ deleted",
+    ),
     "function of qa deleted": (
         VALIDATE,
         "def helper():\n    return 1\n",
@@ -3613,6 +3689,11 @@ NOT_FLAGGED_AT = {
         "x = 1\n",
         'x = 1\ncollect_ignore = ["a.py"]\n',
         "tests/unit/test_a.py",
+    ),
+    "collect_ignore in a conftest that pytest does not load": (
+        None,
+        'collect_ignore = ["a.py"]\n',
+        "qa/conftest.py",
     ),
     "unrelated list in a new conftest": (None, 'skip_names = ["a.py"]\n', CONFTEST),
     "function of qa added": (VALIDATE, VALIDATE + "\ndef extra():\n    return 2\n", QA),

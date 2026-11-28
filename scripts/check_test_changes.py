@@ -24,10 +24,11 @@ function by function, and flags:
 - a test that stops running without a marker: an autouse fixture or a new xunit ``setup_module``,
   ``setup_class``, ``setup_method``, or ``setup_function`` that skips, a ``pytest_*`` hook added or
   changed in a ``conftest.py`` or a test file that existed, an entry added to ``collect_ignore`` or
-  ``collect_ignore_glob`` of a ``conftest.py`` (a new one included), a ``__test__ = False`` added
-  to a module, to a function (``test_fit.__test__ = False``), or to a class, a constructor or a
-  lost ``TestCase`` base that stops pytest collecting a class, a ``test_*`` function that became a
-  fixture, and a ``parametrize`` or fixture ``params`` with no case added, which skips the test;
+  ``collect_ignore_glob`` of a ``conftest.py`` in ``tests/`` (a new one included), a
+  ``__test__ = False`` added to a module, to a function (``test_fit.__test__ = False``), or to a
+  class, a constructor or a lost ``TestCase`` base that stops pytest collecting a class, a
+  ``test_*`` function that became a fixture, and a pytest ``parametrize`` or fixture ``params``
+  with no case added, which skips the test;
 - a ``filterwarnings`` marker that stops raising a warning or lets one pass;
 - a deleted test function or parametrized fixture, a test file renamed out of the names pytest
   collects (or into another kind of file), or a removed ``parametrize`` case (a literal list, tuple,
@@ -43,9 +44,9 @@ function by function, and flags:
 
 An added test, a tightened tolerance, and a test that only moved or was renamed are not flagged. It
 cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, a check
-that moved into a helper, a call of a function of ``qa/`` that was removed, a ``collect_ignore``
-or ``__test__`` set through a value it cannot read, or an existing test pointed at a new baseline
-file, so a pass is necessary and not sufficient.
+that moved into a helper, a call of a function of ``qa/`` that was removed, a nested function of
+``qa/`` that was deleted, a ``collect_ignore`` or ``__test__`` set through a value it cannot read,
+or an existing test pointed at a new baseline file, so a pass is necessary and not sufficient.
 
 The script prints each flagged change with its reason and exits 1 unless the pull request carries
 the label ``test-change-approved``, which a maintainer sets after reading the flags. Run it in a
@@ -91,6 +92,7 @@ DETECTOR = "scripts/check_test_changes.py"
 WORKFLOW = ".github/workflows/ci.yml"
 # The conftest names that make pytest skip collecting from a path, and the xunit-style setups.
 COLLECT_IGNORES = frozenset({"collect_ignore", "collect_ignore_glob"})
+PYTEST_FIXTURES = frozenset({"pytest.fixture", "pytest.yield_fixture"})
 XUNIT_SETUPS = frozenset({"setup_module", "setup_class", "setup_method", "setup_function"})
 # The pytest options (``pyproject.toml``) that choose which tests run, and how a failure counts.
 PYTEST_OPTIONS = (
@@ -1171,6 +1173,11 @@ def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -
 EMPTY = "parametrization with no case added: pytest skips the test"
 
 
+def _pytest_parametrization(call: ast.Call, imports: dict[str, str]) -> bool:
+    """Whether a call is ``pytest.mark.parametrize`` or a fixture, which ``params`` parametrizes."""
+    return _dotted(call.func, imports) in {"pytest.mark.parametrize", *PYTEST_FIXTURES}
+
+
 def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
     """Flag the cases a unit's parametrizations lost and an argument left without one.
 
@@ -1194,7 +1201,12 @@ def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
                         [_clip(_text(old, node))],
                         [_clip(_text(new, after_node))],
                     )
-            elif elements is None and after_elements is not None and not after_elements:
+            elif (
+                elements is None
+                and after_elements is not None
+                and not after_elements
+                and _pytest_parametrization(after_node, new.imports)
+            ):
                 flag(after_node, EMPTY, [_clip(_text(old, node))], [_clip(_text(new, after_node))])
         elif missing := [name for name in names if name not in kept]:
             flag(
@@ -1202,7 +1214,7 @@ def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
             )
     for added in pool.values():
         for elements, node in added:
-            if elements is not None and not elements:
+            if elements is not None and not elements and _pytest_parametrization(node, new.imports):
                 flag(node, EMPTY, [], [_clip(_text(new, node))])
 
 
@@ -1228,17 +1240,18 @@ def _switch_off(unit: Unit) -> list[ast.AST]:
     """List the statements of a module or function that set ``__test__`` to a literal ``False``.
 
     A module-level ``__test__ = False`` and an attribute such as ``test_fit.__test__ = False`` or
-    ``setattr(test_fit, "__test__", False)`` stop pytest collecting what they name; the same line in
-    a class body is read with the class.
+    ``setattr(test_fit, "__test__", False)`` stop pytest collecting what they name when they run as
+    it imports the module; one in a function runs after the collection, and the same line in a
+    class body is read with the class.
     """
-    if isinstance(unit.node, ast.ClassDef):
+    if not isinstance(unit.node, ast.Module):
         return []
     found = []
     for node in sorted(unit.nodes, key=_position):
         if isinstance(node, ast.Assign) or (isinstance(node, ast.AnnAssign) and node.value):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             switched = any(
-                (isinstance(t, ast.Name) and t.id == "__test__" and not unit.is_function)
+                (isinstance(t, ast.Name) and t.id == "__test__")
                 or (isinstance(t, ast.Attribute) and t.attr == "__test__")
                 for t in targets
             )
@@ -1282,6 +1295,13 @@ def _ignored(unit: Unit) -> list[tuple[str, ast.AST]]:
         pairs: list[tuple[str, ast.expr]] = []
         if isinstance(node, ast.Assign | ast.AnnAssign):
             pairs = _assigned(node)
+            if isinstance(node, ast.Assign):
+                # ``collect_ignore[0] = "test_live.py"`` replaces an entry.
+                pairs += [
+                    (t.value.id, ast.List(elts=[node.value]))
+                    for t in node.targets
+                    if isinstance(t, ast.Subscript) and isinstance(t.value, ast.Name)
+                ]
         elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
             pairs = [(node.target.id, node.value)]
         elif (
@@ -1329,6 +1349,13 @@ def _trivial(node: ast.AST) -> bool:
     )
 
 
+def _loaded_conftest(path: str) -> bool:
+    """Whether a path is a ``conftest.py`` that pytest loads: one in the test folders."""
+    return path.rsplit("/", 1)[-1] == "conftest.py" and any(
+        path.startswith(f"{root}/") for root in TESTPATHS
+    )
+
+
 def _in_qa(unit: Unit) -> bool:
     """Whether a unit is a function of ``qa/`` that is no test, such as a validation ``main()``."""
     return unit.is_function and unit.path.split("/")[0] == "qa" and not unit.is_test
@@ -1345,7 +1372,7 @@ def compare(old: Unit, new: Unit, exempt: frozenset[str] = frozenset()) -> list[
     _marker_findings(old, new, flag, exempt)
     _parametrize_findings(old, new, flag)
     _switch_off_findings(old, new, flag)
-    if new.qualname == "<module>" and new.path.rsplit("/", 1)[-1] == "conftest.py":
+    if new.qualname == "<module>" and _loaded_conftest(new.path):
         _ignore_findings(old, new, flag)
     if _in_qa(new) and old.is_function and _trivial(new.node) and not _trivial(old.node):
         before, after = _clip(_text(old, old.node)), _clip(_text(new, new.node))
@@ -1397,8 +1424,7 @@ def _declares_fixture(unit: Unit) -> bool:
     pytest does not collect such a function as a test, whatever its name.
     """
     return any(
-        _dotted(d.func if isinstance(d, ast.Call) else d, unit.imports).rsplit(".", 1)[-1]
-        in {"fixture", "yield_fixture"}
+        _dotted(d.func if isinstance(d, ast.Call) else d, unit.imports) in PYTEST_FIXTURES
         for d in getattr(unit.node, "decorator_list", [])
     )
 
@@ -1425,8 +1451,8 @@ def _hook(unit: Unit) -> bool:
 
 
 def _xunit(unit: Unit) -> bool:
-    """Whether a unit is an xunit-style setup: ``setup_module`` and the like, run before tests."""
-    return unit.is_function and unit.qualname.rsplit(".", 1)[-1] in XUNIT_SETUPS
+    """Whether a unit is an xunit-style setup that pytest runs: ``setup_module`` and the like."""
+    return unit.is_function and unit.collected and unit.qualname.rsplit(".", 1)[-1] in XUNIT_SETUPS
 
 
 def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Finding]:
@@ -1464,13 +1490,19 @@ def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Findin
 QA_DELETED = "function of qa/ deleted"
 
 
-def _moved(unit: Unit, pool: list[Unit]) -> Unit | None:
-    """Return the unit of ``pool`` a deleted unit moved to: the same body, else the same name."""
+def _moved(unit: Unit, pool: list[Unit], scoped: bool = False) -> Unit | None:
+    """Return the unit of ``pool`` a deleted unit moved to: the same body, else the same name.
+
+    A ``scoped`` match by name also needs the same class, so a module-level function does not
+    stand for a method of that name.
+    """
     key = _body_key(unit)
-    name = unit.qualname.rsplit(".", 1)[-1]
+    name = unit.qualname if scoped else unit.qualname.rsplit(".", 1)[-1]
     found = next((a for a in pool if _body_key(a) == key), None)
     if found is None:
-        same_name = [a for a in pool if a.qualname.rsplit(".", 1)[-1] == name]
+        same_name = [
+            a for a in pool if (a.qualname if scoped else a.qualname.rsplit(".", 1)[-1]) == name
+        ]
         found = same_name[0] if len(same_name) == 1 else None
     return found
 
@@ -1496,8 +1528,9 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             added_functions += [u for u in new_file.values() if _in_qa(u)]
             if change.path.rsplit("/", 1)[-1] == "conftest.py":
                 findings += _skipping(new_file, {})
-                module = new_file["<module>"]
-                _ignore_findings(None, module, _flagger(module, findings))
+                if _loaded_conftest(change.path):
+                    module = new_file["<module>"]
+                    _ignore_findings(None, module, _flagger(module, findings))
             continue
         try:
             old_units = collect(change.old_path, change.old)
@@ -1560,7 +1593,7 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             )
     for unit, reason in [*deleted, *((u, QA_DELETED) for u in lost)]:
         pool = added if unit.is_test else added_functions
-        match = _moved(unit, pool)
+        match = _moved(unit, pool, scoped=not unit.is_test)
         if match is None:
             line = _position(unit.node)[0]
             findings.append(

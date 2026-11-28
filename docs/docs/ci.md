@@ -50,10 +50,10 @@ pull request cannot loosen the check it is judged by. The job is a required stat
 elsewhere that stops the job from running is for the code owner who is asked to read it. An added
 test, a tighter tolerance, and a test that only moved or was renamed are not flagged. The check
 cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, a check
-that moved into a helper, a call of a function of `qa/` that was removed, or an existing test
-pointed at a new baseline file. A pass is necessary and not sufficient, so it does not replace
-review. To see the flags before you push, run `uv run python scripts/check_test_changes.py --base
-origin/<release branch>`.
+that moved into a helper, a call of a function of `qa/` that was removed, a nested function of `qa/`
+that was deleted, or an existing test pointed at a new baseline file. A pass is necessary and not
+sufficient, so it does not replace review. To see the flags before you push, run `uv run python
+scripts/check_test_changes.py --base origin/<release branch>`.
 
 Each release's pull request into `main` runs every test, the `release`-marked checks included, and
 a quality gate that fits every supported method ({{ n_supported }}) and the supported nonlinear

@@ -543,8 +543,8 @@ contributors:
   scripts/check_test_changes.py --base origin/release/<x.y.z>` before opening the pull request to
   see the flags. A pass is necessary and not sufficient: the check cannot see an assertion rewritten
   to a weaker one, a tolerance passed through a variable, a check that moved into a helper, a call
-  of a function of `qa/` that was removed, or an existing test pointed at a new baseline file, so
-  review still reads every change to a test.
+  of a function of `qa/` that was removed, a nested function of `qa/` that was deleted, or an
+  existing test pointed at a new baseline file, so review still reads every change to a test.
 - **Blog posts and release cards end with an AI statement.** It says how AI tools were used to
   write the page, as a conference asks of a paper's authors. The author sets `ai` (`none`,
   `edited`, or `drafted`) and `ai_tools` in the front matter, and the site writes the sentence
