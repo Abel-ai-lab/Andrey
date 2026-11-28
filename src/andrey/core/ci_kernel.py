@@ -8,8 +8,9 @@ Selected through ``indep_test="kci"`` and ``indep_test="rcot"``. Each test follo
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from functools import lru_cache
+from typing import Any
 
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
@@ -44,6 +45,30 @@ KCI_BLAS_THREADS_FROM = 2000
 def _cache_entries(floats_per_entry: int) -> int:
     """How many entries of ``floats_per_entry`` float64 values fit in ``_CACHE_BYTES``."""
     return max(16, _CACHE_BYTES // (8 * floats_per_entry))
+
+
+def _grouped_pvalues(
+    test: Callable[[int, int, tuple[int, ...]], float],
+    x: np.ndarray,
+    y: np.ndarray,
+    conditions: np.ndarray,
+    key: Callable[[int, int, tuple[int, ...]], Any],
+) -> np.ndarray:
+    """The p-values of the queries ``(x[i], y[i], conditions[i])``, each one ``test(x[i], y[i],
+    conditions[i])`` exactly, run in the order of ``key`` so that queries sharing a cached matrix
+    run one after another.
+
+    When a query or its key raises, the queries run again in their order, so the error is the one
+    the first failing query raises.
+    """
+    queries = list(zip(x.tolist(), y.tolist(), map(tuple, conditions.tolist())))
+    pvalues = np.empty(len(queries))
+    try:
+        for i in sorted(range(len(queries)), key=lambda i: key(*queries[i])):
+            pvalues[i] = test(*queries[i])
+    except Exception:
+        return np.array([test(*query) for query in queries])
+    return pvalues
 
 
 def _standardize(data: np.ndarray) -> np.ndarray:
@@ -161,12 +186,13 @@ class KCI:
     at 5 variables with 5,000 rows, its median errors (SHD) stayed below the empty graph's at every
     size. The median fit took 4 to 18 seconds at 500 rows, 37 seconds to 11 minutes at 2,000 rows,
     and 13 minutes at 5 variables with 5,000 rows; at 20 variables and 2,000 rows, on shared nodes,
-    4 of 40 fits passed a half-hour cap. Each query with a conditioning set costs two products of
-    ``n x n`` matrices, plus an eigendecomposition for a conditioning set not seen before and two
-    more products for a new ``y`` with it; the test keeps up to 256 MB of each kind of matrix, at
-    least one, except the kernels of single variables, which it keeps only when two fit. So time
-    grows as the cube of the number of rows and memory as its square: thousands of rows are
-    practical, tens of thousands are not. The kernel widths follow the row count and the size of the
+    4 of 40 fits passed a half-hour cap. A conditioning set costs an eigendecomposition of an
+    ``n x n`` matrix the first time it is queried, and each variable costs two products of
+    ``n x n`` matrices the first time it is queried with the set, as ``x`` and again as ``y``; the
+    test keeps up to 256 MB of each of these three kinds of matrix, at least one, except the
+    kernels of single variables, which it keeps only when two fit. So time grows as the cube of
+    the number of rows and memory as its square: thousands of rows are practical, tens of
+    thousands are not. The kernel widths follow the row count and the size of the
     conditioning set, not the data. On simulated draws with up to three conditioning variables and
     500 rows, it rejected a true independence at rates between ``alpha`` and twice ``alpha``; a test
     that rejects too often makes PC and FCI keep edges.
@@ -197,10 +223,12 @@ class KCI:
         self._n = arr.shape[0]
         self._ridge = float(ridge)
         self._rank = None if rank is None else int(rank)
-        # R and R Ky R do not depend on x, so queries with the same conditioning set share them.
+        # R and R Ky R do not depend on x, so queries with the same conditioning set share them;
+        # R Kxs R depends on x and the set only, so queries with the same x and set share it.
         entries = max(1, _CACHE_BYTES // (8 * self._n * self._n))
         self._resid = lru_cache(entries)(self._residual_maker)
         self._resid_y = lru_cache(entries)(self._residualized_kernel)
+        self._resid_x = lru_cache(entries)(self._residualized_joint_kernel)
         # An unconditional column kernel is shared across partners; it is cached only when two
         # kernels fit in _CACHE_BYTES.
         self._kernel = (
@@ -242,16 +270,36 @@ class KCI:
         if self._rank is not None:
             moments = self._low_rank_moments(data[:, x_int], data[:, y_int], z, width, self._rank)
         else:
-            xs = np.column_stack([data[:, x_int], 0.5 * z])
             dev = backend.select_by_size("kci", env.KCI_GPU_THRESHOLD, n * n, amortized=True)
             if dev != "numpy":
+                xs = np.column_stack([data[:, x_int], 0.5 * z])
                 moments = _kci_moments_torch(xs, data[:, [y_int]], z, width, self._ridge, dev)
             else:
-                resid = self._resid(tuple(cond))
-                kxs = _centered_gaussian_kernel(xs, width)
-                moments = _kci_moments(resid @ kxs @ resid, self._resid_y(y_int, tuple(cond)))
+                key = tuple(cond)
+                moments = _kci_moments(self._resid_x(x_int, key), self._resid_y(y_int, key))
         p_value = _gamma_pvalue(*moments)
         return moments[0] / moments[1], p_value
+
+    def _canonical_pvalues(
+        self, x: np.ndarray, y: np.ndarray, conditions: np.ndarray
+    ) -> np.ndarray:
+        """P-values of many queries sharing one conditioning-set size, grouped by conditioning set.
+
+        ``x`` and ``y`` are ``(N,)`` int arrays and ``conditions`` the ``(N, m)`` int array of the
+        conditioning sets, as the skeleton searches build their queries. The queries run through
+        :meth:`__call__` one conditioning set at a time, and within a set one ``x`` at a time, so
+        the set's decomposition and each ``x``'s joint kernel are built once for the stack whatever
+        the size of the caches, and entry ``i`` is ``self(x[i], y[i], conditions[i])`` exactly. When
+        a query raises, the queries run again in their order, so the error is the one the first
+        failing query raises.
+        """
+        return _grouped_pvalues(self, x, y, conditions, self._query_key)
+
+    def _query_key(self, x: int, y: int, condition_set: Iterable[int]) -> tuple:
+        """The cache keys a query reads, coarsest first: its conditioning set, then ``x``, then
+        ``y``, as the test holds them."""
+        x_int, y_int, cond = _canonical_ranked(x, y, condition_set, self._tie_rank)
+        return cond, x_int, y_int
 
     def _width(self, size: int) -> float:
         """The Gaussian kernels' width with ``size`` conditioning variables."""
@@ -269,6 +317,13 @@ class KCI:
         eigval, eigvec = np.linalg.eigh(ks)
         shrink = self._ridge / (np.clip(eigval, 0.0, None) + self._ridge)
         return (eigvec * shrink) @ eigvec.T
+
+    def _residualized_joint_kernel(self, x: int, cond: tuple[int, ...]) -> np.ndarray:
+        """``A = R Kxs R``: the kernel of column ``x`` joined with ``cond`` at half scale, with what
+        ``cond`` explains removed."""
+        resid = self._resid(cond)
+        xs = np.column_stack([self._data[:, x], 0.5 * self._data[:, list(cond)]])
+        return resid @ _centered_gaussian_kernel(xs, self._width(len(cond))) @ resid
 
     def _residualized_kernel(self, y: int, cond: tuple[int, ...]) -> np.ndarray:
         """``B = R Ky R``: the kernel of column ``y`` with what ``cond`` explains removed."""
@@ -611,15 +666,9 @@ class RCoT:
         When a query raises, the queries run again in their order, so the error is the one the
         first failing query raises.
         """
-        queries = list(zip(x.tolist(), y.tolist(), map(tuple, conditions.tolist())))
-        order = sorted(range(len(queries)), key=lambda i: self._condition_key(queries[i][2]))
-        pvalues = np.empty(len(queries))
-        try:
-            for i in order:
-                pvalues[i] = self(*queries[i])
-        except Exception:
-            return np.array([self(*query) for query in queries])
-        return pvalues
+        return _grouped_pvalues(
+            self, x, y, conditions, lambda x, y, cond: self._condition_key(cond)
+        )
 
     def _fit_residual(self, column: int, cond: tuple[int, ...]) -> np.ndarray:
         """Standardized features of ``column``, sampled from a generator seeded by the seed,

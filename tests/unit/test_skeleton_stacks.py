@@ -1,6 +1,6 @@
 """The skeleton scan stacks the chunks of many pairs into one evaluation, with unchanged results.
 
-For FisherZ, StudentT, RCoT, and the degenerate Gaussian test, ``scan_pairs`` evaluates the
+For FisherZ, StudentT, KCI, RCoT, and the degenerate Gaussian test, ``scan_pairs`` evaluates the
 chunks of consecutive pairs together, up to ``_STACK_BYTES`` of correlation submatrices. Every
 cap, from one chunk per stack to the default, gives the removals, separating sets, largest
 p-values, and trace of the per-pair scan, which a subclass of each test takes; a query that raises
@@ -31,6 +31,7 @@ from andrey.constraint._skeleton import (
     subset_rows,
 )
 from andrey.constraint.pc import adjacency_search
+from andrey.core import ci_kernel
 from andrey.core.ci import (
     DGTest,
     FisherZ,
@@ -39,7 +40,7 @@ from andrey.core.ci import (
     StudentT,
     make_indep_test,
 )
-from andrey.core.ci_kernel import RCoT
+from andrey.core.ci_kernel import KCI, RCoT
 
 ALPHA = 0.2
 
@@ -76,6 +77,10 @@ class _PerPairStudentT(StudentT):
 
 class _PerPairRCoT(RCoT):
     """An RCoT subclass, which ``scan_pairs`` scans pair by pair."""
+
+
+class _PerPairKCI(KCI):
+    """A KCI subclass, which ``scan_pairs`` scans pair by pair."""
 
 
 TESTS = [(FisherZ, _PerPairFisherZ), (StudentT, _PerPairStudentT)]
@@ -329,6 +334,85 @@ def test_a_failing_rcot_stack_raises_the_per_pair_error(monkeypatch: pytest.Monk
     assert errors[0] == errors[1]
     assert traces[0] == traces[1]
     assert traces[0], "the failing query must come after other pairs' tests"
+
+
+def test_only_a_kci_test_of_the_exact_type_stacks() -> None:
+    X, _, _ = _case(0, d=4, n=100)
+    assert _skeleton._stacked_route(KCI(X)) is not None
+    assert _skeleton._stacked_route(_PerPairKCI(X)) is None
+
+
+@pytest.mark.parametrize("entries", ["default caches", "one entry each"])
+@pytest.mark.parametrize("cap", [1, None])
+@pytest.mark.parametrize("size", [0, 1, 2])
+def test_kci_stacks_match_the_per_pair_scan(
+    monkeypatch: pytest.MonkeyPatch, entries, cap, size
+) -> None:
+    """KCI's stacks run each conditioning set's queries together; every p-value, removal, and trace
+    record is the per-pair scan's, bit for bit, with caches that hold every matrix and with one
+    entry each."""
+    if cap is not None:
+        monkeypatch.setattr(_skeleton, "_STACK_BYTES", cap)
+    if entries == "one entry each":
+        monkeypatch.setattr(ci_kernel, "_CACHE_BYTES", 0)
+    X, pairs, neighbors = _case(0, d=7, n=120)
+    X[:, 4] += np.sin(X[:, 1] * X[:, 0])
+    test, rows = KCI(X), []
+    grouped = test._canonical_pvalues
+
+    def spy(x, y, conditions):
+        rows.append(len(x))
+        return grouped(x, y, conditions)
+
+    test._canonical_pvalues = spy
+    got = _scan(test, pairs, neighbors, size)
+    want = _scan(_PerPairKCI(X), pairs, neighbors, size)
+    assert got == want
+    assert got[0], "the case must remove something"
+    assert sum(rows) == sum(pair_queries(neighbors, x, y, size) for x, y in pairs)
+
+
+def test_a_failing_kci_stack_raises_the_per_pair_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    X, pairs, neighbors = _case(0, d=7, n=120)
+    failing = pairs[len(pairs) // 2]
+    call = KCI.__call__
+
+    def raising(test, x, y, condition_set=()):
+        if (min(x, y), max(x, y)) == failing:
+            raise FloatingPointError(f"query {x}, {y}, {tuple(condition_set)}")
+        return call(test, x, y, condition_set)
+
+    monkeypatch.setattr(KCI, "__call__", raising)
+    errors, traces = [], []
+    for test in (KCI(X), _PerPairKCI(X)):
+        trace: list[dict] = []
+        with pytest.raises(FloatingPointError) as raised:
+            scan_pairs(test, pairs, neighbors, 2, ALPHA, trace)
+        errors.append(str(raised.value))
+        traces.append(trace)
+    assert errors[0] == errors[1]
+    assert traces[0] == traces[1]
+    assert traces[0], "the failing query must come after other pairs' tests"
+
+
+def test_the_skeleton_search_with_kci_is_the_per_pair_search() -> None:
+    """PC's whole adjacency search, size by size, returns the marks, separating sets, p-values, and
+    trace of a search that scans each pair on its own."""
+    rng = np.random.default_rng(3)
+    X = rng.standard_normal((150, 6))
+    X[:, 1] = np.sin(2 * X[:, 0]) + 0.3 * X[:, 1]
+    X[:, 2] = X[:, 1] ** 2 + 0.3 * X[:, 2]
+    X[:, 4] = np.cos(X[:, 3]) + 0.3 * X[:, 4]
+    X[:, 5] += X[:, 2] + X[:, 4]
+    found = []
+    for test in (KCI(X), _PerPairKCI(X)):
+        trace: list[dict] = []
+        found.append((*adjacency_search(test, 6, 0.05, record_pvalues=True, trace=trace), trace))
+    assert found[0][1], "the search must remove something"
+    assert np.array_equal(found[0][0], found[1][0])
+    assert list(found[0][1].items()) == list(found[1][1].items())
+    assert list(found[0][2].items()) == list(found[1][2].items())
+    assert found[0][3] == found[1][3]
 
 
 class _PerPairDGTest(DGTest):

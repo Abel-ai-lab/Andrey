@@ -329,6 +329,12 @@ names its pull request.
   only when those fits times rows reach `ANDREY_CPCM_PARALLEL_MIN_WORK`.
   `andrey calibrate --method resit` and `--method cpcm` measure the values for a machine, and a fit
   with more than one worker warns once when it nears a default. ([#1385])
+- `indep_test="kci"` runs faster, with the same output bit for bit: a query keeps the kernel of its
+  first variable with the conditioning set for the queries that share it, as it kept the second
+  variable's, and the skeleton searches of `pc`, `fci`, and the methods built on them evaluate a
+  stack of queries one conditioning set at a time, so each matrix is built once for the stack. The
+  test keeps up to 256 MB of each of three kinds of matrix, 768 MB in all instead of 512 MB.
+  ([#1337])
 
 ### Fixed
 
@@ -3343,6 +3349,7 @@ First alpha release.
 [#1329]: https://github.com/Abel-ai-lab/Andrey/pull/1329
 [#1331]: https://github.com/Abel-ai-lab/Andrey/pull/1331
 [#1336]: https://github.com/Abel-ai-lab/Andrey/pull/1336
+[#1337]: https://github.com/Abel-ai-lab/Andrey/pull/1337
 [#1339]: https://github.com/Abel-ai-lab/Andrey/pull/1339
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
