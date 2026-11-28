@@ -311,8 +311,9 @@ class StructureOutput:
         FileNotFoundError
             If ``path`` does not exist.
         ValueError
-            If the file has an unsupported format version or an unknown structure type, or holds a
-            result that ``new`` would reject.
+            If the file has an unsupported format version or an unknown structure type, holds a
+            graph store with a column index outside ``range(n_nodes)``, or holds a result that
+            ``new`` would reject.
         """
         path = os.fspath(path)
         if path.endswith(".npz"):
