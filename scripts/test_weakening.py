@@ -6,28 +6,29 @@ right. This script compares the base and the head of ``tests/`` and ``qa/`` by t
 function by function, and flags:
 
 - a removed ``assert`` statement, ``assert_*``, ``pytest.fail`` or ``self.fail`` call,
-  ``pytest.raises`` check, or ``pytest.approx`` assertion, and a ``pytest.raises`` that lost its
-  ``match`` (or matches every message) or its ``check``, widened to ``Exception``, or lists more
-  exceptions;
+  ``pytest.raises`` check, or ``pytest.approx`` assertion, and a ``pytest.raises``,
+  ``pytest.warns``, or ``assertRaises`` that lost its ``match`` (or matches every message) or its
+  ``check``, widened to ``Exception`` (``Warning`` for a warning), or lists more exceptions;
 - a looser tolerance or bound: a larger ``rtol``, ``atol``, ``abs``, ``rel``, ``tol``, or ``delta``
   (a ``delta`` of ``assertAlmostEqual`` replaces its ``places``), a smaller ``decimal`` or
-  ``places``, a looser bound in a comparison, an exact comparison turned into ``pytest.approx``, in
-  a call, a default, a module constant, or a tolerance table;
+  ``places``, a looser bound in a comparison, ``nan_ok`` or ``equal_nan`` made true, an exact
+  comparison turned into ``pytest.approx``, in a call, a default, a module constant, or a tolerance
+  table;
 - a new ``skip``, ``skipif``, or ``xfail`` marker or call, or a new ``release`` marker (a pull
   request into a release branch skips those tests), on a test that existed in the base, written out,
   through a module name bound to one, or through an alias of ``pytest``; a conditional skip
-  (``skipif``, unittest's ``skipIf`` and ``skipUnless``) made to skip always, and an ``xfail`` made
-  non-strict or without its ``raises``; an autouse fixture or a ``pytest_*`` hook that skips, added
-  to a ``conftest.py`` or to a test file that existed; a ``__test__ = False`` or a lost ``TestCase``
-  base that stops pytest collecting a class; a ``filterwarnings`` marker that stops raising a
-  warning or lets one pass;
+  (``skipif``, unittest's ``skipIf`` and ``skipUnless``) or ``xfail`` condition made to apply
+  always, and an ``xfail`` made non-strict or without its ``raises``; an autouse fixture that skips,
+  and a ``pytest_*`` hook, added or changed in a ``conftest.py`` or a test file that existed; a
+  ``__test__ = False``, a constructor, or a lost ``TestCase`` base that stops pytest collecting a
+  class; a ``filterwarnings`` marker that stops raising a warning or lets one pass;
 - a deleted test function or parametrized fixture, a test file renamed out of the names pytest
-  collects (or into another kind of file), or a removed ``parametrize`` case (a literal list,
-  tuple, set, or ``range``; a case that another replaced counts as removed);
+  collects (or into another kind of file), or a removed ``parametrize`` case (a literal list, tuple,
+  set, or ``range``; a case that another replaced counts as removed);
 - a re-recorded baseline file: a changed or deleted file of ``baselines/`` or named for one, and a
   JSON baseline whose recorded values changed;
-- a change to this script or to the workflow job that runs it (see below), or to the pytest
-  options of ``pyproject.toml`` that choose the tests or judge them (``addopts``, ``testpaths``,
+- a change to this script or to the workflow job that runs it (see below), or to the pytest options
+  of ``pyproject.toml`` that choose the tests or judge them (``addopts``, ``testpaths``,
   ``norecursedirs``, ``python_files``, ``python_classes``, ``python_functions``, ``xfail_strict``,
   ``filterwarnings``).
 
@@ -91,7 +92,12 @@ PYTEST_OPTIONS = (
 )
 UNITTEST_SKIPS = frozenset({"skip", "skipIf", "skipUnless", "expectedFailure"})
 # The conditional skips, and the value of the condition that skips the test.
-SKIP_WHEN = {"pytest.mark.skipif": True, "unittest.skipIf": True, "unittest.skipUnless": False}
+SKIP_WHEN = {
+    "pytest.mark.skipif": True,
+    "unittest.skipIf": True,
+    "unittest.skipUnless": False,
+    "pytest.mark.xfail": True,
+}
 
 LARGER_IS_LOOSER = frozenset(
     {"rtol", "atol", "rel_tol", "abs_tol", "rel", "abs", "tol", "tolerance", "eps", "epsilon"}
@@ -131,10 +137,18 @@ DEFAULTS = {
     "assertAlmostEqual": {"places": 7},
 }
 APPROX_DEFAULT_REL, APPROX_DEFAULT_ABS = 1e-6, 1e-12
-RAISES = frozenset({"raises", "warns", "deprecated_call"})
+# The flags that make a comparison accept NaN as equal to NaN, and each callee's default.
+NAN_FLAGS = {
+    "nan_ok": {"approx": False},
+    "equal_nan": {"assert_allclose": True, "isclose": False, "allclose": False},
+}
+RAISES = frozenset(
+    {"raises", "warns", "deprecated_call"}
+    | {"assertRaises", "assertRaisesRegex", "assertWarns", "assertWarnsRegex"}
+)
 MARKERS = frozenset({"skip", "skipif", "xfail", "release"})
 SKIP_CALLS = frozenset({"skip", "xfail", "importorskip"})
-BROAD = frozenset({"Exception", "BaseException"})
+BROAD = frozenset({"Exception", "BaseException", "Warning"})
 ARITHMETIC = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -290,7 +304,11 @@ class _Mask(ast.NodeTransformer):
         name = _callee(node)
         if name == "approx" and node.args:
             return node.args[0]
-        node.keywords = [keyword for keyword in node.keywords if keyword.arg not in TOLERANCES]
+        node.keywords = [
+            keyword
+            for keyword in node.keywords
+            if keyword.arg not in TOLERANCES and keyword.arg not in NAN_FLAGS
+        ]
         if name in POSITIONAL:
             node.args = node.args[: min(POSITIONAL[name])]
         return node
@@ -384,6 +402,24 @@ def _test_flag(node: ast.ClassDef) -> bool | None:
     return flag
 
 
+def _constructs(node: ast.ClassDef, classes: dict[str, ast.ClassDef], seen: frozenset[str]) -> bool:
+    """Whether a class, or a base in the file, defines ``__init__`` or ``__new__``."""
+    seen = seen | {node.name}
+    if any(
+        isinstance(statement, ast.FunctionDef | ast.AsyncFunctionDef)
+        and statement.name in {"__init__", "__new__"}
+        for statement in node.body
+    ):
+        return True
+    return any(
+        isinstance(base, ast.Name)
+        and base.id in classes
+        and base.id not in seen
+        and _constructs(classes[base.id], classes, seen)
+        for base in node.bases
+    )
+
+
 def _collected_class(
     node: ast.ClassDef,
     classes: dict[str, ast.ClassDef],
@@ -395,14 +431,17 @@ def _collected_class(
     A class named ``Test...`` is collected, and so is one that derives from a ``TestCase``, directly
     or through classes of the file. A base imported from another module cannot be read, so it counts
     as one that may derive from a ``TestCase``. A literal ``__test__ = False`` in the body stops the
-    collection of a class, and a ``True`` collects one whatever its name.
+    collection of a class, and a ``True`` collects one whatever its name; a class that is not a
+    ``TestCase`` and defines ``__init__`` or ``__new__`` is not collected.
     """
     seen = seen | {node.name}
     flag = _test_flag(node)
     if flag is not None:
         return flag
+    unittest = any(_dotted(base, imports).endswith("TestCase") for base in node.bases)
     if node.name.startswith("Test"):
-        return True
+        # pytest does not collect a plain class with a constructor.
+        return unittest or not _constructs(node, classes, frozenset())
     for base in node.bases:
         if _dotted(base, imports).endswith("TestCase"):
             return True
@@ -440,6 +479,14 @@ def collect(path: str, source: str) -> dict[str, Unit]:
         kind = _marker_kind(value.func if isinstance(value, ast.Call) else value, imports)
         if kind:
             aliases[name] = kind
+    # The helper classes whose methods a collected class of the file inherits and pytest collects.
+    exposed: set[str] = set()
+    pending = [c for c in classes.values() if _collected_class(c, classes, imports)]
+    while pending:
+        for base in pending.pop().bases:
+            if isinstance(base, ast.Name) and base.id in classes and base.id not in exposed:
+                exposed.add(base.id)
+                pending.append(classes[base.id])
     units: dict[str, Unit] = {}
 
     def add(
@@ -476,8 +523,10 @@ def collect(path: str, source: str) -> dict[str, Unit]:
             above = (*inherited, *decorators, *marks)
         for child in definitions:
             name = getattr(child, "name", "")
-            inside = isinstance(child, ast.ClassDef) and not _collected_class(
-                child, classes, imports
+            inside = (
+                isinstance(child, ast.ClassDef)
+                and child.name not in exposed
+                and not _collected_class(child, classes, imports)
             )
             add(
                 child,
@@ -523,15 +572,15 @@ def _checks(unit: Unit) -> list[Check]:
     checks = []
     for node in sorted(unit.nodes, key=_position):
         name = _imported_callee(node, unit.imports) if isinstance(node, ast.Call) else ""
-        if (
+        if name in RAISES:
+            checks.append(Check("raises", node, "raises"))
+        elif (
             isinstance(node, ast.Assert)
             or name.lstrip("_").startswith("assert")
             or _pytest_call(node, unit.imports) == "fail"
             or _self_call(node) == "fail"
         ):
             checks.append(Check("assert", node, _key(node)))
-        elif name in RAISES:
-            checks.append(Check("raises", node, "raises"))
     return checks
 
 
@@ -539,8 +588,29 @@ def _count_approx(node: ast.AST) -> int:
     return sum(isinstance(n, ast.Call) and _callee(n) == "approx" for n in ast.walk(node))
 
 
+def _nan_knobs(call: ast.Call, name: str) -> list[Knob]:
+    """Return whether a comparison accepts NaN: looser when ``nan_ok`` or ``equal_nan`` is true."""
+    knobs = []
+    for flag, defaults in NAN_FLAGS.items():
+        if name not in defaults:
+            continue
+        given = next((k.value for k in call.keywords if k.arg == flag), None)
+        if given is None:
+            value = defaults[name]
+        elif isinstance(given, ast.Constant) and isinstance(given.value, bool):
+            value = given.value
+        else:
+            continue
+        knobs.append(Knob(("call", name, flag), flag, float(value), True, shown=str(value)))
+    return knobs
+
+
 def _call_knobs(call: ast.Call, imports: dict[str, str]) -> list[Knob]:
     name = _tolerance_callee(call, imports)
+    return [*_tolerance_knobs(call, name, imports), *_nan_knobs(call, name)]
+
+
+def _tolerance_knobs(call: ast.Call, name: str, imports: dict[str, str]) -> list[Knob]:
     given: dict[str, float] = {}
     opaque: set[str] = set()
     positional = POSITIONAL.get(name, {})
@@ -752,7 +822,11 @@ def _limits_message(value: ast.expr) -> bool:
 
 def _matches(call: ast.Call) -> bool:
     """Whether a ``pytest.raises`` checks the message: it has a ``match`` that limits it."""
-    return any(k.arg == "match" and _limits_message(k.value) for k in call.keywords)
+    if _callee(call).endswith("Regex") and len(call.args) > 1 and _limits_message(call.args[1]):
+        return True
+    return any(
+        k.arg in {"match", "expected_regex"} and _limits_message(k.value) for k in call.keywords
+    )
 
 
 def _checked(call: ast.Call) -> bool:
@@ -949,14 +1023,17 @@ def _keywords(use: ast.expr) -> dict[str, ast.expr]:
     return {k.arg: k.value for k in use.keywords if k.arg} if isinstance(use, ast.Call) else {}
 
 
-def _skipifs(unit: Unit, kind: str) -> list[tuple[ast.Call, bool]]:
+def _skipifs(unit: Unit, kind: str) -> list[tuple[ast.expr, bool]]:
     """List a unit's conditional skips of a kind in order, with whether the condition skips."""
     found = []
     for node in _marker_uses(unit, kind):
         if isinstance(node, ast.Call):
             condition = node.args[0] if node.args else _keywords(node).get("condition")
             skips = isinstance(condition, ast.Constant) and bool(condition.value) == SKIP_WHEN[kind]
-            found.append((node, skips))
+            # An ``xfail`` with no condition always applies, and so does a bare one.
+            found.append((node, skips or (condition is None and kind.endswith("xfail"))))
+        elif kind.endswith("xfail"):
+            found.append((node, True))
     return found
 
 
@@ -1149,20 +1226,25 @@ def _hook(unit: Unit) -> bool:
 
 
 def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Finding]:
-    """Flag the autouse fixtures and hooks that skip tests and that the change added.
+    """Flag the autouse fixtures that skip tests and the pytest hooks that the change added.
 
     An autouse fixture or a hook of a ``conftest.py`` reaches the tests that already exist, so a
-    skip in one skips them without a marker on any test. One that was an autouse fixture or a
-    hook before is compared with its old self, like any other unit.
+    skip in one skips them without a marker on any test, and a hook can deselect, skip, or pass
+    them in ways a reader of the tests does not see: a hook that is new or whose code changed is
+    flagged. An autouse fixture that skipped before is compared with its old self, like any unit.
     """
     findings = []
     for name, unit in units.items():
-        kind = "autouse fixture" if _autouse(unit) else "pytest hook" if _hook(unit) else ""
         was = old_units.get(name)
-        if not kind or (was is not None and (_autouse(was) or _hook(was))):
-            continue
-        if any(_markers(unit._replace(inherited=[])).values()):
-            reason = f"{kind} that skips tests added"
+        if _hook(unit):
+            same = was is not None and _hook(was) and ast.dump(was.node) == ast.dump(unit.node)
+            reason = "" if same else "pytest hook added or changed"
+        elif _autouse(unit) and not (was is not None and _autouse(was)):
+            skips = any(_markers(unit._replace(inherited=[])).values())
+            reason = "autouse fixture that skips tests added" if skips else ""
+        else:
+            reason = ""
+        if reason:
             line = _position(unit.node)[0]
             findings.append(
                 Finding(unit.path, line, unit.qualname, reason, "", _clip(_text(unit, unit.node)))

@@ -1430,6 +1430,159 @@ FLAGGED = {
         """,
         "filter that lets a warning pass added",
     ),
+    "plain test class gains a constructor": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            def __init__(self):
+                self.x = 1
+
+            def test_fit(self):
+                assert fit()
+        """,
+        "test no longer collected",
+    ),
+    "approx nan_ok made true": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, nan_ok=False)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, nan_ok=True)
+        """,
+        "nan_ok loosened from False to True",
+    ),
+    "approx nan_ok added": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, nan_ok=True)
+        """,
+        "nan_ok loosened from False to True",
+    ),
+    "equal_nan left to its default of true": (
+        """
+        def test_fit():
+            np.testing.assert_allclose(a, b, equal_nan=False)
+        """,
+        """
+        def test_fit():
+            np.testing.assert_allclose(a, b)
+        """,
+        "equal_nan loosened from False to True",
+    ),
+    "warns widened to Warning": (
+        """
+        def test_fit():
+            with pytest.warns(DeprecationWarning):
+                fit()
+        """,
+        """
+        def test_fit():
+            with pytest.warns(Warning):
+                fit()
+        """,
+        "widened to Warning",
+    ),
+    "assertRaises widened": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaises(ValueError):
+                    fit(None)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaises(Exception):
+                    fit(None)
+        """,
+        "widened to Exception",
+    ),
+    "assertRaisesRegex lost its pattern": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaisesRegex(ValueError, "alpha"):
+                    fit(None)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaises(ValueError):
+                    fit(None)
+        """,
+        "lost its match",
+    ),
+    "assertRaises removed": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaises(ValueError):
+                    fit(None)
+                with self.assertRaises(TypeError):
+                    fit(1)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaises(ValueError):
+                    fit(None)
+        """,
+        "pytest.raises check removed",
+    ),
+    "xfail condition made true": (
+        """
+        @pytest.mark.xfail(False, reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(True, reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+        "xfail condition made always true",
+    ),
+    "xfail condition dropped": (
+        """
+        @pytest.mark.xfail(condition=False, reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+        "xfail condition made always true",
+    ),
+    "test deleted from a helper class that a test class inherits": (
+        """
+        class Helper:
+            def test_inherited(self):
+                assert fit()
+
+        class TestChild(Helper):
+            pass
+        """,
+        """
+        class Helper:
+            pass
+
+        class TestChild(Helper):
+            pass
+        """,
+        "test deleted",
+    ),
 }
 
 
@@ -2353,6 +2506,152 @@ NOT_FLAGGED = {
             assert fit()
         """,
     ),
+    "TestCase class gains a constructor": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def __init__(self, *args):
+                super().__init__(*args)
+
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+    ),
+    "plain test class that already had a constructor": (
+        """
+        class TestFit:
+            def __init__(self):
+                self.x = 1
+
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            def __init__(self):
+                self.x = 2
+
+            def test_fit(self):
+                assert fit()
+        """,
+    ),
+    "approx nan_ok made false": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, nan_ok=True)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, nan_ok=False)
+        """,
+    ),
+    "approx nan_ok unchanged": (
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, nan_ok=True)
+        """,
+        """
+        def test_fit():
+            assert score == pytest.approx(1.0, nan_ok=True, rel=1e-9)
+        """,
+    ),
+    "equal_nan made false": (
+        """
+        def test_fit():
+            np.testing.assert_allclose(a, b)
+        """,
+        """
+        def test_fit():
+            np.testing.assert_allclose(a, b, equal_nan=False)
+        """,
+    ),
+    "warns narrowed": (
+        """
+        def test_fit():
+            with pytest.warns(Warning):
+                fit()
+        """,
+        """
+        def test_fit():
+            with pytest.warns(DeprecationWarning):
+                fit()
+        """,
+    ),
+    "assertRaises narrowed": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaises(Exception):
+                    fit(None)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaises(ValueError):
+                    fit(None)
+        """,
+    ),
+    "assertRaisesRegex kept": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaisesRegex(ValueError, "alpha"):
+                    fit(None)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                with self.assertRaisesRegex(ValueError, "alpha"):
+                    fit(None)
+                with self.assertRaises(TypeError):
+                    fit(1)
+        """,
+    ),
+    "xfail condition made false": (
+        """
+        @pytest.mark.xfail(True, reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(False, reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "xfail condition not a literal": (
+        """
+        @pytest.mark.xfail(sys.platform == "win32", reason="posix only")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(sys.platform == "darwin", reason="posix only")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "test deleted from a helper class that no test class inherits": (
+        """
+        class Helper:
+            def test_inherited(self):
+                assert fit()
+
+        class TestChild:
+            pass
+        """,
+        """
+        class Helper:
+            pass
+
+        class TestChild:
+            pass
+        """,
+    ),
 }
 
 
@@ -2598,13 +2897,23 @@ def gpu():
         'import pytest\n\n@pytest.fixture(scope="session", autouse=True)\n'
         "def gpu(request):\n    request.applymarker(pytest.mark.skip)\n",
         "from pytest import fixture, skip\n\n@fixture(autouse=True)\ndef gpu():\n    skip('x')\n",
-        "import pytest\n\ndef pytest_collection_modifyitems(items):\n"
-        "    for item in items:\n        item.add_marker(pytest.mark.skip)\n",
     ],
 )
 def test_a_new_conftest_that_skips_every_test_is_flagged(check, source):
     found = reasons(check, None, source, CONFTEST)
     assert len(found) == 1 and found[0].endswith("that skips tests added"), found
+
+
+HOOK = "def pytest_collection_modifyitems(items):\n    items[:] = [i for i in items if i.name]\n"
+
+
+def test_a_pytest_hook_that_the_change_adds_or_edits_is_flagged(check):
+    new = "def pytest_collection_modifyitems(items):\n    items[:] = items[:1]\n"
+    assert reasons(check, None, HOOK, CONFTEST) == ["pytest hook added or changed"]
+    assert reasons(check, "x = 1\n", "x = 1\n\n" + HOOK, CONFTEST) == [
+        "pytest hook added or changed"
+    ]
+    assert reasons(check, HOOK, new, CONFTEST) == ["pytest hook added or changed"]
 
 
 @pytest.mark.parametrize("path", [CONFTEST, "tests/unit/test_a.py"])
@@ -2646,11 +2955,8 @@ def test_a_skip_added_to_an_existing_autouse_fixture_is_flagged_once(check):
             CONFTEST,
         ),
         (AUTOUSE_SKIP, AUTOUSE_SKIP, CONFTEST),
-        (
-            None,
-            "def pytest_configure(config):\n    config.addinivalue_line('markers', 'slow: x')\n",
-            CONFTEST,
-        ),
+        (HOOK, HOOK, CONFTEST),
+        (None, HOOK, "tests/unit/test_new.py"),
     ],
     ids=[
         "autouse without a skip",
@@ -2658,7 +2964,8 @@ def test_a_skip_added_to_an_existing_autouse_fixture_is_flagged_once(check):
         "autouse skip in a new test file",
         "autouse=False",
         "unchanged autouse skip",
-        "hook without a skip",
+        "unchanged hook",
+        "hook in a new test file",
     ],
 )
 def test_other_fixtures_and_hooks_are_not_flagged(check, old, new, path):
