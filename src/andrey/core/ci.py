@@ -137,6 +137,10 @@ SECOND_ORDER_LIMIT = 1e3
 # A block whose conditioners [s1, s2] have 1 - r12^2 at most this is not settled by the closed form:
 # its bound on the inverse is above twice SECOND_ORDER_LIMIT.
 SECOND_ORDER_FLOOR = 1.0 / SECOND_ORDER_LIMIT
+# The smallest eigenvalue of a settled block is at most each of its variances given s1 (1 - r_x1^2,
+# 1 - r_y1^2) and given s1 and s2, and above 5 / SECOND_ORDER_LIMIT, since g is at least 2; a block
+# with a variance at most half of that is not settled, and the closed form stops there.
+SECOND_ORDER_VARIANCE = 2.5 / SECOND_ORDER_LIMIT
 # Stacks of at most this many conditioning sets of size 2 take the closed form one query at a time:
 # up to about 30 queries the vector form's fixed cost per call is the larger.
 SECOND_ORDER_LOOP_ROWS = 24
@@ -2341,18 +2345,23 @@ def _second_order(
     a 2-norm below ``SECOND_ORDER_LIMIT`` has a smallest eigenvalue far above the threshold of
     :func:`_invert_nonsingular`, so it passes the eigenvalue test; a NaN or a nonpositive variance
     fails the comparison. Unsettled entries of the result are not to be read. A stack in which
-    no block has ``1 - r12^2`` above ``SECOND_ORDER_FLOOR`` settles none, and is answered from that
-    alone. :func:`_second_order_float` computes the same bits one query at a time.
+    no block has ``1 - r12^2`` above ``SECOND_ORDER_FLOOR`` and both ``1 - r_x1^2`` and
+    ``1 - r_y1^2`` above ``SECOND_ORDER_VARIANCE`` settles none, and is answered from that alone.
+    :func:`_second_order_float` computes the same bits one query at a time.
     """
     r12 = corr[s1, s2]
     with np.errstate(all="ignore"):
         d1 = 1.0 - r12 * r12
         if not (d1 > SECOND_ORDER_FLOOR).any():
             return np.empty(len(d1), dtype=np.float64), np.zeros(len(d1), dtype=bool)
-        rxy, rx1, rx2 = corr[lo, hi], corr[lo, s1], corr[lo, s2]
-        ry1, ry2 = corr[hi, s1], corr[hi, s2]
+        rx1, ry1 = corr[lo, s1], corr[hi, s1]
         ax = 1.0 - rx1 * rx1
         ay = 1.0 - ry1 * ry1
+        if not (
+            (d1 > SECOND_ORDER_FLOOR) & (ax > SECOND_ORDER_VARIANCE) & (ay > SECOND_ORDER_VARIANCE)
+        ).any():
+            return np.empty(len(d1), dtype=np.float64), np.zeros(len(d1), dtype=bool)
+        rxy, rx2, ry2 = corr[lo, hi], corr[lo, s2], corr[hi, s2]
         rxy1 = (rxy - rx1 * ry1) / np.sqrt(ax * ay)
         rx21 = (rx2 - rx1 * r12) / np.sqrt(ax * d1)
         ry21 = (ry2 - ry1 * r12) / np.sqrt(ay * d1)
@@ -2387,18 +2396,18 @@ def _second_order_float(corr: np.ndarray, x: int, y: int, s1: int, s2: int) -> f
     rx1, ry1 = rx.item(s1), ry.item(s1)
     ax = 1.0 - rx1 * rx1
     ay = 1.0 - ry1 * ry1
-    if not (ax > 0.0 and ay > 0.0):
+    if not (ax > SECOND_ORDER_VARIANCE and ay > SECOND_ORDER_VARIANCE):
         return None
     rxy1 = (rx.item(y) - rx1 * ry1) / math.sqrt(ax * ay)
     rx21 = (rx.item(s2) - rx1 * r12) / math.sqrt(ax * d1)
     ry21 = (ry.item(s2) - ry1 * r12) / math.sqrt(ay * d1)
     bx = 1.0 - rx21 * rx21
     by = 1.0 - ry21 * ry21
-    if not (bx > 0.0 and by > 0.0):
-        return None
-    r = (rxy1 - rx21 * ry21) / math.sqrt(bx * by)
     pxx = ax * bx
     pyy = ay * by
+    if not (pxx > SECOND_ORDER_VARIANCE and pyy > SECOND_ORDER_VARIANCE):
+        return None
+    r = (rxy1 - rx21 * ry21) / math.sqrt(bx * by)
     smallest = pxx * pyy * (1.0 - r * r) / (pxx + pyy)
     if not smallest > 0.0:
         return None
@@ -2478,7 +2487,9 @@ def _cholesky_partial_correlations(
         shifts = _shifts(k)
         passed = _cholesky_lower(unsettled[None] - shifts[:, None])[..., k - 1, k - 1] > 0.0
         certified[rest] = passed[0]
-        singular = len(shifts) == 2 and _certifies_singular(unsettled[~passed[1]])
+        singular = (
+            len(shifts) == 2 and not passed[1].all() and _certifies_singular(unsettled[~passed[1]])
+        )
         return r, settled, certified, singular
 
 
