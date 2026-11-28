@@ -276,6 +276,11 @@ names its pull request.
   smallest and largest index found. A `dag`, `cpdag`, or `undirected` graph used to reach SciPy's
   transpose, which can crash the process, and the other kinds loaded and failed at the first read
   with an `IndexError`. ([#1364])
+- `direct_lingam` and `multi_group_direct_lingam` no longer change their causal order when a column
+  is shifted by a constant, as `measure="skew"` did on columns whose skewness is zero or near it,
+  such as exchangeable or balanced binary ones. The order search now centers each column once;
+  before, its standardization and residuals took the offset's rounding, which could decide the sign
+  of such a skewness. ([#1351])
 - `indep_test="cmiknn"` gives the same p-values on every NumPy version and CPU. Its local shuffles
   took each row's nearest rows in the conditioning set in the order `np.argpartition` returned
   them, which differs between NumPy versions and CPUs, so a p-value with a non-empty conditioning
@@ -3257,6 +3262,7 @@ First alpha release.
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
+[#1351]: https://github.com/Abel-ai-lab/Andrey/pull/1351
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364

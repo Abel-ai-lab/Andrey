@@ -7,7 +7,9 @@ sum of terms far from 0, is a numerical artifact. The data here lie on a grid th
 from the method.
 
 ``varma_lingam`` also has a case of its own on a larger series: its likelihood fit takes a constant
-trend, so a column's mean is not part of the model.
+trend, so a column's mean is not part of the model. The LiNGAM order search has cases of its own on
+columns whose third moment is zero or within rounding of it, where a shift that reaches the order
+through the arithmetic decides the sign of the skew measure.
 """
 
 from __future__ import annotations
@@ -181,3 +183,87 @@ def test_varma_lingam_keeps_its_graph_on_shifted_columns(shift):
     for have, expected in zip(marks(got), marks(want), strict=True):
         np.testing.assert_array_equal(have, expected)
     assert list(got.ordering) == list(want.ordering)
+
+
+def exchangeable(seed: int, d: int = 4) -> np.ndarray:
+    """Columns that hold one grid of values, the later ones a few swaps from the first, as the order
+    search sees exchangeable variables: every column has the same third moment, about 1e-13, the
+    rounding of the values onto the grid, so each step's sign of the skew measure is decided by how
+    exactly the search computes it."""
+    rng = np.random.default_rng(seed)
+    first = rng.permutation(N) + 1.0
+    columns = [first, *(rng.permutation(N) + 1.0 for _ in range(d - 2))]
+    swapped = first.copy()
+    for k in rng.choice(np.arange(1, N, 2), size=20, replace=False):
+        i, j = np.flatnonzero(first == k)[0], np.flatnonzero(first == k + 1)[0]
+        swapped[i], swapped[j] = k + 1, k
+    return on_grid(np.column_stack([first, swapped, *columns[1:]]) / N)
+
+
+def binary(seed: int, d: int = 4) -> np.ndarray:
+    """Correlated binary columns split at their medians: exactly as many ones as zeros, a third
+    moment of exactly zero."""
+    rng = np.random.default_rng(seed)
+    z = rng.multivariate_normal(np.zeros(d), 0.5 * np.eye(d) + 0.5, size=N)
+    return (z > np.median(z, axis=0)).astype(np.float64)
+
+
+def mirrored(seed: int, d: int = 4) -> np.ndarray:
+    """A chain of Laplace columns, each row followed by its negative in a shuffled order: a third
+    moment of exactly zero."""
+    rng = np.random.default_rng(seed)
+    half = on_grid(rng.laplace(size=(N // 2, d)))
+    half[:, 1] = on_grid(half[:, 1] + 0.8 * half[:, 0])
+    return np.vstack([half, -half])[rng.permutation(N)]
+
+
+def skewed_chain(seed: int, d: int = 5) -> np.ndarray:
+    """A chain of exponential columns: a third moment far from zero."""
+    rng = np.random.default_rng(seed)
+    x = rng.exponential(size=(N, d)) - 1.0
+    for j in range(1, d):
+        x[:, j] += 0.8 * x[:, j - 1]
+    return on_grid(x)
+
+
+ORDER_KINDS = {
+    "exchangeable": exchangeable,
+    "binary": binary,
+    "mirrored": mirrored,
+    "skewed_chain": skewed_chain,
+}
+#: Offsets from 1e3 to 1e9, and a power-of-two scale with an offset, each exact on the grid.
+ORDER_SHIFTS = {
+    "offset 1e3": (1.0, 1e3),
+    "offset 1e6": (1.0, 1e6),
+    "offset 1e9": (1.0, 1e9),
+    "scale 8 and offset 1e6": (8.0, 1e6),
+}
+
+
+@pytest.mark.parametrize("measure", ["pwling", "skew", "tanh"])
+@pytest.mark.parametrize("kind", ORDER_KINDS)
+def test_the_lingam_order_search_keeps_its_order_on_shifted_columns(kind, measure):
+    """The order of DirectLiNGAM on shifted columns is the order of the unshifted ones, on every
+    seed of four kinds of columns, three measures, and four shifts. Each shifted copy holds the
+    unshifted values exactly, so any difference comes from the search. The grid is a tripwire
+    for the search reading the offset: it does not show that no other column does."""
+    for seed in range(4 if measure == "pwling" else 10):
+        data = ORDER_KINDS[kind](seed)
+        want = andrey.direct_lingam(data, measure=measure).ordering
+        for scale, offset in ORDER_SHIFTS.values():
+            got = andrey.direct_lingam(data * scale + offset, measure=measure).ordering
+            assert got == want, (seed, scale, offset)
+
+
+@pytest.mark.parametrize("measure", ["pwling", "skew", "tanh"])
+@pytest.mark.parametrize("kind", ORDER_KINDS)
+def test_the_multi_group_order_search_keeps_its_order_on_shifted_columns(kind, measure):
+    """The shared order of two groups, all columns shifted alike, is the unshifted order."""
+    for seed in range(3 if measure == "pwling" else 8):
+        groups = [ORDER_KINDS[kind](seed), ORDER_KINDS[kind](seed + 100)[: N * 3 // 5]]
+        want = andrey.multi_group_direct_lingam(groups, measure=measure)[0].ordering
+        for scale, offset in ORDER_SHIFTS.values():
+            moved = [group * scale + offset for group in groups]
+            got = andrey.multi_group_direct_lingam(moved, measure=measure)[0].ordering
+            assert got == want, (seed, scale, offset)
