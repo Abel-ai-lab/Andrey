@@ -276,13 +276,14 @@ names its pull request.
   return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
   there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
   free cores. ([#1369])
-- For contributors, the `check-test-changes` job of a pull request into a release or topic branch runs
-  `scripts/check_test_changes.py`, which flags a removed assertion or `pytest.raises` check, a looser
-  tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
-  a warning filter that lets a warning pass, a deleted test or `parametrize` case, and a re-recorded
-  baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it and flags a
-  change to the script or to its workflow job, it is a required check, `.github/` and the script
-  have code owners, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
+- For contributors, the `check-test-changes` job of a pull request into a release or topic branch
+  runs `scripts/check_test_changes.py`, which flags a removed assertion or `pytest.raises` check, a
+  looser tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that
+  existed, a warning filter that lets a warning pass, a deleted test or `parametrize` case, and a
+  re-recorded baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it
+  and flags a change to the script or to its workflow job, it is a required check, `.github/` and
+  the script have code owners, and it fails until a maintainer sets the label
+  `test-change-approved`. ([#1358])
 
 ### Fixed
 

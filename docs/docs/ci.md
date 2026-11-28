@@ -22,25 +22,38 @@ website and reruns every notebook, which must reproduce the outputs the website 
 float64 is the reference: the PyTorch paths must match its results and repeat exactly.
 
 A pull request into a release or topic branch also has its changes to `tests/` and `qa/` read for
-tests that it skips, loosens, or removes. The `check-test-changes` job compares the head with the base by syntax trees and flags a
-removed assertion or `pytest.raises` check, a larger tolerance or a looser bound, a `skip`,
-`skipif`, `xfail`, or `release` marker added to a test that existed, a deleted test (or a test file
-renamed so that pytest no longer collects it) or `parametrize` case, a warning filter that lets a
-warning pass, a new or changed `pytest_*` hook, and a re-recorded baseline file. It prints each
-flagged change with its reason and fails until a maintainer, who has read the flags, sets the label
-`test-change-approved`; re-run the job after the label is set. A push withdraws the approval: the
-maintainer removes the label and sets it again after reading the new flags. The job runs the copy of
-the script that the base branch has, never the pull request's own, and flags a change to the script
-or to the workflow job that runs it (its condition and runner included), so a pull request cannot
-loosen the check it is judged by. The job is a required status check, and `.github/` and the script
-have code owners (`.github/CODEOWNERS`); a change to the workflow elsewhere that stops the job from
-running is for the code owner who is asked to read it. The script flags a change to the pytest
-options of `pyproject.toml` that choose the tests or judge them (`addopts`, `testpaths`,
-`filterwarnings`, and the like) too. An added test, a tighter tolerance, and a test that only moved
-or was renamed are not flagged. The check cannot see an assertion rewritten to a weaker one, a
-tolerance passed through a variable, or an existing test pointed at a new baseline file, so it does
-not replace review. To see the flags before you push, run `uv run python scripts/check_test_changes.py
---base origin/<release branch>`.
+tests that it skips, loosens, or removes. The `check-test-changes` job compares the head with the
+base by syntax trees and flags:
+
+- a removed assertion or `pytest.raises` check, a `pytest.raises` widened to `Exception` or
+  `BaseException`, a larger tolerance, and a looser bound;
+- a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed, a `skipif` or
+  `xfail` condition made always true (a string condition made `True` included), and an `xfail` that
+  gains `run=False`;
+- a test that stops running without a marker: a `conftest.py` that sets `collect_ignore` or
+  `collect_ignore_glob`, a `__test__ = False`, a `test_*` function that becomes a fixture, a
+  `parametrize` with no case added, a new `setup_module`, `setup_class`, `setup_method`, or
+  `setup_function` that skips, an autouse fixture that skips, and a new or changed `pytest_*` hook;
+- a deleted test (or a test file renamed so that pytest no longer collects it), a removed
+  `parametrize` case, a warning filter that lets a warning pass, and a function of `qa/` that is
+  deleted or emptied;
+- a re-recorded baseline file, and a change to the pytest options of `pyproject.toml` that choose
+  the tests or judge them (`addopts`, `testpaths`, `filterwarnings`, and the like).
+
+It prints each flagged change with its reason and fails until a maintainer, who has read the flags,
+sets the label `test-change-approved`; re-run the job after the label is set. A push withdraws the
+approval: the maintainer removes the label and sets it again after reading the new flags. The job
+runs the copy of the script that the base branch has, never the pull request's own, and flags a
+change to the script or to the workflow job that runs it (its condition and runner included), so a
+pull request cannot loosen the check it is judged by. The job is a required status check, and
+`.github/` and the script have code owners (`.github/CODEOWNERS`); a change to the workflow
+elsewhere that stops the job from running is for the code owner who is asked to read it. An added
+test, a tighter tolerance, and a test that only moved or was renamed are not flagged. The check
+cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, a check
+that moved into a helper, a call of a function of `qa/` that was removed, or an existing test
+pointed at a new baseline file. A pass is necessary and not sufficient, so it does not replace
+review. To see the flags before you push, run `uv run python scripts/check_test_changes.py --base
+origin/<release branch>`.
 
 Each release's pull request into `main` runs every test, the `release`-marked checks included, and
 a quality gate that fits every supported method ({{ n_supported }}) and the supported nonlinear

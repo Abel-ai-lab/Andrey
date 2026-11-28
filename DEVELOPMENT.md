@@ -512,40 +512,48 @@ contributors:
   a reference is cited only after it has been opened and found to support the claim; the author
   answers for it.
 - **A change that skips, loosens, or removes a test needs a maintainer's approval.** A test or a
-  baseline is never changed to make a check pass. The `check-test-changes` job of a pull request into a release or topic branch runs
-  `scripts/check_test_changes.py`, which compares the base and the head of `tests/` and `qa/` by their
-  syntax trees, function by function, and flags a removed `assert`, `assert_*` call, or
-  `pytest.raises`; a looser tolerance or bound (a larger `rtol`, `atol`, `abs`, or `rel`, a smaller
+  baseline is never changed to make a check pass. The `check-test-changes` job of a pull request
+  into a release or topic branch runs `scripts/check_test_changes.py`, which compares the base and
+  the head of `tests/` and `qa/` by their syntax trees, function by function, and flags a removed
+  `assert`, `assert_*` call, or `pytest.raises`; a `pytest.raises` widened to `Exception` or
+  `BaseException`; a looser tolerance or bound (a larger `rtol`, `atol`, `abs`, or `rel`, a smaller
   `decimal` or `places`, a looser number in a comparison, an exact comparison turned into
   `pytest.approx`); a `skip`, `skipif`, `xfail`, or `release` marker or call added to a test that
-  existed; a deleted test, a test file renamed out of the names pytest collects, or a removed
-  `parametrize` case; a warning filter that lets a warning pass; a new or changed `pytest_*` hook;
-  and a re-recorded baseline file. It prints each flagged change with its reason and fails until the
-  pull request carries the label `test-change-approved`, which a maintainer sets after reading the
-  flags; the job reads the label when it runs, so re-run it after the label is set. The label
-  approves the head it was set after: a push withdraws it, and a maintainer removes it and sets it
-  again after reading the new flags. The job runs the copy of the script that the base branch has,
-  not the pull request's, and a change to the script or to the workflow job that runs it is flagged
-  too, so a pull request cannot loosen the check it is judged by. The job is a required status
-  check, and `.github/` and the script have code owners (`.github/CODEOWNERS`); a workflow change
-  elsewhere that stops the job from running is for the code owner asked to read it. A change to the
-  pytest options of `pyproject.toml` that choose the tests or judge them (`addopts`, `testpaths`,
-  `filterwarnings`, and the like) is flagged too. An added test, a tightened tolerance, and a test
-  that only moved or was renamed are not flagged, and the release pull request into `main` is not
-  read, since each of its changes passed the check in its own pull request. A person's approval is
-  what the label records, so an agent never sets it. Run `uv run python scripts/check_test_changes.py
-  --base origin/release/<x.y.z>` before opening the pull request to see the flags. A pass is
-  necessary and not sufficient: the check cannot see an assertion rewritten to a weaker one, a
-  tolerance passed through a variable, a check that moved into a helper, or an existing test pointed
-  at a new baseline file, so review still reads every change to a test.
+  existed; a `skipif` or `xfail` condition made always true (a string condition made `True`
+  included); an `xfail` that gains `run=False`; a deleted test, a test file renamed out of the names
+  pytest collects, or a removed `parametrize` case; a test that stops running without a marker (a
+  `conftest.py` that sets `collect_ignore` or `collect_ignore_glob`, a `__test__ = False`, a
+  `test_*` function that becomes a fixture, a `parametrize` with no case added, a new
+  `setup_module`, `setup_class`, `setup_method`, or `setup_function` that skips); a warning filter
+  that lets a warning pass; a new or changed `pytest_*` hook; a function of `qa/` that is deleted or
+  emptied; and a re-recorded baseline file. It prints each flagged change with its reason and fails
+  until the pull request carries the label `test-change-approved`, which a maintainer sets after
+  reading the flags; the job reads the label when it runs, so re-run it after the label is set. The
+  label approves the head it was set after: a push withdraws it, and a maintainer removes it and
+  sets it again after reading the new flags. The job runs the copy of the script that the base
+  branch has, not the pull request's, and a change to the script or to the workflow job that runs it
+  is flagged too, so a pull request cannot loosen the check it is judged by. The job is a required
+  status check, and `.github/` and the script have code owners (`.github/CODEOWNERS`); a workflow
+  change elsewhere that stops the job from running is for the code owner asked to read it. A change
+  to the pytest options of `pyproject.toml` that choose the tests or judge them (`addopts`,
+  `testpaths`, `filterwarnings`, and the like) is flagged too. An added test, a tightened tolerance,
+  and a test that only moved or was renamed are not flagged, and the release pull request into
+  `main` is not read, since each of its changes passed the check in its own pull request. A person's
+  approval is what the label records, so an agent never sets it. Run `uv run python
+  scripts/check_test_changes.py --base origin/release/<x.y.z>` before opening the pull request to
+  see the flags. A pass is necessary and not sufficient: the check cannot see an assertion rewritten
+  to a weaker one, a tolerance passed through a variable, a check that moved into a helper, a call
+  of a function of `qa/` that was removed, or an existing test pointed at a new baseline file, so
+  review still reads every change to a test.
 - **Blog posts and release cards end with an AI statement.** It says how AI tools were used to
   write the page, as a conference asks of a paper's authors. The author sets `ai` (`none`,
   `edited`, or `drafted`) and `ai_tools` in the front matter, and the site writes the sentence
   ([The blog](docs/DEVELOPMENT.md#the-blog)). Every post and every release card has one.
 
 Not acceptable: a change nobody reviewed, a number or a reference an AI tool made up, a test or a
-gate skipped, loosened, or removed so that a change passes, and a post or a card whose statement is missing or untrue. A
-maintainer may close a pull request that shows one of these without a full review.
+gate skipped, loosened, or removed so that a change passes, and a post or a card whose statement is
+missing or untrue. A maintainer may close a pull request that shows one of these without a full
+review.
 
 These rules follow published ones. The
 [LLVM AI tool policy](https://llvm.org/docs/AIToolPolicy.html) and the
