@@ -295,6 +295,13 @@ names its pull request.
   same output bit for bit on every platform: each prediction keeps the arithmetic it had, and the
   loop uses scikit-learn's compiled staged prediction only after a check at its first use that it
   returns the bytes of the fits it replaces. ([#1373])
+- For contributors, `qa/identity.py --checkpoints` records a digest of each algorithm's state at its
+  stages, for the constraint-based, score-based, Markov blanket, structural EM, and continuous
+  searches, and `--compare` of two such manifests names, for each fit that differs, the first stage
+  and piece where the builds part, or the output parts that differ when every stage is equal, and
+  groups the differences by fingerprint. A run without the mode has the rows it had, and the fits
+  `GES-em` and `NOTEARS-em` add structural EM to the corpus, so record both manifests of a compare
+  with one version of the gate. ([#1362])
 - For contributors, the `check-test-changes` job also flags a `conftest.py` that sets
   `collect_ignore` or `collect_ignore_glob`, a `__test__ = False` added to a module or a function, a
   string `skipif` or `xfail` condition made `True`, a `pytest.raises` widened from `Exception` to
@@ -3324,6 +3331,7 @@ First alpha release.
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
 [#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
+[#1362]: https://github.com/Abel-ai-lab/Andrey/pull/1362
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
 [#1369]: https://github.com/Abel-ai-lab/Andrey/pull/1369

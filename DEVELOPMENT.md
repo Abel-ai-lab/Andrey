@@ -215,7 +215,11 @@ selection rules) and, for the greedy score-based searches, use the shared worker
 Andrey's execution paths, and measure the speedup with a benchmark campaign. `qa/identity.py`
 shows the change returns the same bits and makes no more queries: write its manifest on the base
 commit and on the change, and compare the two ([`qa/README.md`](qa/README.md#identity)). Tests a
-speed change computes ahead and discards do not count: the count is the algorithm's.
+speed change computes ahead and discards do not count: the count is the algorithm's. When the
+compare names a fit that differs, record both manifests again with `--checkpoints`: the compare then
+names the first stage and piece where the two builds part. A stage of a search is one guarded call
+of the private sink `andrey.core._checkpoint.TAKE` in the function every route of the stage passes
+through, and a change that moves a stage boundary moves its call with it.
 
 ### Change a parameter or default
 
