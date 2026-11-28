@@ -58,10 +58,12 @@ MODULE_CACHES = {
     "andrey.core.backend.torch": "whether torch is installed",
     "andrey.core.backend._torch_is_cpu_build": "whether torch is installed, and its build",
     "andrey.core.ci_missing._apart": "k",
+    "andrey.core.ci_regression._lean_kernels": "whether the installed scikit-learn has the kernels",
     "andrey.core.mixed._triangle": "d",
     "andrey.core.score.ebic_penalty": "n_parents, n_variables, ebic_gamma",
     "andrey.search._parallel._forkserver_starts": "the temporary directory, fixed for the process",
     "andrey.search.operators._position_plan": "m",
+    "andrey.temporal.rpcmci._program": "n_regimes, n_steps, max_transitions",
 }
 
 

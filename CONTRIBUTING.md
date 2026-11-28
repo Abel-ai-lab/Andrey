@@ -122,6 +122,7 @@ uv run --no-sync ruff format --check .    # formatting (`ruff format .` fixes it
 uv run --no-sync ruff check .             # lint
 uv run --no-sync ty check                 # types
 uv run --no-sync pytest tests -m "not release"   # the tests a pull request runs
+uv run --no-sync python scripts/check_test_changes.py --base origin/<release branch>   # tests skipped, loosened, or removed
 ```
 
 `-n logical --dist loadfile` runs the tests on every core, as CI does, with the same tests and
@@ -130,7 +131,9 @@ results; `--dist loadfile` keeps the tests of one file on one worker, so they sh
 two disjoint halves of the tests, as one of CI's two jobs per Python version does. Run `tests/gpu`
 without `-n`: the workers would share one GPU. Tests marked `release` are heavy accuracy checks that
 your pull request skips and the release pull request into `main` runs; drop `-m "not release"` to
-run them too.
+run them too. The last command lists the changes to tests that CI flags for a maintainer's approval:
+a removed assertion, a looser tolerance, a new skip, a deleted test, or a re-recorded baseline
+([`DEVELOPMENT.md`](https://github.com/Abel-ai-lab/Andrey/blob/main/DEVELOPMENT.md#ai-tools)).
 
 For a change to one page or one function, the tests next to it are enough to start with, for
 example `uv run pytest tests/unit -k <name>`; a pull request's CI runs every test not marked

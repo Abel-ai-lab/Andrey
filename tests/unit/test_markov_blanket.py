@@ -31,7 +31,7 @@ from andrey.constraint.blanket import (
     reach,
     table_size,
 )
-from andrey.core.ci import ChiSquare, FisherZ, make_indep_test
+from andrey.core.ci import ChiSquare, FisherZ, PartialCorrelationTest, make_indep_test
 from andrey.core.ci_missing import not_tested, rows_tested
 from andrey.core.knowledge import Constraints
 from andrey.core.orient import dag2cpdag
@@ -992,3 +992,129 @@ def test_a_small_grow_scan_keeps_the_per_query_bits(kind):
                 continue
             got = _scanned(scan, 4, some, cond).tolist()
             assert got == [list(one(4, v, cond)) for v in some], (cond, some)
+
+
+def _loop_shrink(test, target, alpha, members, keep=(), sepsets=None):
+    """The shrink that asks one member at a time: the reference for :func:`blanket._shrink`."""
+    dropped = []
+    for x in list(members):
+        if x in keep:
+            continue
+        rest = [z for z in members if z != x]
+        if test(target, x, rest) > alpha:
+            members.remove(x)
+            dropped.append(x)
+            if sepsets is not None:
+                sepsets[x] = tuple(sorted(rest))
+    return dropped
+
+
+class _Spied:
+    """Each stacked shrink call of a test: its number of queries and of p-values returned."""
+
+    def __init__(self, monkeypatch) -> None:
+        self.calls: list[tuple[int, int]] = []
+        original = PartialCorrelationTest.pvalues_until_separated
+
+        def spied(test, x, y, conditions, alpha):
+            found = original(test, x, y, conditions, alpha)
+            self.calls.append((len(x), len(found)))
+            return found
+
+        monkeypatch.setattr(PartialCorrelationTest, "pvalues_until_separated", spied)
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+@pytest.mark.parametrize("alpha", [0.05, 0.3, 0.7])
+def test_a_stacked_shrink_is_the_one_at_a_time_loop_bit_for_bit(kind, alpha, monkeypatch):
+    """The shrink that asks the members not yet visited in one call drops the members, in the order
+    it drops them, and sets the separating sets, in the order it sets them, as the loop that asks
+    one member at a time does, from blankets of two to nine members in a random order, with members
+    kept untested and without. It drops a member with others after it, so a stack is asked again,
+    and it finds none to drop."""
+    x = data.sample_scm(graph="erdos_renyi", d=14, n=300, seed=5, density=3.0).data
+    test = make_indep_test(kind, x)
+    spy = _Spied(monkeypatch)
+    rng = np.random.default_rng(0)
+    for _ in range(120):
+        target = int(rng.integers(14))
+        others = [v for v in range(14) if v != target]
+        members = [int(v) for v in rng.permutation(others)[: int(rng.integers(2, 10))]]
+        keep = [m for m in members if rng.random() < 0.25]
+        got, want = list(members), list(members)
+        got_sepsets: dict[int, tuple[int, ...]] = {}
+        want_sepsets: dict[int, tuple[int, ...]] = {}
+        dropped = blanket._shrink(test, target, alpha, got, keep, got_sepsets)
+        assert dropped == _loop_shrink(test, target, alpha, want, keep, want_sepsets)
+        assert got == want
+        assert list(got_sepsets.items()) == list(want_sepsets.items())
+    assert any(found < stack for stack, found in spy.calls)  # a drop with members after it
+    assert any(found == stack for stack, found in spy.calls)  # a pass that drops none
+    assert any(stack == 2 for stack, _ in spy.calls)
+
+
+def test_a_shrink_that_cannot_stack_asks_one_member_at_a_time(monkeypatch):
+    """A test that is not exactly a Fisher-z, Student-t, or normal-scores test takes the loop, and a
+    shrink with fewer than two members to ask takes the scalar call."""
+    x = data.sample_scm(graph="erdos_renyi", d=10, n=300, seed=5, density=3.0).data
+    spy = _Spied(monkeypatch)
+
+    class Mine(FisherZ):
+        pass
+
+    for test in (Mine(x), _OneByOne(FisherZ(x))):
+        blanket._shrink(test, 0, 0.5, [1, 2, 3, 4])
+    blanket._shrink(FisherZ(x), 0, 0.5, [1, 2, 3], keep=[1, 2])
+    blanket._shrink(FisherZ(x), 0, 0.5, [1])
+    assert spy.calls == []
+    blanket._shrink(FisherZ(x), 0, 0.5, [1, 2, 3], keep=[1])
+    assert len(spy.calls) == 1
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+@pytest.mark.parametrize("interleaved", [False, True], ids=["iamb", "inter_iamb"])
+def test_a_stacked_shrink_leaves_every_blanket_and_separating_set_as_the_loop_does(
+    kind, interleaved, monkeypatch
+):
+    """IAMB and Inter-IAMB, with required members and a depth cap too, give every target the blanket
+    and the separating sets that they give with the shrink asking one member at a time, the grow
+    step the same in both."""
+    monkeypatch.setenv("ANDREY_SHARED_SCAN_MIN_WORK", "1000000000")
+    x = data.sample_scm(graph="erdos_renyi", d=16, n=200, seed=7, density=4.0).data
+    test = make_indep_test(kind, x)
+    ranks = tie_ranks(x).tolist()
+    edges = np.zeros((16, 16), dtype=bool)
+    edges[2, 3] = edges[5, 6] = True
+    required = Constraints(np.zeros((16, 16), dtype=bool), edges, np.full(16, -1))
+    spy = _Spied(monkeypatch)
+    for alpha, options in (
+        (0.05, {}),
+        (0.4, {}),
+        (0.4, {"max_depth": 3}),
+        (0.4, {"constraints": required}),
+    ):
+        got = _blankets(test, 16, alpha, interleaved, ranks, **options)
+        with monkeypatch.context() as one_at_a_time:
+            one_at_a_time.setattr(blanket, "canonical_capable", lambda test: False)
+            want = _blankets(test, 16, alpha, interleaved, ranks, **options)
+        assert got == want
+    assert any(found < stack for stack, found in spy.calls)
+
+
+@pytest.mark.parametrize("kind", ["fisherz", "student_t", "normal_scores"])
+def test_a_p_value_equal_to_alpha_does_not_separate_in_a_stacked_shrink(kind):
+    """Orthogonal columns have every partial correlation zero, so every p-value is exactly 1: a
+    shrink at ``alpha`` 1 drops no member, as the loop does, and at the float below 1 drops the
+    first and then the next, as the loop does."""
+    columns = [  # four rows of an 8 x 8 Hadamard matrix, with no constant row
+        [1, -1, 1, -1, 1, -1, 1, -1],
+        [1, 1, -1, -1, 1, 1, -1, -1],
+        [1, -1, -1, 1, 1, -1, -1, 1],
+        [1, 1, 1, 1, -1, -1, -1, -1],
+    ]
+    test = make_indep_test(kind, np.array(columns, dtype=float).T)
+    assert test(0, 1, [2]) == 1.0
+    for alpha, dropped in ((1.0, []), (float(np.nextafter(1.0, 0.0)), [1, 2, 3])):
+        got, want = [1, 2, 3], [1, 2, 3]
+        assert blanket._shrink(test, 0, alpha, got) == _loop_shrink(test, 0, alpha, want) == dropped
+        assert got == want == [x for x in [1, 2, 3] if x not in dropped]

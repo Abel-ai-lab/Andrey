@@ -21,11 +21,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
 from andrey.constraint.blanket import blanket_graph
-from andrey.core import GraphStructure
+from andrey.core import GraphStructure, _checkpoint
 from andrey.core.ci import FisherZ
 from andrey.core.knowledge import Constraints
 from andrey.core.orient import to_structure
@@ -101,6 +102,27 @@ _NOT_FINITE = (
 )
 
 
+def _adam_step(
+    params: tuple[Any, ...], moments: list[tuple[Any, Any]], step: int, lr: float
+) -> None:
+    """Apply one Adam update in place, with betas ``(0.9, 0.999)`` and ``eps = 1e-8``.
+
+    Each parameter takes the update that ``torch.optim.Adam`` gives a CPU tensor with its default
+    options: the same in-place operations in the same order, so the parameters hold the same bits
+    after every step. ``params`` are the tensors, each with its gradient set; ``moments`` holds each
+    one's first and second moment buffers, zero at the start of a round; ``step`` counts from one
+    within the round. The caller runs it under ``torch.no_grad``.
+    """
+    beta1, beta2, eps = 0.9, 0.999, 1e-8
+    step_size = lr / (1 - beta1**step)
+    bias2_sqrt = (1 - beta2**step) ** 0.5
+    for param, (exp_avg, exp_avg_sq) in zip(params, moments, strict=True):
+        grad = param.grad
+        exp_avg.lerp_(grad, 1 - beta1)
+        exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+        param.addcdiv_(exp_avg, (exp_avg_sq.sqrt() / bias2_sqrt).add_(eps), value=-step_size)
+
+
 def _optimize_gated_dag(
     cov: np.ndarray,
     moral_mask: np.ndarray,
@@ -159,12 +181,13 @@ def _optimize_gated_dag(
         with torch.no_grad():
             return float(acyclicity(gate(sample=False)))
 
+    params = (weight, logit)
     rho, h_val = rho_init, hard_h()
-    for _outer in range(max_outer):
-        opt = torch.optim.Adam([weight, logit], lr=lr)
+    for outer in range(max_outer):
+        moments = [(torch.zeros_like(p), torch.zeros_like(p)) for p in params]
         prev = float("inf")
         for step in range(subproblem_iter):
-            opt.zero_grad()
+            weight.grad = logit.grad = None
             g = gate(sample=True)
             B = g * weight
             resid = torch.diagonal((eye - B).T @ cov_t @ (eye - B)).clamp_min(1e-12)
@@ -175,11 +198,21 @@ def _optimize_gated_dag(
             if not math.isfinite(cur):
                 raise ValueError(_NOT_FINITE)
             loss.backward()
-            opt.step()
+            with torch.no_grad():
+                _adam_step(params, moments, step + 1, lr)
             if step > 50 and abs(prev - cur) < 1e-7 * (abs(prev) + 1e-9):
                 break
             prev = cur
         h_val = hard_h()
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take(
+                "calm.outer",
+                outer,
+                rho=rho,
+                h=h_val,
+                weight=weight.detach().cpu().numpy(),
+                logit=logit.detach().cpu().numpy(),
+            )
         if h_val <= h_tol or rho >= rho_max:
             break
         rho *= rho_mult
@@ -300,6 +333,8 @@ def calm(
     dag = to_structure(endpoint_marks(support), kind="dag", labels=labels)
     objective = 0.5 * float(np.sum(np.log(np.clip(resid_var, 1e-12, None))))
     objective += lambda1 * float(support.sum())
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take("calm.result", support=support, weighted=weighted, objective=objective)
     return CalmResult(
         weighted_adjacency=weighted, dag=dag, h_final=float(h_final), objective=objective
     )

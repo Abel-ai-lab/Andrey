@@ -1,0 +1,4 @@
+# A change to the workflows, or to the check that judges a pull request's tests, asks a maintainer
+# to read it. DEVELOPMENT.md, AI tools.
+/.github/ @Shu-Wan
+/scripts/check_test_changes.py @Shu-Wan

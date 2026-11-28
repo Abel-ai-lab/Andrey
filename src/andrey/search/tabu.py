@@ -13,7 +13,7 @@ from functools import partial
 
 import numpy as np
 
-from andrey.core import GraphStructure
+from andrey.core import GraphStructure, _checkpoint
 from andrey.core.knowledge import Constraints
 from andrey.core.ties import EPS_IMPROVE
 from andrey.search.hc import MoveScanner, StructureKey, apply_move, greedy_search
@@ -67,6 +67,8 @@ def _search(
         for node in (u, v) if op == "reverse" else (v,):
             local[node] = score.score(node, parents_of[node])
         total = math.fsum(local)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("tabu.move", move=move, parents=adj_int, total=total)
         if total < best_total - EPS_IMPROVE:
             best_key, best_total, losses = tuple(adj_int), total, 0
     adj_int[:] = best_key
