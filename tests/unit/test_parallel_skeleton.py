@@ -18,6 +18,7 @@ import pytest
 
 import andrey
 from andrey.constraint import _parallel_skeleton
+from andrey.constraint._skeleton import adjacent_pairs, scan_pairs
 from andrey.core.ci import FisherZ, SingularCorrelationError, make_indep_test
 from andrey.data import sample_discrete
 
@@ -237,3 +238,46 @@ def test_each_pass_is_counted_once(pools: list[int], monkeypatch: pytest.MonkeyP
     counted.update(search=0, pool=0)
     _search(x, workers=1)
     assert counted == {"search": 0, "pool": 0}, "a serial fit that does not warn counts nothing"
+
+
+@pytest.mark.parametrize("d", [2, 7, 8, 9, 17, 33])
+@pytest.mark.parametrize("density", [0.0, 0.4, 1.0])
+def test_a_task_scans_the_snapshot_it_was_packed_from(
+    monkeypatch: pytest.MonkeyPatch, d: int, density: float
+) -> None:
+    """A task's removals are the scan's over the parent's neighbor lists, for any ``d`` (a row's
+    bits fill whole bytes or leave a partial one) and any density."""
+    x = _gaussian_dag(2, 400, d, 0.3)
+    test = make_indep_test("fisherz", x)
+    rng = np.random.default_rng(d)
+    support = np.triu(rng.random((d, d)) < density, 1)
+    support = support | support.T
+    neighbors = [np.flatnonzero(row) for row in support]
+    pairs = adjacent_pairs(support)
+    monkeypatch.setattr(_parallel_skeleton, "_WORKER_TEST", test)
+    monkeypatch.setattr(_parallel_skeleton, "_WORKER_TOKEN", "token")
+    for size in (1, 2):
+        expected = scan_pairs(test, pairs, neighbors, size, 0.05)
+        payload = (pairs, np.packbits(support, axis=1), size, 0.05, True, "token")
+        assert _parallel_skeleton._scan_task(payload) == expected
+
+
+@pytest.mark.usefixtures("open_gate")
+def test_a_task_carries_one_bit_per_adjacency_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each task of a pass holds its adjacency snapshot at one bit per entry (a byte per eight in a
+    row), not a ``d`` x ``d`` array of bytes, and the pooled skeleton is still the serial one."""
+    sent: list[np.ndarray] = []
+    real = _parallel_skeleton.ProcessPoolExecutor
+
+    class Spy(real):
+        def submit(self, fn, payload, *args, **kwargs):
+            if fn is _parallel_skeleton._scan_task:
+                sent.append(payload[1])
+            return super().submit(fn, payload, *args, **kwargs)
+
+    monkeypatch.setattr(_parallel_skeleton, "ProcessPoolExecutor", Spy)
+    x = _gaussian_dag(1, 600, 20, 0.25)
+    serial = _search(x, workers=1)
+    pooled = _search(x, workers=3)
+    assert _ordered(pooled) == _ordered(serial)
+    assert sent and all(bits.dtype == np.uint8 and bits.shape == (20, 3) for bits in sent)
