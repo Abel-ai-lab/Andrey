@@ -288,6 +288,12 @@ names its pull request.
   baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it and flags a
   change to the script or to its workflow job, it is a required check, `.github/` and the script
   have code owners, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
+- The `gcm` and `wgcm` tests, and the `pcm` test with `regression="boosting"`, grow the boosted
+  trees of their cross-validation folds in a lean loop over scikit-learn's decision trees, not in a
+  gradient-boosting fit per fold, so the methods that take them as `indep_test` run faster, with the
+  same output bit for bit on every platform: each prediction keeps the arithmetic it had, and the
+  loop uses scikit-learn's compiled staged prediction only after a check at its first use that it
+  returns the bytes of the fits it replaces. ([#1373])
 - For contributors, `qa/identity.py --checkpoints` records a digest of each algorithm's state at its
   stages, for the constraint-based, score-based, Markov blanket, structural EM, and continuous
   searches, and `--compare` of two such manifests names, for each fit that differs, the first stage
@@ -3325,3 +3331,4 @@ First alpha release.
 [#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371
 [#1378]: https://github.com/Abel-ai-lab/Andrey/pull/1378
+[#1373]: https://github.com/Abel-ai-lab/Andrey/pull/1373
