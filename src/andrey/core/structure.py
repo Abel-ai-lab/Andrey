@@ -219,13 +219,18 @@ class GraphStructure(Structure):
         labels: tuple[str, ...] | None = None,
         node_types: np.ndarray | None = None,
     ) -> GraphStructure:
-        """Build directly from CSR arrays, casting to the canonical dtypes. Internal entry point."""
+        """Build directly from CSR arrays, casting to the canonical dtypes. Internal entry point.
+
+        A column index outside ``range(n_nodes)`` raises ``ValueError``; the other defects of a
+        store, such as a half-edge or an unsorted row, are left for ``validate()``.
+        """
         n = int(n_nodes)
         types = None
         if node_types is not None:
             types = _frozen(node_types, np.int8)
             if types.shape != (n,):
                 raise ValueError(f"node_types must have shape ({n},), got {types.shape}")
+        _check_column_range(n, indices)
         # Opportunistically halve the store for a conforming dag/cpdag; a nonconforming graph stays
         # symmetric so ``validate()`` still reports it.
         layout: Literal["sym", "compact"] = "sym"
@@ -2211,6 +2216,20 @@ def _dense_to_csr(M: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     indptr = np.zeros(M.shape[0] + 1, dtype=np.int64)
     np.cumsum(np.bincount(rows, minlength=M.shape[0]), out=indptr[1:])
     return indptr, cols.astype(np.int32), M[rows, cols].astype(np.int8)
+
+
+def _check_column_range(n: int, indices: np.ndarray | Sequence[int]) -> None:
+    """Raise ``ValueError`` when a column index of a CSR store lies outside ``range(n)``.
+
+    The indices are read as given, before any cast to ``int32`` could wrap one back into range.
+    """
+    cols = np.asarray(indices)
+    if cols.size:
+        lowest, highest = cols.min(), cols.max()
+        if not (0 <= lowest and highest < n):
+            raise ValueError(
+                f"column indices must lie in range({n}), got values from {lowest} to {highest}"
+            )
 
 
 def _far_marks(

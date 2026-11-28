@@ -15,6 +15,14 @@ names its pull request.
 - Andrey needs scikit-learn 1.9 or later (it was 1.5), and the `torch` extra needs PyTorch 2.5 or
   later (it was 2.2). An environment that pins an older version of either must upgrade it before it
   installs this release. ([#1336])
+- Andrey needs NumPy 2.0 or later (it was 1.26), SciPy 1.14 (1.13), pandas 2.2.2 (2.2), statsmodels
+  0.14.2 (0.14), networkx 3.3 (3), typer 0.26 (0.12.4), threadpoolctl 3.5 (3), and, for the `viz`
+  extra, matplotlib 3.8.4 (3.7). Each is the oldest version on which the tests pass with every
+  direct dependency at its oldest allowed version. Below them, CMIknn gives other p-values (NumPy),
+  NoGAM raises on an empty system (SciPy), the tests' d-separation oracle is missing (networkx 3.3
+  adds `is_d_separator`), the command words its usage errors differently under the current click
+  (typer), and pandas, statsmodels, and matplotlib do not work with NumPy 2. An environment that
+  pins an older version of any of them must upgrade it before it installs this release. ([#1353])
 - `andrey.data.generate` and `andrey.data.Ensemble` are removed, as their warning said they would be
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
@@ -263,6 +271,16 @@ names its pull request.
   log-likelihood for rows that observe one column, and in the expected mean and covariance for rows
   that miss one, because Accelerate sums a dot product by the memory alignment of its operand; such
   patterns are solved alone. ([#1341])
+- A saved graph (JSON or npz) with a column index below 0 or at least `n_nodes`, from a hand edit or
+  damage, raises a `ValueError` on `StructureOutput.load` that gives the allowed range and the
+  smallest and largest index found. A `dag`, `cpdag`, or `undirected` graph used to reach SciPy's
+  transpose, which can crash the process, and the other kinds loaded and failed at the first read
+  with an `IndexError`. ([#1364])
+- `direct_lingam` and `multi_group_direct_lingam` no longer change their causal order when a column
+  is shifted by a constant, as `measure="skew"` did on columns whose skewness is zero or near it,
+  such as exchangeable or balanced binary ones. The order search now centers each column once;
+  before, its standardization and residuals took the offset's rounding, which could decide the sign
+  of such a skewness. ([#1351])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3237,4 +3255,7 @@ First alpha release.
 [#1341]: https://github.com/Abel-ai-lab/Andrey/pull/1341
 [#1343]: https://github.com/Abel-ai-lab/Andrey/pull/1343
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
+[#1351]: https://github.com/Abel-ai-lab/Andrey/pull/1351
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
+[#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
+[#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
