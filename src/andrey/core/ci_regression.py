@@ -258,9 +258,10 @@ def _lean_mean_cv_error(
     """The result of :func:`_gbr_mean_cv_error` from :class:`_Boosted` trees.
 
     The folds grow in step, one round at a time, and the fold errors of a round add in fold order,
-    as the mean over the rows of the earlier error array does. Every ``_WARM_START_ROUNDS`` rounds
-    each fold's training predictions are summed again by the compiled kernel, where the earlier
-    loop's warm-start refit resumes. The held-out predictions add in NumPy, as in the earlier loop.
+    as the mean over the rows of an error array adds them. Every ``_WARM_START_ROUNDS`` rounds each
+    fold's training predictions are summed again by the compiled kernel, as the warm-start refit of
+    :func:`_gbr_mean_cv_error` resumes from that sum. The held-out predictions add in NumPy, as
+    there.
     """
     n_folds = int(folds.max()) + 1
     held = [folds == fold for fold in range(n_folds)]

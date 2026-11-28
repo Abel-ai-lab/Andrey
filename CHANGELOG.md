@@ -254,6 +254,12 @@ names its pull request.
   (centering, `scipy.linalg.lstsq` with its `tol` as `cond`, and its intercept) without the
   estimator's input checks, and any other input still goes through it. `bottom_up_parce_lingam`,
   `varma_lingam`, and `rcd` fit the same way and return the same output bit for bit. ([#1359])
+- The `gcm` and `wgcm` tests, and the `pcm` test with `regression="boosting"`, grow the boosted trees
+  of their cross-validation folds in a lean loop over scikit-learn's decision trees, not in a
+  gradient-boosting fit per fold, so the methods that take them as `indep_test` run faster, with the
+  same output bit for bit on every platform: each prediction keeps the arithmetic it had, and the
+  loop uses scikit-learn's compiled staged prediction only after a check at its first use that it
+  returns the bytes of the fits it replaces. ([#1373])
 
 ### Fixed
 
@@ -3274,3 +3280,4 @@ First alpha release.
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
+[#1373]: https://github.com/Abel-ai-lab/Andrey/pull/1373
