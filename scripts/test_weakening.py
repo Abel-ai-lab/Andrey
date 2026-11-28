@@ -21,11 +21,15 @@ function by function, and flags:
   tuple, set, or ``range``; a case that another replaced counts as removed);
 - a re-recorded baseline file: a changed or deleted file of ``baselines/`` or named for one, and a
   JSON baseline whose recorded values changed;
-- a change to this script or to the workflow step that runs it (see below).
+- a change to this script or to the workflow step that runs it (see below), or to the pytest
+  options of ``pyproject.toml`` that choose the tests or judge them (``addopts``, ``testpaths``,
+  ``norecursedirs``, ``python_files``, ``python_classes``, ``python_functions``, ``xfail_strict``,
+  ``filterwarnings``).
 
 An added test, a tightened tolerance, and a test that only moved or was renamed are not flagged. It
-cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, or a
-check that moved into a helper, so a pass is necessary and not sufficient.
+cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, a check
+that moved into a helper, or an existing test pointed at a new baseline file, so a pass is
+necessary and not sufficient.
 
 The script prints each flagged change with its reason and exits 1 unless the pull request carries
 the label ``test-change-approved``, which a maintainer sets after reading the flags. Run it in a
@@ -57,6 +61,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from datetime import datetime
@@ -67,6 +72,18 @@ ROOTS = ("tests", "qa")
 # This script and the workflow that runs it: a change to either needs the label too.
 DETECTOR = "scripts/test_weakening.py"
 WORKFLOW = ".github/workflows/ci.yml"
+# The pytest options (``pyproject.toml``) that choose which tests run, and how a failure counts.
+PYTEST_OPTIONS = (
+    "addopts",
+    "testpaths",
+    "norecursedirs",
+    "python_files",
+    "python_classes",
+    "python_functions",
+    "xfail_strict",
+    "filterwarnings",
+)
+UNITTEST_SKIPS = frozenset({"skip", "skipIf", "skipUnless", "expectedFailure"})
 
 LARGER_IS_LOOSER = frozenset(
     {"rtol", "atol", "rel_tol", "abs_tol", "rel", "abs", "tol", "tolerance", "eps", "epsilon"}
@@ -158,6 +175,7 @@ class Unit(NamedTuple):
     aliases: dict[str, str] = {}
     collected: bool = True
     imports: dict[str, str] = {}
+    inherited: list[ast.AST] = []  # the markers of the enclosing classes and module
 
     @property
     def is_function(self) -> bool:
@@ -197,16 +215,10 @@ def _callee(node: ast.AST) -> str:
     return func.attr if isinstance(func, ast.Attribute) else ""
 
 
-def _tolerance_callee(call: ast.Call) -> str:
+def _tolerance_callee(call: ast.Call, imports: dict[str, str]) -> str:
     """Return the callee whose tolerance knobs a call has: ``math.isclose`` apart from NumPy's."""
-    func = call.func
-    if (
-        isinstance(func, ast.Attribute)
-        and func.attr == "isclose"
-        and isinstance(func.value, ast.Name)
-        and func.value.id in {"math", "cmath"}
-    ):
-        return f"math.{func.attr}"
+    if _dotted(call.func, imports) in {"math.isclose", "cmath.isclose"}:
+        return "math.isclose"
     return _callee(call)
 
 
@@ -340,6 +352,8 @@ def _marker_kind(node: ast.AST, imports: dict[str, str] | None = None) -> str:
     dotted = _dotted(node, imports or {}).split(".")
     if len(dotted) == 3 and dotted[:2] == ["pytest", "mark"] and dotted[2] in MARKERS:
         return ".".join(dotted)
+    if len(dotted) == 2 and dotted[0] == "unittest" and dotted[1] in UNITTEST_SKIPS:
+        return ".".join(dotted)
     return ""
 
 
@@ -397,15 +411,38 @@ def collect(path: str, source: str) -> dict[str, Unit]:
             aliases[name] = kind
     units: dict[str, Unit] = {}
 
-    def add(root: ast.AST, qualname: str, collected: bool = True) -> None:
+    def add(
+        root: ast.AST, qualname: str, collected: bool = True, inherited: tuple[ast.AST, ...] = ()
+    ) -> None:
         definitions: list[ast.AST] = []
         if isinstance(root, ast.ClassDef | ast.Module):
             nodes = list(_scope_nodes(root, definitions))
         else:
             nodes = list(ast.walk(root))
         units[qualname] = Unit(
-            path, qualname, root, nodes, source, constants, aliases, collected, imports
+            path,
+            qualname,
+            root,
+            nodes,
+            source,
+            constants,
+            aliases,
+            collected,
+            imports,
+            list(inherited),
         )
+        # What a test inherits from its class and module: their decorators and ``pytestmark``.
+        above = inherited
+        if isinstance(root, ast.ClassDef | ast.Module):
+            marks = [
+                node
+                for statement in root.body
+                if isinstance(statement, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "pytestmark" for t in statement.targets)
+                for node in ast.walk(statement.value)
+            ]
+            decorators = [n for d in getattr(root, "decorator_list", []) for n in ast.walk(d)]
+            above = (*inherited, *decorators, *marks)
         for child in definitions:
             name = getattr(child, "name", "")
             inside = isinstance(child, ast.ClassDef) and not _collected_class(
@@ -415,6 +452,7 @@ def collect(path: str, source: str) -> dict[str, Unit]:
                 child,
                 name if qualname == "<module>" else f"{qualname}.{name}",
                 collected and not inside,
+                above,
             )
 
     add(tree, "<module>")
@@ -437,15 +475,12 @@ def _pytest_call(node: ast.AST, imports: dict[str, str]) -> str:
     return ""
 
 
-def _self_fail(node: ast.AST) -> bool:
-    """Whether a node is the call ``self.fail(...)`` of a ``unittest.TestCase``."""
+def _self_call(node: ast.AST) -> str:
+    """Return ``fail`` for the call ``self.fail(...)`` of a ``unittest.TestCase`` and so on."""
     func = node.func if isinstance(node, ast.Call) else None
-    return (
-        isinstance(func, ast.Attribute)
-        and func.attr == "fail"
-        and isinstance(func.value, ast.Name)
-        and func.value.id == "self"
-    )
+    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+        return func.attr if func.value.id == "self" else ""
+    return ""
 
 
 def _checks(unit: Unit) -> list[Check]:
@@ -454,9 +489,9 @@ def _checks(unit: Unit) -> list[Check]:
         name = _callee(node) if isinstance(node, ast.Call) else ""
         if (
             isinstance(node, ast.Assert)
-            or name.startswith("assert")
+            or name.lstrip("_").startswith("assert")
             or _pytest_call(node, unit.imports) == "fail"
-            or _self_fail(node)
+            or _self_call(node) == "fail"
         ):
             checks.append(Check("assert", node, _key(node)))
         elif name in RAISES:
@@ -468,8 +503,8 @@ def _count_approx(node: ast.AST) -> int:
     return sum(isinstance(n, ast.Call) and _callee(n) == "approx" for n in ast.walk(node))
 
 
-def _call_knobs(call: ast.Call) -> list[Knob]:
-    name = _tolerance_callee(call)
+def _call_knobs(call: ast.Call, imports: dict[str, str]) -> list[Knob]:
+    name = _tolerance_callee(call, imports)
     given: dict[str, float] = {}
     opaque: set[str] = set()
     positional = POSITIONAL.get(name, {})
@@ -529,11 +564,11 @@ def _compare_knobs(node: ast.Compare) -> list[Knob]:
     return knobs
 
 
-def _check_knobs(node: ast.AST) -> list[Knob]:
+def _check_knobs(node: ast.AST, imports: dict[str, str]) -> list[Knob]:
     knobs = []
     for child in ast.walk(node):
         if isinstance(child, ast.Call):
-            knobs += _call_knobs(child)
+            knobs += _call_knobs(child, imports)
         elif isinstance(child, ast.Compare):
             knobs += _compare_knobs(child)
     return knobs
@@ -548,6 +583,26 @@ def _dict_knobs(node: ast.Dict, path: tuple[str, ...]) -> Iterator[Knob]:
             yield from _dict_knobs(value, here)
         elif key.value in TOLERANCES and (number := _number(value)) is not None:
             yield Knob(("key", here), ".".join(here), number, key.value in LARGER_IS_LOOSER)
+
+
+def _assigned(node: ast.Assign | ast.AnnAssign) -> list[tuple[str, ast.expr]]:
+    """Return the (name, value) pairs an assignment binds, chained and unpacked ones included."""
+    if isinstance(node, ast.AnnAssign):
+        named = isinstance(node.target, ast.Name) and node.value is not None
+        return [(node.target.id, node.value)] if named else []  # type: ignore[union-attr]
+    pairs = []
+    for target in node.targets:
+        if isinstance(target, ast.Name):
+            pairs.append((target.id, node.value))
+        elif (
+            isinstance(target, ast.Tuple | ast.List)
+            and isinstance(node.value, ast.Tuple | ast.List)
+            and len(target.elts) == len(node.value.elts)
+        ):
+            pairs += [
+                (t.id, v) for t, v in zip(target.elts, node.value.elts) if isinstance(t, ast.Name)
+            ]
+    return pairs
 
 
 def _own_knobs(unit: Unit) -> list[Knob]:
@@ -565,23 +620,21 @@ def _own_knobs(unit: Unit) -> list[Knob]:
                     larger = not re.search(r"decimal|places", arg.arg, re.IGNORECASE)
                     knobs.append(Knob(("default", node.name, arg.arg), arg.arg, number, larger))
         elif isinstance(node, ast.Assign | ast.AnnAssign) and not unit.is_function:
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            if len(targets) != 1 or not isinstance(targets[0], ast.Name) or node.value is None:
-                continue
-            name, number = targets[0].id, _number(node.value)
-            if number is not None and TOLERANCE_NAME.search(name):
-                larger = not re.search(r"decimal|places", name, re.IGNORECASE)
-                knobs.append(Knob(("name", name), name, number, larger))
-            elif isinstance(node.value, ast.Dict):
-                knobs += [
-                    Knob(
-                        ("table", name, *k.context[1]),
-                        f"{name}.{k.label}",
-                        k.value,
-                        k.larger_is_looser,
-                    )
-                    for k in _dict_knobs(node.value, ())
-                ]
+            for name, value in _assigned(node):
+                number = _number(value)
+                if number is not None and TOLERANCE_NAME.search(name):
+                    larger = not re.search(r"decimal|places", name, re.IGNORECASE)
+                    knobs.append(Knob(("name", name), name, number, larger))
+                elif isinstance(value, ast.Dict):
+                    knobs += [
+                        Knob(
+                            ("table", name, *k.context[1]),
+                            f"{name}.{k.label}",
+                            k.value,
+                            k.larger_is_looser,
+                        )
+                        for k in _dict_knobs(value, ())
+                    ]
     return knobs
 
 
@@ -614,20 +667,37 @@ def _is_none(node: ast.AST | None) -> bool:
     return isinstance(node, ast.Constant) and node.value is None
 
 
-def _listed(call: ast.Call) -> frozenset[str]:
-    """Return the names of the exceptions a ``pytest.raises`` lists that the source writes out."""
-    first = call.args[0] if call.args else None
-    elements = first.elts if isinstance(first, ast.Tuple | ast.List) else [first]
-    return frozenset(name for e in elements if e is not None and (name := _callee(e)))
+def _first_arg(call: ast.Call) -> ast.expr | None:
+    return call.args[0] if call.args else None
 
 
-def _accepted(call: ast.Call) -> frozenset[str] | None:
-    """Return the exception names a ``pytest.raises`` lists, or None when it does not name them."""
-    first = call.args[0] if call.args else None
-    names = [
-        _callee(n) for n in (first.elts if isinstance(first, ast.Tuple | ast.List) else [first])
-    ]
-    return frozenset(names) if first is not None and all(names) else None
+def _exception_names(node: ast.expr | None) -> list[str]:
+    """Return the names of the exceptions an expression lists, "" for one it does not name."""
+    elements = node.elts if isinstance(node, ast.Tuple | ast.List) else [node]
+    return [_callee(e) if e is not None else "" for e in elements]
+
+
+def _listed(node: ast.expr | None) -> frozenset[str]:
+    """Return the exception names an expression lists that the source writes out."""
+    return frozenset(name for name in _exception_names(node) if name)
+
+
+def _accepted(node: ast.expr | None) -> frozenset[str] | None:
+    """Return the exception names an expression lists, or None when it does not name them all."""
+    names = _exception_names(node)
+    return frozenset(names) if node is not None and all(names) else None
+
+
+def _widened(before: ast.expr | None, after: ast.expr | None) -> list[str]:
+    """Return why ``after`` accepts more exceptions than ``before``: a broad one, or more names."""
+    reasons = []
+    broad = _listed(after) & BROAD
+    if broad and not _listed(before) & BROAD:
+        reasons.append(f"widened to {', '.join(sorted(broad))}")
+    old, new = _accepted(before), _accepted(after)
+    if old is not None and new is not None and old < new:
+        reasons.append(f"accepts {', '.join(sorted(new - old))} as well")
+    return reasons
 
 
 # Messages a pattern is tested on: one that matches all of them limits nothing (``""``, ``.*``).
@@ -655,12 +725,9 @@ def _raises_reasons(before: ast.Call, after: ast.Call) -> list[str]:
     reasons = []
     if _matches(before) and not _matches(after):
         reasons.append("pytest.raises lost its match")
-    broad = _listed(after) & BROAD
-    if broad and not _listed(before) & BROAD:
-        reasons.append(f"pytest.raises widened to {', '.join(sorted(broad))}")
-    old, new = _accepted(before), _accepted(after)
-    if old is not None and new is not None and old < new:
-        reasons.append(f"pytest.raises accepts {', '.join(sorted(new - old))} as well")
+    reasons += [
+        f"pytest.raises {reason}" for reason in _widened(_first_arg(before), _first_arg(after))
+    ]
     return reasons
 
 
@@ -684,7 +751,7 @@ def _markers(unit: Unit, exempt: frozenset[str] = frozenset()) -> dict[str, list
     """Return a unit's markers by kind: written out, or used through a module name bound to one."""
     found: dict[str, list[ast.AST]] = defaultdict(list)
     skipped = _exempt_nodes(unit, exempt)
-    for node in sorted(unit.nodes, key=_position):
+    for node in sorted([*unit.nodes, *unit.inherited], key=_position):
         if id(node) in skipped:
             continue
         if kind := _marker_kind(node, unit.imports):
@@ -697,6 +764,8 @@ def _markers(unit: Unit, exempt: frozenset[str] = frozenset()) -> dict[str, list
             found[unit.aliases[node.id]].append(node)
         elif (call := _pytest_call(node, unit.imports)) in SKIP_CALLS:
             found[f"pytest.{call}()"].append(node)
+        elif _self_call(node) == "skipTest":
+            found["self.skipTest()"].append(node)
     return found
 
 
@@ -758,12 +827,14 @@ def _parametrizations(
         if not isinstance(node, ast.Call):
             continue
         name = _callee(node)
-        if name == "parametrize" and node.args:
-            values = node.args[1] if len(node.args) > 1 else None
-            values = values or next((k.value for k in node.keywords if k.arg == "argvalues"), None)
-            found.append((_argnames(node.args[0]), _elements(values, unit.constants), node))
+        keywords = {k.arg: k.value for k in node.keywords}
+        if name == "parametrize":
+            names = node.args[0] if node.args else keywords.get("argnames")
+            values = node.args[1] if len(node.args) > 1 else keywords.get("argvalues")
+            if names is not None:
+                found.append((_argnames(names), _elements(values, unit.constants), node))
         elif name == "fixture":
-            params = next((k.value for k in node.keywords if k.arg == "params"), None)
+            params = keywords.get("params")
             if params is not None:
                 found.append((("params",), _elements(params, unit.constants), node))
     return found
@@ -804,7 +875,9 @@ def _check_findings(old: Unit, new: Unit, flag: Flag) -> None:
         reasons = _raises_reasons(before.node, after.node) if before.kind == "raises" else []
         if _count_approx(after.node) > _count_approx(before.node):
             reasons.append("exact comparison relaxed to pytest.approx")
-        reasons += _looser(_check_knobs(before.node), _check_knobs(after.node))
+        reasons += _looser(
+            _check_knobs(before.node, old.imports), _check_knobs(after.node, new.imports)
+        )
         if reasons:
             flag(
                 after.node,
@@ -860,8 +933,11 @@ def _xfail_reasons(before: ast.expr, after: ast.expr) -> list[str]:
     reasons = []
     if _strict(before) is True and _strict(after) is False:
         reasons.append("xfail made non-strict")
-    if "raises" in _keywords(before) and "raises" not in _keywords(after):
+    old, new = _keywords(before).get("raises"), _keywords(after).get("raises")
+    if old is not None and (new is None or _is_none(new)):
         reasons.append("xfail lost its raises")
+    elif old is not None and new is not None:
+        reasons += [f"xfail {reason}" for reason in _widened(old, new)]
     return reasons
 
 
@@ -988,7 +1064,7 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 new_file = collect(change.path, change.new or "")
             except (SyntaxError, ValueError):
                 continue
-            added += [u for u in new_file.values() if u.is_test]
+            added += [u for u in new_file.values() if u.is_test and _collected(change.path)]
             added_fixtures += [u for u in new_file.values() if _is_fixture(u)]
             continue
         try:
@@ -1016,7 +1092,11 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 deleted.append((unit, reason))
             elif _is_fixture(unit):
                 fixtures.append(unit)
-        added += [u for n, u in new_units.items() if n not in old_units and u.is_test]
+        added += [
+            u
+            for n, u in new_units.items()
+            if n not in old_units and u.is_test and _collected(change.path)
+        ]
         added_fixtures += [u for n, u in new_units.items() if n not in old_units and _is_fixture(u)]
     for unit in fixtures:
         name = unit.qualname.rsplit(".", 1)[-1]
@@ -1046,7 +1126,11 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
         else:
             added.remove(match)
             findings += compare(unit, match)
-    return findings
+    # A marker on a class or module counts for each of its tests: the same line is reported once.
+    unique: dict[tuple, Finding] = {}
+    for finding in findings:
+        unique.setdefault((finding.path, finding.line, finding.reason, finding.after), finding)
+    return list(unique.values())
 
 
 def _is_baseline(path: str) -> bool:
@@ -1147,6 +1231,17 @@ def _exists(root: str, revision: str, path: str) -> bool:
     return bool(_git("ls-tree", "--name-only", revision, "--", path, root=root).strip())
 
 
+def _pytest_options(root: str, revision: str) -> dict[str, Any]:
+    """Return the ``[tool.pytest.ini_options]`` of ``pyproject.toml`` at a revision."""
+    if not _exists(root, revision, "pyproject.toml"):
+        return {}
+    try:
+        text = _show(root, revision, "pyproject.toml").decode("utf-8", "replace")
+        return tomllib.loads(text).get("tool", {}).get("pytest", {}).get("ini_options", {})
+    except tomllib.TOMLDecodeError:
+        return {}
+
+
 def workflow_steps(workflow: str) -> list[tuple[int, str]]:
     """Return the steps of a workflow file that run this script, found by content: (line, text).
 
@@ -1192,6 +1287,14 @@ def guard_findings(base: str, head: str, root: str) -> list[Finding]:
             findings.append(Finding(DETECTOR, 0, "", "the weakened-test check was deleted"))
         elif _show(root, head, DETECTOR) != _show(root, merge_base, DETECTOR):
             findings.append(Finding(DETECTOR, 0, "", "the weakened-test check changed"))
+    changed = [
+        key
+        for key in PYTEST_OPTIONS
+        if _pytest_options(root, merge_base).get(key) != _pytest_options(root, head).get(key)
+    ]
+    if changed:
+        reason = f"pytest options that choose or judge the tests changed: {', '.join(changed)}"
+        findings.append(Finding("pyproject.toml", 0, "", reason))
     if _exists(root, merge_base, WORKFLOW):
         before = workflow_steps(_show(root, merge_base, WORKFLOW).decode("utf-8", "replace"))
         text = (

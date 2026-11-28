@@ -1050,6 +1050,160 @@ FLAGGED = {
         """,
         "assertion removed",
     ),
+    "xfail raises widened to more exceptions": (
+        """
+        @pytest.mark.xfail(raises=ValueError)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(raises=(ValueError, TypeError))
+        def test_fit():
+            assert fit()
+        """,
+        "xfail accepts TypeError as well",
+    ),
+    "xfail raises widened to Exception": (
+        """
+        @pytest.mark.xfail(raises=ValueError)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(raises=Exception)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail widened to Exception",
+    ),
+    "xfail raises turned into None": (
+        """
+        @pytest.mark.xfail(raises=ValueError)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(raises=None)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail lost its raises",
+    ),
+    "math.isclose through an alias of math": (
+        """
+        import math as m
+
+        def test_fit():
+            assert m.isclose(a, b)
+        """,
+        """
+        import math as m
+
+        def test_fit():
+            assert m.isclose(a, b, rel_tol=0.5)
+        """,
+        "rel_tol loosened from 1e-09 to 0.5",
+    ),
+    "math.isclose imported by name": (
+        """
+        from math import isclose
+
+        def test_fit():
+            assert isclose(a, b)
+        """,
+        """
+        from math import isclose
+
+        def test_fit():
+            assert isclose(a, b, rel_tol=0.5)
+        """,
+        "rel_tol loosened from 1e-09 to 0.5",
+    ),
+    "parametrize with keyword arguments": (
+        """
+        @pytest.mark.parametrize(argnames="x", argvalues=[1, 2, 3])
+        def test_fit(x):
+            assert fit(x)
+        """,
+        """
+        @pytest.mark.parametrize(argnames="x", argvalues=[1])
+        def test_fit(x):
+            assert fit(x)
+        """,
+        "2 parametrize case(s) removed",
+    ),
+    "underscored assertion helper removed": (
+        """
+        def test_fit():
+            _assert_same(a, b)
+            _assert_order_free(c)
+        """,
+        """
+        def test_fit():
+            _assert_same(a, b)
+        """,
+        "assertion removed",
+    ),
+    "unittest skip added": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            @unittest.skip("off")
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        "unittest.skip added",
+    ),
+    "unittest expectedFailure added": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            @unittest.expectedFailure
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        "unittest.expectedFailure added",
+    ),
+    "self.skipTest added": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertTrue(fit())
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.skipTest("off")
+                self.assertTrue(fit())
+        """,
+        "self.skipTest() added",
+    ),
+    "unpacked tolerance constants": (
+        """
+        RTOL, ATOL = 1e-6, 1e-12
+        """,
+        """
+        RTOL, ATOL = 0.5, 1e-12
+        """,
+        "RTOL loosened from 1e-06 to 0.5",
+    ),
+    "chained tolerance constants": (
+        """
+        RTOL = TOL = 1e-6
+        """,
+        """
+        RTOL = TOL = 1e-2
+        """,
+        "loosened from 1e-06 to 0.01",
+    ),
 }
 
 
@@ -1663,6 +1817,63 @@ NOT_FLAGGED = {
             assert fit()
         """,
     ),
+    "xfail raises narrowed": (
+        """
+        @pytest.mark.xfail(raises=(ValueError, TypeError))
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(raises=ValueError)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "math.isclose through an alias tightened": (
+        """
+        import math as m
+
+        def test_fit():
+            assert m.isclose(a, b, rel_tol=1e-3)
+        """,
+        """
+        import math as m
+
+        def test_fit():
+            assert m.isclose(a, b)
+        """,
+    ),
+    "parametrize with keyword arguments and more cases": (
+        """
+        @pytest.mark.parametrize(argnames="x", argvalues=[1])
+        def test_fit(x):
+            assert fit(x)
+        """,
+        """
+        @pytest.mark.parametrize(argnames="x", argvalues=[1, 2])
+        def test_fit(x):
+            assert fit(x)
+        """,
+    ),
+    "underscored assertion helper added": (
+        """
+        def test_fit():
+            _assert_same(a, b)
+        """,
+        """
+        def test_fit():
+            _assert_same(a, b)
+            _assert_order_free(c)
+        """,
+    ),
+    "unpacked tolerance constants tightened": (
+        """
+        RTOL, ATOL = 0.5, 1e-12
+        """,
+        """
+        RTOL, ATOL = 1e-6, 1e-12
+        """,
+    ),
 }
 
 
@@ -1859,6 +2070,43 @@ def test_a_fixture_that_moved_without_its_params_is_flagged(check):
         check.Change(conftest, conftest, None, plain),
     ]
     assert [f.reason for f in check.analyze(changes)] == ["parametrized fixture deleted"]
+
+
+def test_a_test_moved_into_a_file_pytest_does_not_collect_is_lost(check):
+    source = "def test_fit():\n    assert fit()\n"
+    a, helpers = "tests/unit/test_a.py", "tests/unit/helpers.py"
+    changes = [check.Change(a, a, source, "x = 1\n"), check.Change(helpers, helpers, None, source)]
+    assert [f.reason for f in check.analyze(changes)] == ["test deleted"]
+
+
+def test_a_class_renamed_and_skipped_is_flagged(check):
+    old = "class TestOld:\n    def test_fit(self):\n        assert fit()\n"
+    skipped = "@pytest.mark.skip\n" + old.replace("TestOld", "TestNew")
+    renamed = old.replace("TestOld", "TestNew")
+    a = "tests/unit/test_a.py"
+    found = check.analyze([check.Change(a, a, old, skipped)])
+    assert [f.reason for f in found] == ["pytest.mark.skip added to a test that existed"]
+    assert check.analyze([check.Change(a, a, old, renamed)]) == []
+
+
+def test_a_test_moved_into_a_skipped_module_is_flagged(check):
+    source = "def test_fit():\n    assert fit()\n"
+    a, b = "tests/unit/test_a.py", "tests/unit/test_b.py"
+    changes = [
+        check.Change(a, a, source, "x = 1\n"),
+        check.Change(b, b, None, "pytestmark = pytest.mark.skip\n\n" + source),
+    ]
+    found = check.analyze(changes)
+    assert [f.reason for f in found] == ["pytest.mark.skip added to a test that existed"]
+
+
+def test_a_marker_on_a_class_is_reported_once(check):
+    methods = (
+        "    def test_a(self):\n        assert a()\n\n    def test_b(self):\n        assert b()\n"
+    )
+    old, new = "class TestFit:\n" + methods, "@pytest.mark.skip\nclass TestFit:\n" + methods
+    found = check.analyze([check.Change(PATH, PATH, old, new)])
+    assert [f.reason for f in found] == ["pytest.mark.skip added to a test that existed"]
 
 
 def test_a_flag_names_the_file_the_test_and_the_code(check):
@@ -2094,6 +2342,7 @@ WORKFLOW = textwrap.dedent("""
         steps:
           - run: echo hi
     """)
+PYPROJECT = '[project]\nname = "x"\n\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n'
 CHECK = "print('the check')\n"
 WORKFLOW_FILE = ".github/workflows/ci.yml"
 CHECK_FILE = "scripts/test_weakening.py"
@@ -2103,7 +2352,7 @@ CHECK_FILE = "scripts/test_weakening.py"
 def guarded(repo):
     """The repository whose base branch already has the check and the step that runs it."""
     git(repo, "checkout", "-q", "main")
-    write(repo, {CHECK_FILE: CHECK, WORKFLOW_FILE: WORKFLOW})
+    write(repo, {CHECK_FILE: CHECK, WORKFLOW_FILE: WORKFLOW, "pyproject.toml": PYPROJECT})
     commit(repo)
     git(repo, "checkout", "-q", "feature")
     git(repo, "reset", "-q", "--hard", "main")
@@ -2139,6 +2388,30 @@ def test_a_change_to_the_check_or_its_step_needs_approval(check, guarded, capsys
     assert "1 flagged change(s)" in output
     assert "weakened-test check" in output
     assert "title=Weakened test::" in output
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        'addopts = "--ignore=tests/unit/test_a.py"',
+        'testpaths = ["tests/unit"]',
+        'filterwarnings = ["ignore"]',
+    ],
+)
+def test_a_change_to_the_pytest_options_that_choose_the_tests_needs_approval(
+    check, guarded, capsys, options
+):
+    write(guarded, {"pyproject.toml": PYPROJECT.replace('testpaths = ["tests"]', options)})
+    commit(guarded)
+    assert check.main(["--base", "main"]) == 1
+    assert "pytest options that choose or judge the tests changed" in capsys.readouterr().out
+
+
+def test_other_changes_to_pyproject_need_no_approval(check, guarded):
+    text = PYPROJECT.replace('name = "x"', 'name = "y"') + 'markers = ["slow: a slow test"]\n'
+    write(guarded, {"pyproject.toml": text})
+    commit(guarded)
+    assert check.main(["--base", "main"]) == 0
 
 
 def test_deleting_the_check_needs_approval(check, guarded, capsys):
