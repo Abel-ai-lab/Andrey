@@ -126,7 +126,7 @@ class _Program:
 
     ``A_ub``, ``b_ub``, ``A_eq``, ``b_eq``, and ``bounds`` are the arguments of ``linprog``. The
     rest is the same model in HiGHS's form, as ``linprog`` hands it over: the stacked constraint
-    matrix in compressed-column form, the row bounds, and the column bounds.
+    matrix in compressed-column form with 32-bit indices, the row bounds, and the column bounds.
     """
 
     n_gamma: int
@@ -185,8 +185,8 @@ def _build_program(n_regimes: int, n_steps: int, max_transitions: int) -> _Progr
         A_eq=A_eq,
         b_eq=b_eq,
         bounds=bounds,
-        indptr=stacked.indptr,
-        indices=stacked.indices,
+        indptr=stacked.indptr.astype(np.int32),
+        indices=stacked.indices.astype(np.int32),
         data=stacked.data,
         row_lower=np.concatenate([np.full(b_ub.size, -np.inf), b_eq]),
         row_upper=np.concatenate([b_ub, b_eq]),

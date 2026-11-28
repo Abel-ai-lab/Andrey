@@ -238,7 +238,8 @@ def test_the_direct_call_solves_the_programs_and_linprog_does_not(monkeypatch) -
 @needs_highs
 def test_the_model_is_the_one_linprog_hands_to_highs(monkeypatch) -> None:
     """Each array the direct call reads equals, in dtype and bytes, the argument ``linprog`` passes
-    to SciPy's HiGHS wrapper, and the options it sets are the wrapper's.
+    to SciPy's HiGHS wrapper (the two index arrays, in values), and the options it sets are the
+    wrapper's.
     """
     module = pytest.importorskip("scipy.optimize._linprog_highs")
     seen: list[tuple] = []
@@ -261,8 +262,13 @@ def test_the_model_is_the_one_linprog_hands_to_highs(monkeypatch) -> None:
             program.col_upper,
         )
         for ours, theirs in zip(mine, (c, indptr, indices, data, lhs, rhs, lb, ub), strict=True):
-            assert (ours.dtype, ours.shape) == (theirs.dtype, theirs.shape)
-            assert ours.tobytes() == theirs.tobytes()
+            if (
+                ours.dtype.kind == "i"
+            ):  # SciPy's index width depends on its version; HiGHS reads 32 bits
+                assert np.array_equal(ours, theirs)
+            else:
+                assert (ours.dtype, ours.shape) == (theirs.dtype, theirs.shape)
+                assert ours.tobytes() == theirs.tobytes()
         passed = {
             key: (("on" if value else "off") if key == "presolve" else value)
             for key, value in options.items()
