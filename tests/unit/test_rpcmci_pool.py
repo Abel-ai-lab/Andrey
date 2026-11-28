@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import os
+import sys
 import warnings
 import weakref
 from concurrent.futures import Future
@@ -136,8 +137,13 @@ def worker_state(monkeypatch):
     saved = (config._backend, config._n_jobs, config._tie_break)
     environ = {name: os.environ.get(name) for name in GPU_VARIABLES}
     blas = [(lib, lib.num_threads) for lib in threadpoolctl.ThreadpoolController().lib_controllers]
+    torch = sys.modules.get("torch")
+    torch_threads = torch.get_num_threads() if torch is not None else None
     monkeypatch.setattr(pr, "_WORKER_STARTS", None)
     yield
+    torch = sys.modules.get("torch")
+    if torch is not None and torch_threads is not None:
+        torch.set_num_threads(torch_threads)
     if pr._WORKER_BLAS is not None:
         pr._WORKER_BLAS.restore_original_limits()
         monkeypatch.setattr(pr, "_WORKER_BLAS", None)
@@ -380,6 +386,27 @@ def test_an_initialized_worker_holds_the_callers_settings(worker_state):
     assert {pool["num_threads"] for pool in threadpoolctl.threadpool_info()} == {1}
 
 
+def test_a_cpu_worker_runs_pytorch_on_one_thread(worker_state, monkeypatch):
+    """The BLAS limit does not always reach PyTorch's thread pool, so a ``cpu`` worker sets it; the
+    BLAS limit is replaced here by one that changes nothing, so that this call is what is seen."""
+
+    class NoLimit:
+        def restore_original_limits(self) -> None:
+            pass
+
+    torch = pytest.importorskip("torch")
+    monkeypatch.setattr(threadpoolctl, "threadpool_limits", lambda limits: NoLimit())
+    torch_threads = torch.get_num_threads()
+    try:
+        torch.set_num_threads(2)
+        pr._init_worker(object(), "rank", "numpy", ())
+        assert torch.get_num_threads() == 2  # a NumPy worker leaves PyTorch alone
+        pr._init_worker(object(), "rank", "cpu", ())
+        assert torch.get_num_threads() == 1
+    finally:
+        torch.set_num_threads(torch_threads)
+
+
 @pytest.mark.parametrize("scope", ["attribute", "context"])
 def test_the_pool_is_given_the_callers_tie_break_backend_and_environment(
     scope, in_process, monkeypatch
@@ -506,26 +533,30 @@ def _starts() -> rp.Starts:
 
 
 @pytest.mark.parametrize(
-    "preference, live, pooled",
+    "preference, live, available, pooled",
     [
-        ("numpy", None, True),
-        ("numpy", "cuda", True),
-        ("auto", None, True),
-        ("auto", "mps", True),
-        ("auto", "cuda", False),
-        ("cpu", None, True),
-        ("cpu", "cuda", True),
-        ("cuda", None, False),
-        ("mps", None, False),
+        ("numpy", None, (), True),
+        ("numpy", "cuda", ("cuda",), True),
+        ("auto", None, ("cuda",), True),
+        ("auto", "mps", ("mps",), True),
+        ("auto", "cuda", ("cuda",), False),
+        ("cpu", None, (), True),
+        ("cpu", "cuda", ("cuda",), True),
+        ("cuda", None, ("cuda",), False),
+        ("mps", None, ("mps",), False),
+        ("cuda", None, ("mps",), True),  # a device the machine lacks falls back to NumPy
+        ("mps", None, (), True),
     ],
 )
 def test_a_fit_that_can_use_a_gpu_runs_its_starts_in_this_process(
-    preference, live, pooled, monkeypatch
+    preference, live, available, pooled, monkeypatch
 ):
-    """``auto`` takes only CUDA, and only once its runtime is live, and ``cuda`` and ``mps`` are
-    pinned devices; a ``numpy`` or ``cpu`` fit takes the pool whatever runtime is live."""
+    """``auto`` takes only CUDA, and only once its runtime is live, and a backend pinned to a
+    ``cuda`` or ``mps`` device the machine has takes that device; a ``numpy`` or ``cpu`` fit, or a
+    pin to a device the machine lacks, takes the pool whatever runtime is live."""
     monkeypatch.setenv(VARIABLE, "0")
     monkeypatch.setattr(backend, "_is_live", lambda device: device == live)
+    monkeypatch.setattr(backend, "_is_available", lambda device: device in available)
     with andrey.config(n_jobs=4, backend=preference):
         runs = pr.pooled_starts(_starts(), N_STARTS)
     assert (runs is not None) is pooled

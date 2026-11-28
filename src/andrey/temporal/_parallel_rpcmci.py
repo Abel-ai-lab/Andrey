@@ -11,9 +11,9 @@ in, and are those of a fit in the calling process. It reads each start once, so 
 holds the best start and the starts that finished ahead of the one it reads, not every start.
 
 A fit whose statistics can run on a GPU runs its starts in the calling process: a backend pinned to
-``cuda`` or ``mps`` would start a device runtime in each worker, and ``auto`` with a CUDA runtime
-live in the calling process can take the device for a start that a fresh worker runs on NumPy,
-which could give another result.
+``cuda`` or ``mps`` that the machine has would start a device runtime in each worker, and ``auto``
+with a CUDA runtime live in the calling process can take the device for a start that a fresh
+worker runs on NumPy, which could give another result.
 """
 
 from __future__ import annotations
@@ -59,7 +59,8 @@ def _init_worker(
 ) -> None:
     """Keep the caller's ``starts`` for the life of the worker, on one BLAS thread, with the
     caller's ``tie_break`` rule, numeric backend, and ``environment`` (:data:`ENVIRONMENT`, as
-    ``(name, value or None)``), and no workers of its own."""
+    ``(name, value or None)``), and no workers of its own. A ``cpu`` backend also runs PyTorch on
+    one thread, which the BLAS limit does not always reach."""
     global _WORKER_STARTS, _WORKER_BLAS
     from threadpoolctl import threadpool_limits
 
@@ -67,6 +68,8 @@ def _init_worker(
     backend.config.n_jobs = 1
     backend.config.backend = numeric_backend
     backend.config.tie_break = tie_break
+    if numeric_backend == "cpu" and (torch := backend.torch()) is not None:
+        torch.set_num_threads(1)  # held for the worker's lifetime, as the BLAS limit is
     for name, value in environment:
         if value is None:
             os.environ.pop(name, None)
@@ -86,14 +89,15 @@ def _run(a: int) -> RPCMCIResult | None:
 def _starts_can_use_a_gpu() -> bool:
     """Whether a start's statistics can run on a GPU in this process.
 
-    That is so for a backend pinned to ``cuda`` or ``mps``, and for ``auto`` once a CUDA runtime is
-    live in this process, since ``auto`` takes a device only once its runtime is running. A
-    ``numpy`` or ``cpu`` backend, and ``auto`` without a live runtime, give a worker the same
-    statistics as this process.
+    That is so for a backend pinned to ``cuda`` or ``mps`` that this machine has, and for ``auto``
+    once a CUDA runtime is live in this process, since ``auto`` takes a device only once its runtime
+    is running. A pinned device the machine lacks falls back to NumPy, so a ``numpy`` or ``cpu``
+    backend, that pin, and ``auto`` without a live runtime give a worker the same statistics as this
+    process.
     """
     preference = backend.config.backend
     if preference in ("cuda", "mps"):
-        return True
+        return backend._is_available(preference)
     return preference == "auto" and any(
         backend._is_live(device) for device in backend.TORCH_AUTO if device != "numpy"
     )
