@@ -5,8 +5,9 @@ its gate datasets and of one larger dataset (:data:`LARGER`), and UT-IGSP and Gn
 smaller interventional dataset (:data:`UNKNOWN_TARGETS`), on the numpy backend with one worker and
 one BLAS thread. Regime-PCMCI, which the gate does not run, is fitted on two series of its own
 (:data:`EXPERIMENTAL`). The options 0.19.0 added (:data:`OPTIONS`) have fits of their own on data
-where they change the answer. A fit's hash covers its whole output: the graph, the edge weights, the
-causal order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats
+where they change the answer, and LPCMCI is fitted on a series whose searches reach the subset
+lattice (:data:`PATH_DATASETS`). A fit's hash covers its whole output: the graph, the edge weights,
+the causal order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats
 enter as their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so
 equal hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each
 part of the output has its own digest (:func:`parts`), so a difference reads as a changed graph, as
@@ -82,6 +83,7 @@ from andrey import GraphStructure, StructureOutput, TemporalStructure, data
 from andrey.core import ci, ci_cmiknn, ci_gpdc, ci_kernel, ci_missing, score, score_delta
 from andrey.data import missingness
 from andrey.search import hc, xges
+from andrey.temporal.lpcmci_lattice import SubsetLattice
 from qa import quality_gate as qg
 
 # ==================================================================================================
@@ -397,6 +399,25 @@ def sparse_discrete_draws() -> tuple[qg.Draw, ...]:
     return tuple(qg.Draw(sample.data, sample.graph) for sample in out)
 
 
+#: The seeds of the series of :func:`lattice_series_draws`, each with a link whose search of
+#: separating sets reaches subsets of four or more nodes in the thousands.
+LATTICE_SEEDS = (0, 7)
+
+
+def lattice_series_draws() -> tuple[qg.Draw, ...]:
+    """Return a draw per seed of :data:`LATTICE_SEEDS` of a vector autoregression of 10 variables
+    and 1,000 steps, with its lagged links as the truth.
+
+    LPCMCI's search on each reaches the subsets of four or more nodes that it reads from a
+    :class:`~andrey.temporal.lpcmci_lattice.SubsetLattice`, which the gate's series do not.
+    """
+    out = (
+        data.sample_scm(functional="var", d=10, n=1000, seed=seed, density=2)
+        for seed in LATTICE_SEEDS
+    )
+    return tuple(qg.Draw(sample.data, sample.graph) for sample in out)
+
+
 def regime_draws(kind: str, n_steps: int, n_vars: int) -> tuple[qg.Draw, ...]:
     """Return a draw per seed of a series that switches between two regimes in runs of 70 to 100
     steps, with no true graph.
@@ -424,14 +445,20 @@ def regime_draws(kind: str, n_steps: int, n_vars: int) -> tuple[qg.Draw, ...]:
     return tuple(out)
 
 
-#: The datasets the gate does not draw: those of the option fits and of :data:`EXPERIMENTAL`.
+#: The datasets the gate does not draw: those of the option fits, of :data:`EXPERIMENTAL`, and of
+#: the fits on a path the gate's datasets do not reach.
 OPTION_DRAWS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "cohorts_d14_n2000": functools.partial(cohort_draws, 2000),
     "gapped_series_d6_n600": functools.partial(gapped_series_draws, 6, 600),
     "discrete_sparse_d12_n250": sparse_discrete_draws,
+    "lpcmci_var_d10_n1000": lattice_series_draws,
     "regime_sign_d2_n600": functools.partial(regime_draws, "sign", 600, 2),
     "regime_wide_d3_n600": functools.partial(regime_draws, "wide", 600, 3),
 }
+#: The methods fitted on one more dataset, whose fit takes a path that their gate and larger
+#: datasets do not reach: LPCMCI's separating-set search of subsets of four or more nodes reads
+#: the partial correlations of each subset from a lattice (:mod:`andrey.temporal.lpcmci_lattice`).
+PATH_DATASETS: dict[str, tuple[str, ...]] = {"LPCMCI": ("lpcmci_var_d10_n1000",)}
 
 
 @dataclass(frozen=True)
@@ -721,7 +748,7 @@ EXPERIMENTAL: dict[str, tuple[str, ...]] = {
 
 def datasets(method: str) -> tuple[str, ...]:
     """Return the datasets ``method`` is fitted on: its gate datasets, its larger dataset, and any
-    of :data:`EXACT_SEARCH_DATASETS`."""
+    of :data:`EXACT_SEARCH_DATASETS` and :data:`PATH_DATASETS`."""
     if method in OPTIONS:
         return (OPTIONS[method].dataset,)
     if method in EXPERIMENTAL:
@@ -731,7 +758,12 @@ def datasets(method: str) -> tuple[str, ...]:
     method = TARGET_LISTS.get(method, method)
     if method in UNKNOWN_TARGETS:
         return UNKNOWN_TARGETS[method]
-    return (*qg.SUPPORTED[method].datasets, LARGER[method], *EXACT_SEARCH_DATASETS.get(method, ()))
+    return (
+        *qg.SUPPORTED[method].datasets,
+        LARGER[method],
+        *EXACT_SEARCH_DATASETS.get(method, ()),
+        *PATH_DATASETS.get(method, ()),
+    )
 
 
 @functools.cache
@@ -1042,6 +1074,12 @@ CI_QUERIES: dict[str, Callable[..., Iterable[tuple[int, int, Any, float]]]] = {
         x, y, conditions, ps
     ),
     "first_order_pvalues": lambda ps, test, x, y, zs: [(x, y, (z,), p) for z, p in zip(zs, ps)],
+    # The subsets of a lattice answered, up to the first separating one; the chunk's subsets after
+    # it are computed ahead and dropped, so they are not queries.
+    "prefix": lambda rp, lattice, start, stop, alpha: [
+        (lattice.x, lattice.y, row, p)
+        for row, p in zip(lattice.rows(np.arange(start, start + len(rp[1]))), rp[1])
+    ],
     "statistic_pvalues_given": lambda rp, test, x, ys, condition_set: [
         (x, y, condition_set, p) for y, p in zip(ys, rp[1])
     ],
@@ -1069,6 +1107,8 @@ CI_CLASSES = (
     ci_missing.GaussianDeletion,
     ci_missing.ChiSquareDeletion,
     ci_missing.BoundedDeletion,
+    # LPCMCI's partial correlations of the subsets of a search, read from the previous size's.
+    SubsetLattice,
 )
 #: The local scores' query methods and the score-delta functions, each with the parent sets one
 #: call scores, read from the call's result, the score, and the call's arguments. A delta scores

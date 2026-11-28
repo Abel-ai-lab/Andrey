@@ -65,6 +65,15 @@ Whether ``B`` is inside reads the vote when both links to ``B`` have empty middl
 otherwise requires ``B`` in every stored separating set. The paths of R9' and R10' leave out links
 whose middle mark is ``"?"``, and R4 reads only links with empty middle marks.
 
+A separating-set search of ``p``-subsets with ``p`` above the cached depth, on complete data with
+``fisherz`` or ``student_t``, and with at least a few thousand subsets, reads each subset's partial
+correlation from the factors of its parent subset instead of inverting its correlation submatrix
+(:mod:`andrey.temporal.lpcmci_lattice`), and keeps those factors between rounds while the search
+order repeats. The tests, their order, the first separating set, and what the search records of a
+link, its smallest absolute statistic and its largest p-value, are those of the inversion, bit for
+bit: the subsets that decide them are asked of the test again. A search whose factors would hold
+too much memory, or whose correlation block is near singular, takes the inversion.
+
 Every test reads the lagged design of :func:`~andrey.temporal.pcmci.lagged_design` over
 ``T - 2 * tau_max`` time steps, through any :class:`~andrey.temporal.pcmci.LinkTest`, and is
 written with its later node at time ``t``. Every node a step uses lies within ``tau_max`` steps of
@@ -93,6 +102,8 @@ from andrey.core import backend
 from andrey.core.ci_missing import NOT_TESTED, PartialCorrelationDeletion
 from andrey.core.structure import ARROW, CIRCLE, NULL, TAIL
 from andrey.core.ties import KEY_DP, tie_ranks
+from andrey.temporal import lpcmci_lattice as lattice
+from andrey.temporal.lpcmci_lattice import SubsetLattice
 from andrey.temporal.pcmci import DesignTest, LinkTest, design_test
 
 if TYPE_CHECKING:
@@ -246,6 +257,9 @@ class LPCMCISearch:
         self.cache = OrderedDict()
         self.votes: dict[Key, tuple[list[frozenset[Node]], list[frozenset[Node]]]] = {}
         self.votes_version = -1
+        #: The :class:`~andrey.temporal.lpcmci_lattice.SubsetLattice` of each search being read in
+        #: levels, by its pair, candidates and fixed columns.
+        self.lattices: dict[tuple[int, int, bytes, bytes], SubsetLattice] = {}
 
     # ---- the graph -----------------------------------------------------------------------
 
@@ -597,15 +611,20 @@ class LPCMCISearch:
 
         The sets are built as rows of column numbers, so a batch costs one array operation rather
         than one Python set per test; the tests, their order, and the memories they update are
-        those of :meth:`separating`.
+        those of :meth:`separating`. A search that :meth:`_lattice_subsets` takes reads the same
+        values from a lattice, with those the memories keep from the test.
         """
         key, _ = _key(a, b)
         shift = -min(a[1], b[1])
         x, y = self._column((a[0], a[1] + shift)), self._column((b[0], b[1] + shift))
         columns = np.array([self._column((v, lag + shift)) for v, lag in search], dtype=np.intp)
-        fixed = np.array([self._column((v, lag + shift)) for v, lag in sdef], dtype=np.intp)
-        subsets = combinations(range(len(search)), p)
+        fixed = np.array(sorted(self._column((v, lag + shift)) for v, lag in sdef), dtype=np.intp)
         cached = self.cache_every_size or p <= CACHED_DEPTH
+        if not cached:
+            handled, found = self._lattice_subsets(key, x, y, columns, fixed, search, sdef, p)
+            if handled:
+                return found
+        subsets = combinations(range(len(search)), p)
         size = 16
         while batch := list(islice(subsets, size)):
             picks = np.array(batch, dtype=np.intp).reshape(len(batch), p)
@@ -620,6 +639,67 @@ class LPCMCISearch:
                 return frozenset(search[k] for k in batch[int(above[0])]) | frozenset(sdef)
             size = min(2 * size, BATCH)
         return None
+
+    def _lattice_subsets(
+        self,
+        key: Key,
+        x: int,
+        y: int,
+        columns: np.ndarray,
+        fixed: np.ndarray,
+        search: list[Node],
+        sdef: frozenset[Node] | set[Node],
+        p: int,
+    ) -> tuple[bool, frozenset[Node] | None]:
+        """:meth:`separating_subsets` from the partial correlations of a
+        :class:`~andrey.temporal.lpcmci_lattice.SubsetLattice`, for a ``p``-subset search of
+        complete data that is large enough, fits the memory bound, and passes the lattice's
+        certificate. Returns whether it ran, and what the search found.
+
+        The lattice keeps its level between rounds while the candidates in their order and the
+        fixed columns repeat, and the lattices of a search hold at most
+        :data:`~andrey.temporal.lpcmci_lattice.MAX_BYTES`, or its share when the search runs in one
+        of a pool's workers: the one used longest ago goes first. A search that does not run on it
+        takes the batches of :meth:`separating_subsets`, whatever its neighbors do.
+        """
+        m = len(columns)
+        if not isinstance(self.test, DesignTest) or math.comb(m, p) < lattice.MIN_SUBSETS:
+            return False, None
+        held = (x, y, columns.tobytes(), fixed.tobytes())
+        state = self.lattices.pop(held, None)
+        resumed = state is not None and state.level == p - 1
+        f = len(fixed)
+        need = (
+            lattice.level_bytes(m, f, p - 1) + lattice.level_bytes(m, f, p)
+            if resumed
+            else lattice.live_bytes(m, f, p)
+        )
+        cap = lattice.MAX_BYTES // backend.pool_workers()
+        if need > cap:
+            return False, None
+        while self.lattices and need + sum(o.nbytes for o in self.lattices.values()) > cap:
+            del self.lattices[next(iter(self.lattices))]  # the one used longest ago
+        if not resumed:
+            if not lattice.rebuild_pays(m, p):
+                return False, None
+            state = SubsetLattice.build(self.test, x, y, columns, fixed)
+            if state is None:
+                return False, None
+            state.grow(p - 1)
+        total = math.comb(m, p)
+        start, size = 0, lattice.FIRST_CHUNK
+        while start < total:
+            stop = min(start + size, total)
+            statistics, p_values = state.prefix(start, stop, self.alpha)
+            self._record_batch(key, statistics, p_values)
+            if p_values[-1] > self.alpha:
+                subset = state.subset(start + len(p_values) - 1)
+                return True, frozenset(search[k] for k in subset) | frozenset(sdef)
+            start, size = stop, min(2 * size, lattice.CHUNK)
+        if p < m:
+            state.advance()
+            self.lattices[held] = state
+        return True, None
 
     def _test_rows(
         self, x: int, y: int, rows: np.ndarray, cached: bool
@@ -792,6 +872,7 @@ class LPCMCISearch:
 
     def ancestral_phase(self, rules: list[Callable[[], tuple[dict, dict, dict]]]) -> None:
         """Algorithm S2, then the full rule list."""
+        self.lattices.clear()
         p = 0
         while True:
             removed = False
@@ -832,6 +913,7 @@ class LPCMCISearch:
                 p += 1
             if all(edge[1] in ("!", "") for edge in self.edges.values()):
                 break
+        self.lattices.clear()
         self.apply_rules(self.full_rules(), lagged_only=False)
 
     def _past_depth(self, p: int) -> bool:
@@ -899,6 +981,7 @@ class LPCMCISearch:
 
     def non_ancestral_phase(self) -> None:
         """Algorithm S3, then the full rule list."""
+        self.lattices.clear()
         p = 0
         while True:
             removed = False
@@ -940,6 +1023,7 @@ class LPCMCISearch:
                 p += 1
             if all(edge[1] == "" for edge in self.edges.values()):
                 break
+        self.lattices.clear()
         self.apply_rules(self.full_rules(), lagged_only=False)
 
     # ---- the rules ---------------------------------------------------------------------------

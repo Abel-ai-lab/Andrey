@@ -320,6 +320,14 @@ names its pull request.
   `BaseException`, a `test_*` function that becomes a fixture, a `parametrize` with no case added,
   an `xfail` that gains `run=False`, a new `setup_module`, `setup_class`, `setup_method`, or
   `setup_function` that skips, and a function of `qa/` that is deleted or emptied. ([#1381])
+- `lpcmci` runs faster where a link's search set is large, with `fisherz` or `student_t` on complete
+  data: a search of subsets of four or more nodes reads each subset's partial correlation from the
+  factors of its parent subset, kept between rounds, instead of inverting its correlation
+  submatrix, and asks the test again for the subsets that decide what the search records, so the
+  output is the same bit for bit. A search whose factors would hold more than 1 GiB, or whose
+  correlation block is near singular, inverts as before; in a bootstrap's worker processes the
+  workers share the 1 GiB. For contributors, `qa/identity.py` counts the tests the lattice answers
+  and fits LPCMCI on a series whose searches reach it. ([#1360])
 - `resit` and the exact search of `cpcm_graph` (3 or 4 variables) run their regressions on the
   `andrey.config(n_jobs=...)` worker processes, so they run faster with more than one worker, with
   the same graph, causal order, and scores bit for bit at any number of workers. A `resit` fit uses
@@ -3359,6 +3367,7 @@ First alpha release.
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
 [#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
+[#1360]: https://github.com/Abel-ai-lab/Andrey/pull/1360
 [#1362]: https://github.com/Abel-ai-lab/Andrey/pull/1362
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
