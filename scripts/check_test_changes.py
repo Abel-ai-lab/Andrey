@@ -8,7 +8,8 @@ function by function, and flags:
 - a removed ``assert`` statement, ``assert_*``, ``pytest.fail`` or ``self.fail`` call,
   ``pytest.raises`` check, or ``pytest.approx`` assertion, and a ``pytest.raises``,
   ``pytest.warns``, or ``assertRaises`` that lost its ``match`` (or matches every message) or its
-  ``check``, widened to ``Exception`` (``Warning`` for a warning), or lists more exceptions;
+  ``check``, widened to ``Exception`` or ``BaseException`` (``Warning`` for a warning), or lists
+  more exceptions;
 - a looser tolerance or bound: a larger ``rtol``, ``atol``, ``abs``, ``rel``, ``tol``, or ``delta``
   (a ``delta`` of ``assertAlmostEqual`` replaces its ``places``), a smaller ``decimal`` or
   ``places``, a looser bound in a comparison, ``nan_ok`` or ``equal_nan`` made true, an exact
@@ -18,13 +19,21 @@ function by function, and flags:
   request into a release branch skips those tests), on a test that existed in the base, written out,
   through a module name bound to one, or through an alias of ``pytest``; a conditional skip
   (``skipif``, unittest's ``skipIf`` and ``skipUnless``) or ``xfail`` condition made to apply
-  always, and an ``xfail`` made non-strict or without its ``raises``; an autouse fixture that skips,
-  and a ``pytest_*`` hook, added or changed in a ``conftest.py`` or a test file that existed; a
-  ``__test__ = False``, a constructor, or a lost ``TestCase`` base that stops pytest collecting a
-  class; a ``filterwarnings`` marker that stops raising a warning or lets one pass;
+  always (pytest evaluates a string condition, so one counts when it is a literal such as
+  ``"True"``), and an ``xfail`` made non-strict, without its ``raises``, or with ``run=False``;
+- a test that stops running without a marker: an autouse fixture or a new xunit ``setup_module``,
+  ``setup_class``, ``setup_method``, or ``setup_function`` that skips, a ``pytest_*`` hook added or
+  changed in a ``conftest.py`` or a test file that existed, an entry added to ``collect_ignore`` or
+  ``collect_ignore_glob`` of a ``conftest.py`` (a new one included), a ``__test__ = False`` added
+  to a module, to a function (``test_fit.__test__ = False``), or to a class, a constructor or a
+  lost ``TestCase`` base that stops pytest collecting a class, a ``test_*`` function that became a
+  fixture, and a ``parametrize`` or fixture ``params`` with no case added, which skips the test;
+- a ``filterwarnings`` marker that stops raising a warning or lets one pass;
 - a deleted test function or parametrized fixture, a test file renamed out of the names pytest
   collects (or into another kind of file), or a removed ``parametrize`` case (a literal list, tuple,
   set, or ``range``; a case that another replaced counts as removed);
+- a function of ``qa/`` that is no test, such as a validation ``main()``, deleted or emptied to
+  ``pass``, ``...``, a docstring, or a plain return; one that moved to another file is not deleted;
 - a re-recorded baseline file: a changed or deleted file of ``baselines/`` or named for one, and a
   JSON baseline whose recorded values changed;
 - a change to this script or to the workflow job that runs it (see below), or to the pytest options
@@ -34,8 +43,9 @@ function by function, and flags:
 
 An added test, a tightened tolerance, and a test that only moved or was renamed are not flagged. It
 cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, a check
-that moved into a helper, or an existing test pointed at a new baseline file, so a pass is
-necessary and not sufficient.
+that moved into a helper, a call of a function of ``qa/`` that was removed, a ``collect_ignore``
+or ``__test__`` set through a value it cannot read, or an existing test pointed at a new baseline
+file, so a pass is necessary and not sufficient.
 
 The script prints each flagged change with its reason and exits 1 unless the pull request carries
 the label ``test-change-approved``, which a maintainer sets after reading the flags. Run it in a
@@ -79,6 +89,9 @@ ROOTS = ("tests", "qa")
 # This script and the workflow whose job runs it: a change to either needs the label too.
 DETECTOR = "scripts/check_test_changes.py"
 WORKFLOW = ".github/workflows/ci.yml"
+# The conftest names that make pytest skip collecting from a path, and the xunit-style setups.
+COLLECT_IGNORES = frozenset({"collect_ignore", "collect_ignore_glob"})
+XUNIT_SETUPS = frozenset({"setup_module", "setup_class", "setup_method", "setup_function"})
 # The pytest options (``pyproject.toml``) that choose which tests run, and how a failure counts.
 PYTEST_OPTIONS = (
     "addopts",
@@ -148,7 +161,9 @@ RAISES = frozenset(
 )
 MARKERS = frozenset({"skip", "skipif", "xfail", "release"})
 SKIP_CALLS = frozenset({"skip", "xfail", "importorskip"})
-BROAD = frozenset({"Exception", "BaseException", "Warning"})
+# The exception types that catch nearly anything, and how much: ``BaseException`` catches more than
+# ``Exception``.
+BROAD = {"Warning": 1, "Exception": 1, "BaseException": 2}
 ARITHMETIC = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -206,9 +221,14 @@ class Unit(NamedTuple):
 
     @property
     def is_test(self) -> bool:
-        """Whether the unit is a function named ``test...`` that pytest collects."""
+        """Whether the unit is a function named ``test...`` that pytest collects as a test."""
         name = self.qualname.rsplit(".", 1)[-1]
-        return self.is_function and self.collected and name.startswith("test")
+        return (
+            self.is_function
+            and self.collected
+            and name.startswith("test")
+            and not _declares_fixture(self)
+        )
 
 
 class Check(NamedTuple):
@@ -795,8 +815,9 @@ def _accepted(node: ast.expr | None) -> frozenset[str] | None:
 def _widened(before: ast.expr | None, after: ast.expr | None) -> list[str]:
     """Return why ``after`` accepts more exceptions than ``before``: a broad one, or more names."""
     reasons = []
-    broad = _listed(after) & BROAD
-    if broad and not _listed(before) & BROAD:
+    reach = max((BROAD.get(name, 0) for name in _listed(before)), default=0)
+    broad = {name for name in _listed(after) if BROAD.get(name, 0) > reach}
+    if broad:
         reasons.append(f"widened to {', '.join(sorted(broad))}")
     old, new = _accepted(before), _accepted(after)
     if old is not None and new is not None and old < new:
@@ -907,8 +928,10 @@ def _elements(
         return Counter(_case(key) for key in node.keys if key is not None)
     if isinstance(node, ast.Name) and node.id in constants and depth < 2:
         return _elements(constants[node.id], constants, depth + 1)
-    if isinstance(node, ast.Call) and _callee(node) in {"list", "tuple", "set"} and node.args:
-        return _elements(node.args[0], constants, depth + 1)
+    if isinstance(node, ast.Call) and _callee(node) in {"list", "tuple", "set"}:
+        if not node.args and not node.keywords:
+            return Counter()
+        return _elements(node.args[0], constants, depth + 1) if node.args else None
     if isinstance(node, ast.Call) and _callee(node) == "range" and 1 <= len(node.args) <= 3:
         integers = _integers(node.args)
         try:
@@ -1023,13 +1046,30 @@ def _keywords(use: ast.expr) -> dict[str, ast.expr]:
     return {k.arg: k.value for k in use.keywords if k.arg} if isinstance(use, ast.Call) else {}
 
 
+def _applies(condition: ast.expr | None, kind: str) -> bool:
+    """Whether a condition is a literal that makes the skip or ``xfail`` apply every time.
+
+    pytest evaluates the string condition of its markers as Python code, so a string counts only
+    when it is a literal (``"True"``); ``unittest`` reads a non-empty string as true.
+    """
+    if not isinstance(condition, ast.Constant):
+        return False
+    value = condition.value
+    if isinstance(value, str) and kind.startswith("pytest."):
+        try:
+            value = ast.literal_eval(value.strip())
+        except (ValueError, SyntaxError):
+            return False
+    return bool(value) == SKIP_WHEN[kind]
+
+
 def _skipifs(unit: Unit, kind: str) -> list[tuple[ast.expr, bool]]:
     """List a unit's conditional skips of a kind in order, with whether the condition skips."""
     found = []
     for node in _marker_uses(unit, kind):
         if isinstance(node, ast.Call):
             condition = node.args[0] if node.args else _keywords(node).get("condition")
-            skips = isinstance(condition, ast.Constant) and bool(condition.value) == SKIP_WHEN[kind]
+            skips = _applies(condition, kind)
             # An ``xfail`` with no condition always applies, and so does a bare one.
             found.append((node, skips or (condition is None and kind.endswith("xfail"))))
         elif kind.endswith("xfail"):
@@ -1048,10 +1088,18 @@ def _strict(use: ast.expr) -> bool | None:
     return bool(value.value) if isinstance(value, ast.Constant) else None
 
 
+def _stops_running(use: ast.expr) -> bool:
+    """Whether an ``xfail`` marker has the literal ``run=False``, which skips running the test."""
+    run = _keywords(use).get("run")
+    return isinstance(run, ast.Constant) and run.value is False
+
+
 def _xfail_reasons(before: ast.expr, after: ast.expr) -> list[str]:
     reasons = []
     if _strict(before) is True and _strict(after) is False:
         reasons.append("xfail made non-strict")
+    if _stops_running(after) and not _stops_running(before):
+        reasons.append("xfail made not to run the test (run=False)")
     old, new = _keywords(before).get("raises"), _keywords(after).get("raises")
     if old is not None and (new is None or _is_none(new)):
         reasons.append("xfail lost its raises")
@@ -1120,8 +1168,15 @@ def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -
             flag(node, f"{name} added to a test that existed", [], [_clip(_text(new, node))])
 
 
+EMPTY = "parametrization with no case added: pytest skips the test"
+
+
 def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
-    """Flag the cases a unit's parametrizations lost and an argument left without one."""
+    """Flag the cases a unit's parametrizations lost and an argument left without one.
+
+    A parametrization with no case at all skips the test, so one that is empty and was not before
+    (it is new, or its cases were not stated) is flagged too.
+    """
     pool: dict[tuple[str, ...], list[tuple[Counter[str] | None, ast.Call]]] = defaultdict(list)
     kept = set()
     for names, elements, node in _parametrizations(new):
@@ -1139,18 +1194,20 @@ def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
                         [_clip(_text(old, node))],
                         [_clip(_text(new, after_node))],
                     )
+            elif elements is None and after_elements is not None and not after_elements:
+                flag(after_node, EMPTY, [_clip(_text(old, node))], [_clip(_text(new, after_node))])
         elif missing := [name for name in names if name not in kept]:
             flag(
                 None, f"parametrization of {', '.join(missing)} removed", [_clip(_text(old, node))]
             )
+    for added in pool.values():
+        for elements, node in added:
+            if elements is not None and not elements:
+                flag(node, EMPTY, [], [_clip(_text(new, node))])
 
 
-def compare(old: Unit, new: Unit, exempt: frozenset[str] = frozenset()) -> list[Finding]:
-    """Return the changes in ``new`` that skip, loosen, or remove what the same unit ``old`` runs.
-
-    ``exempt`` names the module constants whose markers are not read: those only added tests use.
-    """
-    findings: list[Finding] = []
+def _flagger(new: Unit, findings: list[Finding]) -> Flag:
+    """Return the function that records a flagged change of a unit in ``findings``."""
 
     def flag(
         node: ast.AST | None, reason: str, before: Sequence[str] = (), after: Sequence[str] = ()
@@ -1160,9 +1217,139 @@ def compare(old: Unit, new: Unit, exempt: frozenset[str] = frozenset()) -> list[
             Finding(new.path, line, new.qualname, reason, "\n".join(before), "\n".join(after))
         )
 
+    return flag
+
+
+def _is_false(node: ast.AST | None) -> bool:
+    return isinstance(node, ast.Constant) and node.value is False
+
+
+def _switch_off(unit: Unit) -> list[ast.AST]:
+    """List the statements of a module or function that set ``__test__`` to a literal ``False``.
+
+    A module-level ``__test__ = False`` and an attribute such as ``test_fit.__test__ = False`` or
+    ``setattr(test_fit, "__test__", False)`` stop pytest collecting what they name; the same line in
+    a class body is read with the class.
+    """
+    if isinstance(unit.node, ast.ClassDef):
+        return []
+    found = []
+    for node in sorted(unit.nodes, key=_position):
+        if isinstance(node, ast.Assign) or (isinstance(node, ast.AnnAssign) and node.value):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            switched = any(
+                (isinstance(t, ast.Name) and t.id == "__test__" and not unit.is_function)
+                or (isinstance(t, ast.Attribute) and t.attr == "__test__")
+                for t in targets
+            )
+            if switched and _is_false(node.value):
+                found.append(node)
+        elif isinstance(node, ast.Call) and _callee(node) == "setattr" and len(node.args) == 3:
+            name = node.args[1]
+            if (
+                isinstance(name, ast.Constant)
+                and name.value == "__test__"
+                and _is_false(node.args[2])
+            ):
+                found.append(node)
+    return found
+
+
+def _switch_off_findings(old: Unit, new: Unit, flag: Flag) -> None:
+    """Flag a ``__test__ = False`` that the unit gained."""
+    before = Counter(ast.dump(node) for node in _switch_off(old))
+    for node in _switch_off(new):
+        key = ast.dump(node)
+        if before[key] > 0:
+            before[key] -= 1
+        else:
+            flag(node, SWITCHED_OFF, [], [_clip(_text(new, node))])
+
+
+SWITCHED_OFF = "__test__ = False added: pytest stops collecting what it names"
+IGNORE = "collect_ignore or collect_ignore_glob entry added: pytest stops collecting what it names"
+
+
+def _ignored(unit: Unit) -> list[tuple[str, ast.AST]]:
+    """List the entries a module adds to ``collect_ignore`` and ``collect_ignore_glob``.
+
+    An assignment, an augmented assignment, and an ``append``, ``extend``, or ``insert`` count,
+    each entry of a literal list by itself and any other value as one; ``collect_ignore = []`` adds
+    none.
+    """
+    found = []
+    for node in sorted(unit.nodes, key=_position):
+        pairs: list[tuple[str, ast.expr]] = []
+        if isinstance(node, ast.Assign | ast.AnnAssign):
+            pairs = _assigned(node)
+        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+            pairs = [(node.target.id, node.value)]
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.attr in {"append", "extend", "insert"}
+            and node.args
+        ):
+            pairs = [(node.func.value.id, node.args[-1])]
+            if node.func.attr != "extend":
+                pairs = [(node.func.value.id, ast.List(elts=[node.args[-1]]))]
+        for name, value in pairs:
+            if name in COLLECT_IGNORES:
+                entries = (
+                    value.elts if isinstance(value, ast.List | ast.Tuple | ast.Set) else [value]
+                )
+                found += [(f"{name} {_case(entry)}", node) for entry in entries]
+    return found
+
+
+def _ignore_findings(old: Unit | None, new: Unit, flag: Flag) -> None:
+    """Flag a ``conftest.py`` module that gained an entry of ``collect_ignore`` or its glob."""
+    before = Counter(key for key, _ in _ignored(old)) if old is not None else Counter()
+    flagged: set[int] = set()
+    for key, node in _ignored(new):
+        if before[key] > 0:
+            before[key] -= 1
+        elif id(node) not in flagged:
+            flagged.add(id(node))
+            flag(node, IGNORE, [], [_clip(_text(new, node))])
+
+
+def _trivial(node: ast.AST) -> bool:
+    """Whether a function does nothing: only ``pass``, ``...``, a docstring, or a plain return."""
+    assert isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    return all(
+        isinstance(statement, ast.Pass)
+        or (isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant))
+        or (
+            isinstance(statement, ast.Return)
+            and (statement.value is None or isinstance(statement.value, ast.Constant))
+        )
+        for statement in node.body
+    )
+
+
+def _in_qa(unit: Unit) -> bool:
+    """Whether a unit is a function of ``qa/`` that is no test, such as a validation ``main()``."""
+    return unit.is_function and unit.path.split("/")[0] == "qa" and not unit.is_test
+
+
+def compare(old: Unit, new: Unit, exempt: frozenset[str] = frozenset()) -> list[Finding]:
+    """Return the changes in ``new`` that skip, loosen, or remove what the same unit ``old`` runs.
+
+    ``exempt`` names the module constants whose markers are not read: those only added tests use.
+    """
+    findings: list[Finding] = []
+    flag = _flagger(new, findings)
     _check_findings(old, new, flag)
     _marker_findings(old, new, flag, exempt)
     _parametrize_findings(old, new, flag)
+    _switch_off_findings(old, new, flag)
+    if new.qualname == "<module>" and new.path.rsplit("/", 1)[-1] == "conftest.py":
+        _ignore_findings(old, new, flag)
+    if _in_qa(new) and old.is_function and _trivial(new.node) and not _trivial(old.node):
+        before, after = _clip(_text(old, old.node)), _clip(_text(new, new.node))
+        flag(new.node, "function of qa/ emptied", [before], [after])
     return findings
 
 
@@ -1204,6 +1391,18 @@ def _is_fixture(unit: Unit) -> bool:
     return unit.is_function and any(n == ("params",) for n, _, _ in _parametrizations(unit))
 
 
+def _declares_fixture(unit: Unit) -> bool:
+    """Whether a function carries ``@pytest.fixture`` or ``@pytest.yield_fixture``.
+
+    pytest does not collect such a function as a test, whatever its name.
+    """
+    return any(
+        _dotted(d.func if isinstance(d, ast.Call) else d, unit.imports).rsplit(".", 1)[-1]
+        in {"fixture", "yield_fixture"}
+        for d in getattr(unit.node, "decorator_list", [])
+    )
+
+
 def _autouse(unit: Unit) -> bool:
     """Whether a unit is a fixture that every test of its scope uses: ``fixture(autouse=...)``."""
     if not unit.is_function:
@@ -1225,13 +1424,20 @@ def _hook(unit: Unit) -> bool:
     return unit.is_function and unit.qualname.rsplit(".", 1)[-1].startswith("pytest_")
 
 
+def _xunit(unit: Unit) -> bool:
+    """Whether a unit is an xunit-style setup: ``setup_module`` and the like, run before tests."""
+    return unit.is_function and unit.qualname.rsplit(".", 1)[-1] in XUNIT_SETUPS
+
+
 def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Finding]:
-    """Flag the autouse fixtures that skip tests and the pytest hooks that the change added.
+    """Flag the autouse fixtures and xunit setups that skip tests and the hooks the change added.
 
     An autouse fixture or a hook of a ``conftest.py`` reaches the tests that already exist, so a
     skip in one skips them without a marker on any test, and a hook can deselect, skip, or pass
     them in ways a reader of the tests does not see: a hook that is new or whose code changed is
-    flagged. An autouse fixture that skipped before is compared with its old self, like any unit.
+    flagged. An autouse fixture that skipped before is compared with its old self, like any unit,
+    and so is a ``setup_module``, ``setup_class``, ``setup_method``, or ``setup_function`` that
+    existed: only a new one that skips is flagged here.
     """
     findings = []
     for name, unit in units.items():
@@ -1242,6 +1448,9 @@ def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Findin
         elif _autouse(unit) and not (was is not None and _autouse(was)):
             skips = any(_markers(unit._replace(inherited=[])).values())
             reason = "autouse fixture that skips tests added" if skips else ""
+        elif _xunit(unit) and was is None:
+            skips = any(_markers(unit._replace(inherited=[])).values())
+            reason = f"{unit.qualname.rsplit('.', 1)[-1]} that skips tests added" if skips else ""
         else:
             reason = ""
         if reason:
@@ -1252,6 +1461,20 @@ def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Findin
     return findings
 
 
+QA_DELETED = "function of qa/ deleted"
+
+
+def _moved(unit: Unit, pool: list[Unit]) -> Unit | None:
+    """Return the unit of ``pool`` a deleted unit moved to: the same body, else the same name."""
+    key = _body_key(unit)
+    name = unit.qualname.rsplit(".", 1)[-1]
+    found = next((a for a in pool if _body_key(a) == key), None)
+    if found is None:
+        same_name = [a for a in pool if a.qualname.rsplit(".", 1)[-1] == name]
+        found = same_name[0] if len(same_name) == 1 else None
+    return found
+
+
 def analyze(changes: Sequence[Change]) -> list[Finding]:
     """Return the changes that skip, loosen, or remove a test in the changed Python files."""
     findings: list[Finding] = []
@@ -1259,6 +1482,8 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
     fixtures: list[Unit] = []
     added: list[Unit] = []
     added_fixtures: list[Unit] = []
+    lost: list[Unit] = []
+    added_functions: list[Unit] = []
     for change in changes:
         if change.old is None:
             # A new file has nothing to compare with, but a test moved into it is not a deletion.
@@ -1268,8 +1493,11 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 continue
             added += [u for u in new_file.values() if u.is_test and _collected(change.path)]
             added_fixtures += [u for u in new_file.values() if _is_fixture(u)]
+            added_functions += [u for u in new_file.values() if _in_qa(u)]
             if change.path.rsplit("/", 1)[-1] == "conftest.py":
                 findings += _skipping(new_file, {})
+                module = new_file["<module>"]
+                _ignore_findings(None, module, _flagger(module, findings))
             continue
         try:
             old_units = collect(change.old_path, change.old)
@@ -1292,8 +1520,13 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             if name in new_units:
                 now = new_units[name]
                 if unit.is_test and now.is_function and not now.is_test:
-                    # Same function, but pytest no longer collects its class.
-                    reason = "test no longer collected: pytest stops collecting its class"
+                    # Same function, but pytest no longer collects it: it is a fixture now, or its
+                    # class is not collected.
+                    reason = (
+                        "test no longer collected: it became a fixture"
+                        if _declares_fixture(now)
+                        else "test no longer collected: pytest stops collecting its class"
+                    )
                     line = _position(now.node)[0]
                     findings.append(
                         Finding(now.path, line, name, reason, _clip(_text(unit, unit.node)))
@@ -1303,12 +1536,15 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 deleted.append((unit, reason))
             elif _is_fixture(unit):
                 fixtures.append(unit)
+            elif _in_qa(unit):
+                lost.append(unit)
         added += [
             u
             for n, u in new_units.items()
             if n not in old_units and u.is_test and _collected(change.path)
         ]
         added_fixtures += [u for n, u in new_units.items() if n not in old_units and _is_fixture(u)]
+        added_functions += [u for n, u in new_units.items() if n not in old_units and _in_qa(u)]
     for unit in fixtures:
         name = unit.qualname.rsplit(".", 1)[-1]
         # A fixture that moved is an added parametrized fixture of the same name; a function of that
@@ -1322,20 +1558,16 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             findings.append(
                 Finding(unit.path, line, unit.qualname, reason, _clip(_text(unit, unit.node)))
             )
-    for unit, reason in deleted:
-        key = _body_key(unit)
-        name = unit.qualname.rsplit(".", 1)[-1]
-        match = next((a for a in added if _body_key(a) == key), None)
-        if match is None:
-            same_name = [a for a in added if a.qualname.rsplit(".", 1)[-1] == name]
-            match = same_name[0] if len(same_name) == 1 else None
+    for unit, reason in [*deleted, *((u, QA_DELETED) for u in lost)]:
+        pool = added if unit.is_test else added_functions
+        match = _moved(unit, pool)
         if match is None:
             line = _position(unit.node)[0]
             findings.append(
                 Finding(unit.path, line, unit.qualname, reason, _clip(_text(unit, unit.node)))
             )
         else:
-            added.remove(match)
+            pool.remove(match)
             findings += compare(unit, match)
     # A marker on a class or module counts for each of its tests: the same line is reported once.
     unique: dict[tuple, Finding] = {}
