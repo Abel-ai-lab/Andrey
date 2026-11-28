@@ -38,10 +38,10 @@ from andrey.temporal.pcmci import DesignTest
 #: level's fixed cost (about 0.7 ms) and the levels built beneath it exceed the inversions' time;
 #: from 4,096 on the lattice was faster in every case measured (candidates 12 to 16, 0 or 3 fixed).
 MIN_SUBSETS = 1 << 12
-#: The most bytes the factors of the live levels hold, in all the lattices of a search, 256 MiB. A
+#: The most bytes the factors of the live levels hold, in all the lattices of a fit, 1 GiB. A
 #: search that runs in one of a pool's workers holds its share of it,
 #: ``MAX_BYTES // backend.pool_workers()``, so the workers of a pool hold ``MAX_BYTES`` in all.
-MAX_BYTES = 1 << 28
+MAX_BYTES = 1 << 30
 #: The subsets of a level answered in one call, after the doubling from :data:`FIRST_CHUNK`.
 CHUNK = 1 << 14
 FIRST_CHUNK = 16
