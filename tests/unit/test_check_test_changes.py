@@ -1,4 +1,4 @@
-"""The weakened-test check flags each kind of weakening and passes added and tightened tests."""
+"""The check of test changes flags each skipped, loosened, or removed test and passes the rest."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ PATH = "tests/unit/test_example.py"
 @pytest.fixture(scope="module")
 def check():
     spec = importlib.util.spec_from_file_location(
-        "test_weakening", ROOT / "scripts/test_weakening.py"
+        "check_test_changes", ROOT / "scripts/check_test_changes.py"
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -769,6 +769,83 @@ FLAGGED = {
             assert fit()
         """,
         "skipif condition made always true",
+    ),
+    "skipif with a second positional condition made true": (
+        """
+        @pytest.mark.skipif(False, False, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(False, True, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        "skipif condition made always true",
+    ),
+    "xfail with a second positional condition made to stop running": (
+        """
+        @pytest.mark.xfail(False, False, reason="slow", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(False, True, reason="slow", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail made not to run the test",
+    ),
+    "unittest skipIf made true with a reason": (
+        """
+        @unittest.skipIf(False, "slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @unittest.skipIf(True, "slow")
+        def test_fit():
+            assert fit()
+        """,
+        "skipIf condition made always true",
+    ),
+    "fixture decorator named like one a function of the file imports from elsewhere": (
+        """
+        from pytest import fixture
+
+        def helper():
+            from custom import fixture
+            return fixture
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from pytest import fixture
+
+        def helper():
+            from custom import fixture
+            return fixture
+
+        @fixture
+        def test_fit():
+            assert fit()
+        """,
+        "test no longer collected: it became a fixture",
+    ),
+    "skip called by a name a function imports": (
+        """
+        def test_fit():
+            from pytest import skip
+            assert fit()
+        """,
+        """
+        def test_fit():
+            from pytest import skip
+            skip("disabled")
+            assert fit()
+        """,
+        "pytest.skip() added",
     ),
     "skipif condition replaced by true": (
         """
@@ -1583,11 +1660,320 @@ FLAGGED = {
         """,
         "test deleted",
     ),
+    "__test__ = False set on a module": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        __test__ = False
+
+        def test_fit():
+            assert fit()
+        """,
+        "__test__ = False added",
+    ),
+    "__test__ = False set on a function": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+
+        test_fit.__test__ = False
+        """,
+        "__test__ = False added",
+    ),
+    "__test__ set to False with setattr": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+
+        setattr(test_fit, "__test__", False)
+        """,
+        "__test__ = False added",
+    ),
+    "string skipif condition made true": (
+        """
+        @pytest.mark.skipif("sys.platform == 'win32'", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(True, reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        "skipif condition made always true",
+    ),
+    "string skipif condition made the string True": (
+        """
+        @pytest.mark.skipif("sys.platform == 'win32'", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif("True", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        "skipif condition made always true",
+    ),
+    "string xfail condition made true": (
+        """
+        @pytest.mark.xfail("sys.platform == 'win32'", reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(condition=True, reason="flaky")
+        def test_fit():
+            assert fit()
+        """,
+        "xfail condition made always true",
+    ),
+    "raises widened from Exception to BaseException": (
+        """
+        def test_fit():
+            with pytest.raises(Exception):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(BaseException):
+                fit(None)
+        """,
+        "widened to BaseException",
+    ),
+    "xfail raises widened from Exception to BaseException": (
+        """
+        @pytest.mark.xfail(raises=Exception, strict=True)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(raises=BaseException, strict=True)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail widened to BaseException",
+    ),
+    "test made a fixture": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.fixture
+        def test_fit():
+            assert fit()
+        """,
+        "test no longer collected: it became a fixture",
+    ),
+    "test made a fixture with arguments, imported by name": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from pytest import fixture
+
+        @fixture(scope="module")
+        def test_fit():
+            assert fit()
+        """,
+        "test no longer collected: it became a fixture",
+    ),
+    "test made a fixture through an alias of pytest": (
+        """
+        import pytest as pt
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        import pytest as pt
+
+        @pt.fixture
+        def test_fit():
+            assert fit()
+        """,
+        "test no longer collected: it became a fixture",
+    ),
+    "xfail with a condition made not to run": (
+        """
+        @pytest.mark.xfail(sys.platform == "win32", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(sys.platform == "win32", reason="windows", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail made not to run the test",
+    ),
+    "setup_class that skips added to a class": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            @classmethod
+            def setup_class(cls):
+                pytest.skip("slow")
+
+            def test_fit(self):
+                assert fit()
+        """,
+        "setup_class that skips tests added",
+    ),
+    "autouse fixture with no params added": (
+        """
+        def helper():
+            return 1
+        """,
+        """
+        def helper():
+            return 1
+
+        @pytest.fixture(autouse=True, params=[])
+        def gpu(request):
+            return request.param
+        """,
+        "parametrization with no case added",
+    ),
+    "empty parametrization added": (
+        """
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", [])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        "parametrization with no case added",
+    ),
+    "parametrization over an empty range added": (
+        """
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", range(0))
+        def test_fit(n):
+            assert fit(n)
+        """,
+        "parametrization with no case added",
+    ),
+    "parametrization with cases not stated made empty": (
+        """
+        @pytest.mark.parametrize("n", CASES)
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", ())
+        def test_fit(n):
+            assert fit(n)
+        """,
+        "parametrization with no case added",
+    ),
+    "fixture with no params added": (
+        """
+        @pytest.fixture
+        def data():
+            return load()
+        """,
+        """
+        @pytest.fixture(params=[])
+        def data(request):
+            return load(request.param)
+        """,
+        "parametrization with no case added",
+    ),
+    "xfail made not to run": (
+        """
+        @pytest.mark.xfail(reason="flaky", strict=True)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(reason="flaky", strict=True, run=False)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail made not to run the test",
+    ),
+    "setup_module that skips added": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def setup_module():
+            pytest.skip("no gpu")
+
+        def test_fit():
+            assert fit()
+        """,
+        "setup_module that skips tests added",
+    ),
+    "setup_function that skips added": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def setup_function(function):
+            pytest.importorskip("torch")
+
+        def test_fit():
+            assert fit()
+        """,
+        "setup_function that skips tests added",
+    ),
+    "setup_method that skips added to a class": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            def setup_method(self, method):
+                pytest.skip("slow")
+
+            def test_fit(self):
+                assert fit()
+        """,
+        "setup_method that skips tests added",
+    ),
+    "skip added to a setup_module that existed": (
+        """
+        def setup_module():
+            seed()
+        """,
+        """
+        def setup_module():
+            pytest.skip("slow")
+        """,
+        "pytest.skip() added",
+    ),
 }
 
 
 @pytest.mark.parametrize("name", FLAGGED)
-def test_each_weakening_is_flagged(check, name):
+def test_each_change_that_skips_loosens_or_removes_a_test_is_flagged(check, name):
     old, new, expected = FLAGGED[name]
     found = reasons(check, old, new)
     assert any(expected in reason for reason in found), found
@@ -2652,6 +3038,417 @@ NOT_FLAGGED = {
             pass
         """,
     ),
+    "__test__ = True set on a module": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        __test__ = True
+
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "__test__ = False kept on a module": (
+        """
+        __test__ = False
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        __test__ = False
+
+        def test_fit():
+            assert fit()
+            assert fit() == 1
+        """,
+    ),
+    "__test__ = False kept on a function": (
+        """
+        def test_fit():
+            assert fit()
+
+        test_fit.__test__ = False
+        """,
+        """
+        def test_fit():
+            assert fit()
+
+        test_fit.__test__ = False
+        """,
+    ),
+    "__test__ = False removed": (
+        """
+        __test__ = False
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "string skipif condition changed to another string": (
+        """
+        @pytest.mark.skipif("sys.platform == 'win32'", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif("sys.platform == 'darwin'", reason="mac")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "string skipif condition kept": (
+        """
+        @pytest.mark.skipif("sys.platform == 'win32'", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif("sys.platform == 'win32'", reason="windows")
+        def test_fit():
+            assert fit()
+            assert fit() == 1
+        """,
+    ),
+    "string skipif condition made False": (
+        """
+        @pytest.mark.skipif("sys.platform == 'win32'", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif("False", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "raises narrowed from BaseException to Exception": (
+        """
+        def test_fit():
+            with pytest.raises(BaseException):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(Exception):
+                fit(None)
+        """,
+    ),
+    "raises kept at BaseException": (
+        """
+        def test_fit():
+            with pytest.raises(BaseException):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(BaseException):
+                fit(None)
+            assert fit(1)
+        """,
+    ),
+    "xfail raises narrowed from BaseException to Exception": (
+        """
+        @pytest.mark.xfail(raises=BaseException, strict=True)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(raises=Exception, strict=True)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "helper made a fixture": (
+        """
+        def make():
+            return fit()
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.fixture
+        def make():
+            return fit()
+
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "fixture added next to a test": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.fixture
+        def data():
+            return load()
+
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "fixture that was named like a test stays one": (
+        """
+        @pytest.fixture
+        def test_data():
+            return load()
+        """,
+        """
+        @pytest.fixture(scope="module")
+        def test_data():
+            return load()
+        """,
+    ),
+    "test given a decorator named fixture of another module": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @custom.fixture
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "__test__ = False set while a test runs": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            helper.__test__ = False
+            assert fit()
+        """,
+    ),
+    "parametrize called on another object": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            helper.parametrize("x", [])
+            assert fit()
+        """,
+    ),
+    "setup_method that skips in a class pytest does not collect": (
+        """
+        class Helper:
+            def run(self):
+                return 1
+        """,
+        """
+        class Helper:
+            def setup_method(self, method):
+                pytest.skip("slow")
+
+            def run(self):
+                return 1
+        """,
+    ),
+    "xfail with a false condition made not to run": (
+        """
+        @pytest.mark.xfail(False, reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(False, reason="windows", run=False)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "xfail with the string False made not to run": (
+        """
+        @pytest.mark.xfail("False", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(condition="False", reason="windows", run=False)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "setup_method at the top of a module that skips": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def setup_method(method):
+            pytest.skip("slow")
+
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "setup_module in a class that skips": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            def setup_module(self):
+                pytest.skip("slow")
+
+            def test_fit(self):
+                assert fit()
+        """,
+    ),
+    "fixture with params added": (
+        """
+        def helper():
+            return 1
+        """,
+        """
+        def helper():
+            return 1
+
+        @pytest.fixture(autouse=True, params=[1, 2])
+        def size(request):
+            return request.param
+        """,
+    ),
+    "parametrization with a case added": (
+        """
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", [1, 2])
+        def test_fit(n):
+            assert fit(n)
+        """,
+    ),
+    "empty parametrization kept": (
+        """
+        @pytest.mark.parametrize("n", [])
+        def test_fit(n):
+            assert fit(n)
+        """,
+        """
+        @pytest.mark.parametrize("n", [])
+        def test_fit(n):
+            assert fit(n)
+            assert fit(n) == 1
+        """,
+    ),
+    "empty parametrization on a new test": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+
+        @pytest.mark.parametrize("n", [])
+        def test_fit_more(n):
+            assert fit(n)
+        """,
+    ),
+    "xfail made to run": (
+        """
+        @pytest.mark.xfail(reason="flaky", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(reason="flaky", run=True)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "xfail with run=False kept": (
+        """
+        @pytest.mark.xfail(reason="flaky", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(reason="flaky", run=False)
+        def test_fit():
+            assert fit()
+            assert fit() == 1
+        """,
+    ),
+    "setup_module without a skip added": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def setup_module():
+            seed()
+
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "setup_method without a skip added to a class": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            def setup_method(self, method):
+                seed()
+
+            def test_fit(self):
+                assert fit()
+        """,
+    ),
+    "setup_module that skips kept": (
+        """
+        def setup_module():
+            pytest.skip("slow")
+        """,
+        """
+        def setup_module():
+            pytest.skip("slow")
+            seed()
+        """,
+    ),
+    "skipif with a second positional condition kept false": (
+        """
+        @pytest.mark.skipif(False, False, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.skipif(False, sys.platform == "win32", reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "helper named like a setup that skips": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def setup_data():
+            pytest.skip("slow")
+
+        def test_fit():
+            assert fit()
+        """,
+    ),
 }
 
 
@@ -2867,6 +3664,40 @@ def test_a_class_renamed_and_skipped_is_flagged(check):
     assert check.analyze([check.Change(a, a, old, renamed)]) == []
 
 
+SKIPPING_SETUP = "def setup_module():\n    pytest.skip('no gpu')\n\n"
+
+
+def test_a_test_moved_into_a_new_file_with_a_skipping_setup_is_flagged(check):
+    source = "def test_fit():\n    assert fit()\n"
+    a, b = "tests/unit/test_a.py", "tests/unit/test_b.py"
+    changes = [
+        check.Change(a, a, source, "x = 1\n"),
+        check.Change(b, b, None, SKIPPING_SETUP + source),
+    ]
+    found = check.analyze(changes)
+    assert [f.reason for f in found] == ["setup_module that skips tests added"]
+    assert found[0].path == b
+
+
+def test_a_new_file_with_a_skipping_setup_and_new_tests_is_not_flagged(check):
+    source = "def test_fit():\n    assert fit()\n"
+    a, b, c = "tests/unit/test_a.py", "tests/unit/test_b.py", "tests/unit/test_c.py"
+    changes = [
+        check.Change(a, a, source, "x = 1\n"),
+        check.Change(b, b, None, source),
+        check.Change(c, c, None, SKIPPING_SETUP + "def test_other():\n    assert other()\n"),
+    ]
+    assert check.analyze(changes) == []
+
+
+@pytest.mark.parametrize(
+    "path", ["tests/unit/conftest.py", "qa/check_fit.py", "tests/unit/helpers.py"]
+)
+def test_a_setup_that_skips_is_inert_where_pytest_collects_no_test_module(check, path):
+    assert reasons(check, "x = 1\n", "x = 1\n\n" + SKIPPING_SETUP, path) == []
+    assert reasons(check, None, "x = 1\n\n" + SKIPPING_SETUP, path) == []
+
+
 def test_a_test_moved_into_a_skipped_module_is_flagged(check):
     source = "def test_fit():\n    assert fit()\n"
     a, b = "tests/unit/test_a.py", "tests/unit/test_b.py"
@@ -2970,6 +3801,220 @@ def test_a_skip_added_to_an_existing_autouse_fixture_is_flagged_once(check):
 )
 def test_other_fixtures_and_hooks_are_not_flagged(check, old, new, path):
     assert reasons(check, old, new, path) == []
+
+
+QA = "qa/validate.py"
+VALIDATE = """
+def helper():
+    return 1
+
+def main():
+    result = run()
+    report(result)
+    return 0
+"""
+
+# Changes to a ``conftest.py`` or to ``qa/`` that skip or remove checks, with the file they are in.
+FLAGGED_AT = {
+    "collect_ignore in a new conftest": (
+        None,
+        'collect_ignore = ["test_slow.py"]\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "collect_ignore_glob in a new conftest": (
+        None,
+        'collect_ignore_glob = ["*_gpu.py"]\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "collect_ignore in a new conftest, annotated": (
+        None,
+        'collect_ignore: list[str] = ["test_slow.py"]\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "collect_ignore set to a computed value": (
+        "x = 1\n",
+        "x = 1\ncollect_ignore = sorted(glob('*.py'))\n",
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "entry added to collect_ignore": (
+        'collect_ignore = ["a.py"]\n',
+        'collect_ignore = ["a.py", "b.py"]\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "entry appended to collect_ignore": (
+        'collect_ignore = ["a.py"]\n',
+        'collect_ignore = ["a.py"]\ncollect_ignore.append("b.py")\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "entries added to collect_ignore_glob with +=": (
+        "collect_ignore_glob = []\n",
+        'collect_ignore_glob = []\ncollect_ignore_glob += ["*_slow.py"]\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "entry of collect_ignore replaced by index": (
+        'collect_ignore = ["a.py"]\n',
+        'collect_ignore = ["a.py"]\ncollect_ignore[0] = "test_live.py"\n',
+        CONFTEST,
+        "collect_ignore or collect_ignore_glob entry added",
+    ),
+    "function of qa deleted while a method of that name is added": (
+        "def main():\n    run()\n    return 0\n",
+        "class Check:\n    def main(self):\n        stop()\n        return 1\n",
+        QA,
+        "function of qa/ deleted",
+    ),
+    "empty-params fixture in a new conftest": (
+        None,
+        (
+            "import pytest\n\n@pytest.fixture(autouse=True, params=[])\n"
+            "def gpu(request):\n    return 1\n"
+        ),
+        CONFTEST,
+        "parametrization with no case added",
+    ),
+    "function of qa named like a test emptied": (
+        "def test_validation():\n    run()\n    report()\n",
+        "def test_validation():\n    pass\n",
+        QA,
+        "function of qa/ emptied",
+    ),
+    "function of qa named like a test deleted": (
+        "def test_validation():\n    run()\n    report()\n",
+        "x = 1\n",
+        QA,
+        "function of qa/ deleted",
+    ),
+    "function of qa deleted": (
+        VALIDATE,
+        "def helper():\n    return 1\n",
+        QA,
+        "function of qa/ deleted",
+    ),
+    "function of qa emptied to pass": (
+        VALIDATE,
+        VALIDATE.replace("    result = run()\n    report(result)\n    return 0\n", "    pass\n"),
+        QA,
+        "function of qa/ emptied",
+    ),
+    "function of qa emptied to a docstring and a return": (
+        VALIDATE,
+        VALIDATE.replace(
+            "    result = run()\n    report(result)\n    return 0\n",
+            '    """Validate."""\n    return 0\n',
+        ),
+        QA,
+        "function of qa/ emptied",
+    ),
+    "method of a class of qa deleted": (
+        (
+            "class Check:\n    def run(self):\n        return go()\n\n"
+            "    def stop(self):\n        halt()\n"
+        ),
+        "class Check:\n    def run(self):\n        return go()\n",
+        QA,
+        "function of qa/ deleted",
+    ),
+    "file of qa deleted": (VALIDATE, None, QA, "function of qa/ deleted"),
+}
+NOT_FLAGGED_AT = {
+    "empty collect_ignore in a new conftest": (None, "collect_ignore = []\n", CONFTEST),
+    "collect_ignore kept": (
+        'collect_ignore = ["a.py"]\n',
+        'collect_ignore = ["a.py"]\nx = 1\n',
+        CONFTEST,
+    ),
+    "collect_ignore entry removed": (
+        'collect_ignore = ["a.py", "b.py"]\n',
+        'collect_ignore = ["a.py"]\n',
+        CONFTEST,
+    ),
+    "collect_ignore entries reordered": (
+        'collect_ignore = ["a.py", "b.py"]\n',
+        'collect_ignore = ["b.py", "a.py"]\n',
+        CONFTEST,
+    ),
+    "collect_ignore in a test file": (
+        "x = 1\n",
+        'x = 1\ncollect_ignore = ["a.py"]\n',
+        "tests/unit/test_a.py",
+    ),
+    "collect_ignore in a conftest that pytest does not load": (
+        None,
+        'collect_ignore = ["a.py"]\n',
+        "qa/conftest.py",
+    ),
+    "unrelated list in a new conftest": (None, 'skip_names = ["a.py"]\n', CONFTEST),
+    "function of qa added": (VALIDATE, VALIDATE + "\ndef extra():\n    return 2\n", QA),
+    "function of qa edited": (VALIDATE, VALIDATE.replace("report(result)", "log(result)"), QA),
+    "function of qa renamed": (VALIDATE, VALIDATE.replace("def main", "def run_all"), QA),
+    "function of qa that was empty already": (
+        "def main():\n    pass\n",
+        'def main():\n    """Validate."""\n',
+        QA,
+    ),
+    "function of qa that returns more": (
+        "def main():\n    return 0\n",
+        "def main():\n    run()\n    return 0\n",
+        QA,
+    ),
+    "helper of tests deleted": (
+        "def helper():\n    return 1\n\ndef test_a():\n    assert helper()\n",
+        "def test_a():\n    assert 1\n",
+        "tests/unit/test_a.py",
+    ),
+    "new file of qa": (None, VALIDATE, QA),
+}
+
+
+@pytest.mark.parametrize("name", FLAGGED_AT)
+def test_each_conftest_or_qa_change_that_skips_or_removes_checks_is_flagged(check, name):
+    old, new, path, expected = FLAGGED_AT[name]
+    found = reasons(check, old, new, path)
+    assert any(expected in reason for reason in found), found
+
+
+@pytest.mark.parametrize("name", NOT_FLAGGED_AT)
+def test_other_conftest_and_qa_changes_are_not_flagged(check, name):
+    old, new, path = NOT_FLAGGED_AT[name]
+    assert reasons(check, old, new, path) == []
+
+
+def test_a_function_of_qa_that_moved_to_another_file_is_not_flagged(check):
+    helper = "def helper():\n    run()\n    return 1\n"
+    changes = [
+        check.Change(
+            "qa/a.py",
+            "qa/a.py",
+            helper + "\ndef keep():\n    return 2\n",
+            "def keep():\n    return 2\n",
+        ),
+        check.Change("qa/b.py", "qa/b.py", None, helper),
+    ]
+    assert check.analyze(changes) == []
+
+
+def test_a_function_of_qa_that_moved_and_was_emptied_is_flagged(check):
+    helper = "def helper():\n    run()\n    return 1\n"
+    changes = [
+        check.Change("qa/a.py", "qa/a.py", helper, "x = 1\n"),
+        check.Change("qa/b.py", "qa/b.py", None, "def helper():\n    pass\n"),
+    ]
+    found = [f.reason for f in check.analyze(changes)]
+    assert found == ["function of qa/ emptied"], found
+
+
+def test_a_flag_for_a_collect_ignore_names_the_file_and_the_statement(check):
+    change = check.Change(CONFTEST, CONFTEST, None, 'collect_ignore = ["test_slow.py"]\n')
+    text = check.report(check.analyze([change]))
+    assert f"{CONFTEST}:1: <module>: collect_ignore or collect_ignore_glob entry added" in text
+    assert '+ collect_ignore = ["test_slow.py"]' in text
 
 
 def test_a_marker_on_a_class_is_reported_once(check):
@@ -3194,7 +4239,7 @@ def test_a_change_outside_tests_and_qa_is_not_read(check, repo):
     assert check.main(["--base", "main"]) == 0
 
 
-# The check and the workflow job that runs it are guarded: a pull request cannot weaken the check
+# The check and the workflow job that runs it are guarded: a pull request cannot loosen the check
 # it is judged by without a maintainer reading the change.
 
 WORKFLOW = textwrap.dedent("""
@@ -3206,17 +4251,17 @@ WORKFLOW = textwrap.dedent("""
           - name: ty
             run: ty check
       # A required check, by its name.
-      test-weakening:
+      check-test-changes:
         if: github.event_name == 'pull_request'
         runs-on: ubuntu-24.04
         steps:
           - uses: actions/checkout@v7
-          - name: Weakened tests need a maintainer's approval
+          - name: Changes that skip, loosen, or remove a test need approval
             # Judges the pull request's tests.
             if: github.base_ref != 'main'
             run: |
-              git show HEAD^1:scripts/test_weakening.py > "$RUNNER_TEMP/test_weakening.py"
-              python -I "$RUNNER_TEMP/test_weakening.py" --base HEAD^1
+              git show HEAD^1:scripts/check_test_changes.py > "$RUNNER_TEMP/check_test_changes.py"
+              python -I "$RUNNER_TEMP/check_test_changes.py" --base HEAD^1
       other:
         steps:
           - run: echo hi
@@ -3224,7 +4269,7 @@ WORKFLOW = textwrap.dedent("""
 PYPROJECT = '[project]\nname = "x"\n\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n'
 CHECK = "print('the check')\n"
 WORKFLOW_FILE = ".github/workflows/ci.yml"
-CHECK_FILE = "scripts/test_weakening.py"
+CHECK_FILE = "scripts/check_test_changes.py"
 
 
 @pytest.fixture
@@ -3241,19 +4286,21 @@ def guarded(repo):
 GUARDED = {
     "the check edited": {CHECK_FILE: "import sys\nsys.exit(0)\n"},
     "the step edited": {WORKFLOW_FILE: WORKFLOW.replace("--base HEAD^1", "--base HEAD")},
-    "the step renamed": {WORKFLOW_FILE: WORKFLOW.replace("Weakened tests", "Tests")},
+    "the step renamed": {
+        WORKFLOW_FILE: WORKFLOW.replace("Changes that skip, loosen, or remove a test", "Tests")
+    },
     "the step condition edited": {
         WORKFLOW_FILE: WORKFLOW.replace("github.base_ref != 'main'", "false")
     },
     "the step pointed at the pull request's copy": {
-        WORKFLOW_FILE: WORKFLOW.replace('"$RUNNER_TEMP/test_weakening.py"', CHECK_FILE)
+        WORKFLOW_FILE: WORKFLOW.replace('"$RUNNER_TEMP/check_test_changes.py"', CHECK_FILE)
     },
-    "the step removed": {WORKFLOW_FILE: WORKFLOW.replace("test_weakening", "other")},
+    "the step removed": {WORKFLOW_FILE: WORKFLOW.replace("check_test_changes", "other")},
     "the job condition edited": {
         WORKFLOW_FILE: WORKFLOW.replace("github.event_name == 'pull_request'", "false")
     },
     "the job runner edited": {WORKFLOW_FILE: WORKFLOW.replace("ubuntu-24.04", "macos-14")},
-    "the job renamed": {WORKFLOW_FILE: WORKFLOW.replace("  test-weakening:", "  test-tests:")},
+    "the job renamed": {WORKFLOW_FILE: WORKFLOW.replace("  check-test-changes:", "  check-tests:")},
     "the job removed": {
         WORKFLOW_FILE: WORKFLOW[: WORKFLOW.index("  # A required check")]
         + WORKFLOW[WORKFLOW.index("  other:") :]
@@ -3281,8 +4328,8 @@ def test_a_change_to_the_check_or_its_step_needs_approval(check, guarded, capsys
     assert check.main(["--base", "main"]) == 1
     output = capsys.readouterr().out
     assert "1 flagged change(s)" in output
-    assert "weakened-test check" in output
-    assert "title=Weakened test::" in output
+    assert "this check changed" in output
+    assert "title=Test change needs approval::" in output
 
 
 @pytest.mark.parametrize(
@@ -3313,7 +4360,7 @@ def test_deleting_the_check_needs_approval(check, guarded, capsys):
     (guarded / CHECK_FILE).unlink()
     commit(guarded)
     assert check.main(["--base", "main"]) == 1
-    assert f"{CHECK_FILE}: the weakened-test check was deleted" in capsys.readouterr().out
+    assert f"{CHECK_FILE}: this check was deleted" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("name", NOT_GUARDED)
@@ -3344,18 +4391,27 @@ def test_a_pull_request_that_adds_the_check_and_its_step_is_not_flagged(check, r
 def test_the_job_of_this_repository_runs_the_check_of_the_base_branch(check):
     text = (ROOT / WORKFLOW_FILE).read_text()
     [(_, job)] = check.workflow_jobs(text)
-    assert job.startswith("  test-weakening:")
-    assert 'git show HEAD^1:scripts/test_weakening.py > "$detector"' in job
+    assert job.startswith("  check-test-changes:")
+    assert 'git show HEAD^1:scripts/check_test_changes.py > "$detector"' in job
     assert 'python -I "$detector"' in job
-    assert "python scripts/test_weakening.py" not in job
+    assert "python scripts/check_test_changes.py" not in job
+
+
+def test_the_job_of_this_repository_falls_back_to_the_script_under_its_old_name(check):
+    """A base from before the rename has the script as ``scripts/test_weakening.py``."""
+    text = (ROOT / WORKFLOW_FILE).read_text()
+    [(_, job)] = check.workflow_jobs(text)
+    new, old = "HEAD^1:scripts/check_test_changes.py", "HEAD^1:scripts/test_weakening.py"
+    assert 'git show HEAD^1:scripts/test_weakening.py > "$detector"' in job
+    assert job.index(new) < job.index(old)
 
 
 def test_the_job_of_this_repository_is_a_gated_check_that_reports_on_every_pull_request(check):
     workflow = yaml.safe_load((ROOT / WORKFLOW_FILE).read_text())
-    job = workflow["jobs"]["test-weakening"]
+    job = workflow["jobs"]["check-test-changes"]
     assert "needs" not in job
     assert "base_ref" not in job["if"]
-    assert "test-weakening" in workflow["jobs"]["ci-gate"]["needs"]
+    assert "check-test-changes" in workflow["jobs"]["ci-gate"]["needs"]
     assert [s["if"] for s in job["steps"] if "if" in s] == ["github.base_ref != 'main'"]
 
 
@@ -3376,8 +4432,8 @@ def test_a_flagged_change_fails_without_the_label(check, repo, monkeypatch, caps
     output = capsys.readouterr().out
     assert "tests/unit/test_a.py:1: test_a: 2 assertions removed" in output
     assert (
-        "::error file=tests/unit/test_a.py,line=1,title=Weakened test::2 assertions removed"
-        in output
+        "::error file=tests/unit/test_a.py,line=1,"
+        "title=Test change needs approval::2 assertions removed" in output
     )
     assert "test-change-approved" in output
     assert "::warning" not in output
@@ -3411,7 +4467,7 @@ def test_a_label_set_before_the_head_changed_does_not_approve(
     assert check.main(argv) == 1
     output = capsys.readouterr().out
     assert "::warning::The label test-change-approved was set before" in output
-    assert "title=Weakened test::2 assertions removed" in output
+    assert "title=Test change needs approval::2 assertions removed" in output
 
 
 def test_a_pull_request_needs_the_time_of_its_last_head_change(check, repo, capsys):

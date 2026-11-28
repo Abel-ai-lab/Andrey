@@ -122,7 +122,7 @@ uv run --no-sync ruff format --check .    # formatting (`ruff format .` fixes it
 uv run --no-sync ruff check .             # lint
 uv run --no-sync ty check                 # types
 uv run --no-sync pytest tests -m "not release"   # the tests a pull request runs
-uv run --no-sync python scripts/test_weakening.py --base origin/<release branch>   # weakened tests
+uv run --no-sync python scripts/check_test_changes.py --base origin/<release branch>   # tests skipped, loosened, or removed
 ```
 
 `-n logical --dist loadfile` runs the tests on every core, as CI does, with the same tests and
