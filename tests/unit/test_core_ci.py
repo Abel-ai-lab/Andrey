@@ -1017,6 +1017,110 @@ def test_singular_decisions_are_the_eigenvalues_on_every_path(test_class, size, 
     stack(healthy, healthy)
 
 
+def _decision_by_eigenvalues(block: np.ndarray) -> bool:
+    """Whether the eigenvalue test finds ``block`` singular: its smallest eigenvalue is at most
+    ``SINGULAR_RTOL`` times its largest."""
+    w = np.linalg.eigvalsh(block)
+    return bool(w[0] <= w[-1] * ci.SINGULAR_RTOL)
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [3, 4, 6, 30, 31])
+@pytest.mark.parametrize(
+    "smallest", [1e-3, 1e-8, 1e-10, 3e-11, 1e-11, 3e-12, 1e-12, 5e-13, 2e-13, 1e-13, 1e-14, 1e-16]
+)
+def test_the_certificates_never_move_a_singular_decision_from_the_eigenvalues(
+    test_class, size, smallest
+):
+    # Sweeps the smallest eigenvalue across the three shifts of the factor (the bound's, the pass
+    # certificate's and the singular certificate's) for blocks of three or more conditioners, and
+    # asks the scalar path, the stack alone, and the stack beside healthy blocks for the same
+    # decision as the eigenvalue test, with the error of the inverse path.
+    k = size + 2
+    corr = np.zeros((2 * k, 2 * k))
+    corr[:k, :k] = _equicorrelation(k, 0.5)
+    corr[k:, k:] = _equicorrelation(k, smallest)
+    test = test_class.from_corr(corr, 400)
+    healthy, edge = list(range(k)), list(range(k, 2 * k))
+    singular = _decision_by_eigenvalues(corr[k:, k:])
+    refused = None
+    if singular:
+        with pytest.raises(ci.SingularCorrelationError) as reference:
+            test._invert(corr[np.ix_(edge, edge)][None])
+        refused = reference.value
+
+    def stack(*queries):
+        rows = np.array(queries)
+        return test.statistic_pvalues(rows[:, 0], rows[:, 1], rows[:, 2:])
+
+    for call in (
+        lambda: stack(edge),
+        lambda: stack(healthy, edge),
+        lambda: stack(edge, healthy, healthy),
+        lambda: test.statistic_pvalue(edge[0], edge[1], edge[2:]),
+    ):
+        if singular:
+            with pytest.raises(ci.SingularCorrelationError) as info:
+                call()
+            assert str(info.value) == str(refused)
+            assert getattr(info.value, "groups", None) == getattr(refused, "groups", None)
+        else:
+            assert np.isfinite(np.asarray(call()[0])).all()
+    assert np.isfinite(stack(healthy, healthy)[0]).all()
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+@pytest.mark.parametrize("size", [3, 5])
+def test_a_block_with_a_missing_correlation_gets_what_the_inverse_path_gives(test_class, size):
+    # A NaN fails every shifted factor, as a singular block does, but it is not certified singular:
+    # the block is left to the inverse and the eigenvalue test, which either way raise or return
+    # what they did before the factor (here, on every path, the same as a stack of the inverse).
+    k = size + 2
+    corr = _equicorrelation(k, 0.5)
+    corr[0, 2] = corr[2, 0] = np.nan
+    test = test_class.from_corr(corr, 400)
+    query = list(range(k))
+    reference = _inverted_or_error(ci._invert_nonsingular, corr[None])
+    for call in (
+        lambda: test.statistic_pvalue(query[0], query[1], query[2:]),
+        lambda: test.statistic_pvalues(
+            np.array([query[0]]), np.array([query[1]]), np.array([query[2:]])
+        ),
+    ):
+        try:
+            got = call()
+        except (ValueError, np.linalg.LinAlgError) as error:
+            assert isinstance(reference, tuple)
+            assert isinstance(error, reference[0])
+        else:
+            assert not isinstance(reference, tuple)
+            assert np.isnan(np.asarray(got[0])).all()
+
+
+@pytest.mark.parametrize("test_class", PARTIAL_CORRELATION_TESTS)
+def test_a_block_that_is_not_a_correlation_matrix_is_left_to_the_eigenvalue_test(test_class):
+    # The singular certificate needs a largest eigenvalue of at least 1, as a diagonal of 1 gives.
+    # A matrix scaled to a diagonal of 1e-3 and a smallest eigenvalue of 1e-14 of it is singular
+    # by the eigenvalue test on every path, and one scaled to 1e-3 with a smallest eigenvalue of
+    # 1e-10 of it is not, though both fail the shifted factor of 1e-13.
+    k = 5
+    for scaled, smallest in ((1e-3, 1e-14), (1e-3, 1e-10)):
+        corr = scaled * _equicorrelation(k, smallest)
+        test = test_class.from_corr(corr, 400)
+        singular = _decision_by_eigenvalues(corr)
+        for call in (
+            lambda: test.statistic_pvalue(0, 1, (2, 3, 4)),
+            lambda: test.statistic_pvalues(
+                np.array([0, 0]), np.array([1, 1]), np.array([[2, 3, 4]] * 2)
+            ),
+        ):
+            if singular:
+                with pytest.raises(ci.SingularCorrelationError):
+                    call()
+            else:
+                call()
+
+
 def test_the_public_cholesky_route_gives_the_gufunc_its_bits(monkeypatch):
     # The factors of a stack in which a matrix is not positive definite: NaN for that matrix alone,
     # on either route, and the other matrices' factors are the same bits as when they are alone.

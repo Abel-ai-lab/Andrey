@@ -84,7 +84,7 @@ import importlib
 import math
 from collections.abc import Callable, Iterable, Sequence
 from functools import lru_cache, partial
-from typing import Any, Protocol, Self, cast, runtime_checkable
+from typing import Any, NoReturn, Protocol, Self, cast, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
@@ -120,6 +120,15 @@ BOUND_MARGIN = 1e4
 # the eigenvalues, where the shift of BOUND_MARGIN rejects it (_cholesky_partial_correlations): a
 # smaller margin than the bound's, since the rounding of a factor is far below the threshold.
 NONSINGULAR_MARGIN = 10.0
+# The shift, in units of SINGULAR_RTOL, of the factor whose failure certifies a block singular: a
+# block of a unit diagonal has a largest eigenvalue of at least 1, so a smallest eigenvalue below
+# this much of SINGULAR_RTOL is at most SINGULAR_RTOL times it. Used for blocks of at most
+# SINGULAR_FACTOR_MAX columns, where the rounding of the factor, about k^2 times the machine
+# epsilon, stays under half of the threshold.
+SINGULAR_MARGIN = 0.1
+SINGULAR_FACTOR_MAX = 32
+# The message of the error a correlation submatrix that is singular to working precision raises.
+SINGULAR_MESSAGE = "correlation matrix is singular; cannot run a partial-correlation test"
 # The bound on the 2-norm of the inverse of a 4 x 4 block [x, y, s1, s2] below which the
 # second-order closed form settles it as nonsingular: its smallest eigenvalue is then above 1e-3,
 # orders above the threshold of the inverse bound, and the recursion loses at most about 1e-14 of
@@ -293,24 +302,19 @@ class PartialCorrelationTest:
         smaller shift of the factor certifies it nonsingular."""
         corr = self._corr
         if len(cond) == 2:
-            s1, s2 = cond
-            rx, ry = corr[x_int], corr[y_int]
-            closed = _second_order_float(
-                rx.item(y_int),
-                rx.item(s1),
-                rx.item(s2),
-                ry.item(s1),
-                ry.item(s2),
-                corr.item(s1, s2),
-            )
+            closed = _second_order_float(corr, x_int, y_int, cond[0], cond[1])
             if closed is not None:
                 return closed
             certified = False
         else:
             order = np.array((*cond, x_int, y_int), dtype=np.intp)
-            factored, certified = _cholesky_partial_correlation(corr[order[:, None], order])
+            factored, certified, singular = _cholesky_partial_correlation(
+                corr[order[:, None], order]
+            )
             if factored is not None:
                 return factored
+            if singular:
+                self._raise_singular()
         var = np.array((x_int, y_int, *cond), dtype=np.intp)
         inv = self._invert_one(corr[var[:, None], var], certified)
         return -inv.item(0, 1) / math.sqrt(abs(inv.item(0, 0) * inv.item(1, 1)))
@@ -331,14 +335,20 @@ class PartialCorrelationTest:
         try:
             return _invert_nonsingular(stack, certified)
         except SingularCorrelationError as error:
-            copies = self.copies()
-            if not copies:
-                raise
-            named = SingularCorrelationError(
-                f"correlation matrix is singular because {copies_message(copies)}"
-            )
-            named.groups = copies
-            raise named from error
+            self._raise_singular(error)
+
+    def _raise_singular(self, error: SingularCorrelationError | None = None) -> NoReturn:
+        """Raise ``error``, the error of a singular submatrix, or a new one, naming the data's
+        copies when it has any."""
+        error = error or SingularCorrelationError(SINGULAR_MESSAGE)
+        copies = self.copies()
+        if not copies:
+            raise error
+        named = SingularCorrelationError(
+            f"correlation matrix is singular because {copies_message(copies)}"
+        )
+        named.groups = copies
+        raise named from error
 
     def _invert_one(self, matrix: np.ndarray, certified: bool = False) -> np.ndarray:
         """:meth:`_invert` of the one ``(k, k)`` submatrix ``matrix``, with the bits of a stack of
@@ -506,6 +516,8 @@ class PartialCorrelationTest:
         """
         corr = self._corr
         size = conds.shape[1]
+        if len(lo) == 1:  # the scalar path has the bits of a stack of one and fewer fixed costs
+            return np.array([self._second_or_higher_order(lo[0], hi[0], conds[0].tolist())])
         certified = None
         if size == 2 and len(lo) <= SECOND_ORDER_LOOP_ROWS:
             r = np.empty(len(lo), dtype=np.float64)
@@ -513,15 +525,7 @@ class PartialCorrelationTest:
             for i, (x, y, s1, s2) in enumerate(
                 zip(lo.tolist(), hi.tolist(), conds[:, 0].tolist(), conds[:, 1].tolist())
             ):
-                rx, ry = corr[x], corr[y]
-                closed = _second_order_float(
-                    rx.item(y),
-                    rx.item(s1),
-                    rx.item(s2),
-                    ry.item(s1),
-                    ry.item(s2),
-                    corr.item(s1, s2),
-                )
+                closed = _second_order_float(corr, x, y, s1, s2)
                 if closed is None:
                     unsettled.append(i)
                 else:
@@ -535,17 +539,20 @@ class PartialCorrelationTest:
                 order[:, :size] = conds
                 order[:, size] = lo
                 order[:, size + 1] = hi
-                r, settled, nonsingular = _cholesky_partial_correlations(
+                r, settled, nonsingular, singular = _cholesky_partial_correlations(
                     corr[order[:, :, None], order[:, None, :]]
                 )
+                if singular:
+                    self._raise_singular()
             rest = np.flatnonzero(~settled)
             if size > 2:
                 certified = nonsingular[rest]
         if len(rest):
             var = np.empty((len(rest), size + 2), dtype=np.intp)
-            var[:, 0] = lo[rest]
-            var[:, 1] = hi[rest]
-            var[:, 2:] = conds[rest]
+            if len(rest) == len(lo):
+                var[:, 0], var[:, 1], var[:, 2:] = lo, hi, conds
+            else:
+                var[:, 0], var[:, 1], var[:, 2:] = lo[rest], hi[rest], conds[rest]
             inv = self._invert(corr[var[:, :, None], var[:, None, :]], certified)
             r[rest] = -inv[:, 0, 1] / np.sqrt(np.abs(inv[:, 0, 0] * inv[:, 1, 1]))
         return r
@@ -2369,19 +2376,22 @@ def _second_order(
     return r, settled
 
 
-def _second_order_float(
-    rxy: float, rx1: float, rx2: float, ry1: float, ry2: float, r12: float
-) -> float | None:
-    """:func:`_second_order` of one block of Python floats, with its bits: the partial correlation,
-    or ``None`` when the block is not settled."""
+def _second_order_float(corr: np.ndarray, x: int, y: int, s1: int, s2: int) -> float | None:
+    """:func:`_second_order` of the one block ``[x, y, s1, s2]`` of ``corr``, read as Python floats,
+    with its bits: the partial correlation, or ``None`` when the block is not settled."""
+    r12 = corr.item(s1, s2)
     d1 = 1.0 - r12 * r12
+    if not d1 > SECOND_ORDER_FLOOR:
+        return None
+    rx, ry = corr[x], corr[y]
+    rx1, ry1 = rx.item(s1), ry.item(s1)
     ax = 1.0 - rx1 * rx1
     ay = 1.0 - ry1 * ry1
-    if not (d1 > SECOND_ORDER_FLOOR and ax > 0.0 and ay > 0.0):
+    if not (ax > 0.0 and ay > 0.0):
         return None
-    rxy1 = (rxy - rx1 * ry1) / math.sqrt(ax * ay)
-    rx21 = (rx2 - rx1 * r12) / math.sqrt(ax * d1)
-    ry21 = (ry2 - ry1 * r12) / math.sqrt(ay * d1)
+    rxy1 = (rx.item(y) - rx1 * ry1) / math.sqrt(ax * ay)
+    rx21 = (rx.item(s2) - rx1 * r12) / math.sqrt(ax * d1)
+    ry21 = (ry.item(s2) - ry1 * r12) / math.sqrt(ay * d1)
     bx = 1.0 - rx21 * rx21
     by = 1.0 - ry21 * ry21
     if not (bx > 0.0 and by > 0.0):
@@ -2419,10 +2429,10 @@ def _cholesky_lower(blocks: np.ndarray) -> np.ndarray:
 
 def _cholesky_partial_correlations(
     blocks: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, bool]:
     """The partial correlations of the last two variables given the others, from each block's
-    Cholesky factor, which blocks the factor settles as nonsingular, and which blocks are certified
-    to pass the eigenvalue test.
+    Cholesky factor, which blocks the factor settles as nonsingular, which blocks are certified to
+    pass the eigenvalue test, and whether a block is certified singular.
 
     ``blocks`` is an ``(N, k, k)`` stack of correlation submatrices ordered ``[*S, x, y]``. The
     last row of the factor ``L`` of a block holds the factor of the 2 x 2 Schur complement of ``x``
@@ -2436,28 +2446,54 @@ def _cholesky_partial_correlations(
     is unsettled, and its own factor is not taken. An unsettled block is certified when the factor
     of the block less ``NONSINGULAR_MARGIN * SINGULAR_RTOL * k I`` exists: its smallest eigenvalue
     is above that, so it passes the eigenvalue test as well, which a certified block is spared.
-    Each result depends on its own block only. Unsettled entries of the partial correlations are not
-    to be read. :func:`_cholesky_partial_correlation` computes the same bits for one block.
+    The factor of an unsettled block less ``SINGULAR_MARGIN * SINGULAR_RTOL I`` that does not exist
+    certifies it singular, when the block has at most ``SINGULAR_FACTOR_MAX`` columns, a unit
+    diagonal and finite entries: the eigenvalue test rejects it, as it rejects a stack that holds
+    it. Any other unsettled block is left to that test. Each result depends on its own block only.
+    Unsettled entries of the partial correlations are not to be read.
+    :func:`_cholesky_partial_correlation` computes the same bits for one block.
     """
     k = blocks.shape[-1]
     with np.errstate(all="ignore"):
         factored = _cholesky_lower(blocks - _shift(k, BOUND_MARGIN))[:, k - 1, k - 1] > 0.0
         if factored.all():
             r, settled = _last_row_correlation(_cholesky_lower(blocks), k)
-        else:
+            if settled.all():
+                return r, settled, settled, False
+            certified = settled.copy()
+        elif factored.any():
             r = np.empty(len(blocks), dtype=np.float64)
             settled = factored
             rows = np.flatnonzero(factored)
-            if len(rows):
-                r[rows], settled[rows] = _last_row_correlation(_cholesky_lower(blocks[rows]), k)
-        if settled.all():
-            return r, settled, settled
+            r[rows], settled[rows] = _last_row_correlation(_cholesky_lower(blocks[rows]), k)
+            certified = settled.copy()
+        else:
+            r, settled, certified = (
+                np.empty(len(blocks), dtype=np.float64),
+                factored,
+                factored.copy(),
+            )
         rest = np.flatnonzero(~settled)
-        certified = settled.copy()
-        certified[rest] = (
-            _cholesky_lower(blocks[rest] - _shift(k, NONSINGULAR_MARGIN))[:, k - 1, k - 1] > 0.0
-        )
-        return r, settled, certified
+        unsettled = blocks if len(rest) == len(blocks) else blocks[rest]
+        shifts = _shifts(k)
+        passed = _cholesky_lower(unsettled[None] - shifts[:, None])[..., k - 1, k - 1] > 0.0
+        certified[rest] = passed[0]
+        singular = len(shifts) == 2 and _certifies_singular(unsettled[~passed[1]])
+        return r, settled, certified, singular
+
+
+def _certifies_singular(blocks: np.ndarray) -> bool:
+    """Whether ``blocks``, the unsettled blocks whose factor less ``SINGULAR_MARGIN *
+    SINGULAR_RTOL I`` does not exist, hold one that the eigenvalue test rejects: some block, and
+    every entry finite with a trace of at least ``k`` less ``1e-8 k``, so the factor failed on the
+    smallest eigenvalue and not on a NaN, and the largest eigenvalue, at least the mean of the
+    diagonal, is at least 1 less ``1e-8``."""
+    if not len(blocks):
+        return False
+    k = blocks.shape[-1]
+    return bool(
+        math.isfinite(blocks.sum()) and (blocks.trace(axis1=1, axis2=2) >= k * (1.0 - 1e-8)).all()
+    )
 
 
 def _last_row_correlation(low: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
@@ -2477,10 +2513,23 @@ def _shift(k: int, margin: float) -> np.ndarray:
     return shift
 
 
-def _cholesky_partial_correlation(block: np.ndarray) -> tuple[float | None, bool]:
+@lru_cache(maxsize=64)
+def _shifts(k: int) -> np.ndarray:
+    """The shifts of the factors that tell an unsettled block of ``k`` columns from one that
+    passes the eigenvalue test and from a singular one, as a ``(2, k, k)`` stack, or the first alone
+    as a ``(1, k, k)`` stack when ``k`` is above ``SINGULAR_FACTOR_MAX`` (read only)."""
+    shifts = [_shift(k, NONSINGULAR_MARGIN)]
+    if k <= SINGULAR_FACTOR_MAX:
+        shifts.append(SINGULAR_MARGIN * SINGULAR_RTOL * np.eye(k))
+    stack = np.stack(shifts)
+    stack.flags.writeable = False
+    return stack
+
+
+def _cholesky_partial_correlation(block: np.ndarray) -> tuple[float | None, bool, bool]:
     """:func:`_cholesky_partial_correlations` of one ``(k, k)`` block, with its bits: the partial
-    correlation of a settled block as a float, ``None`` when it is not settled, and whether the
-    block is certified to pass the eigenvalue test."""
+    correlation of a settled block as a float, ``None`` when it is not settled, whether the block is
+    certified to pass the eigenvalue test, and whether it is certified singular."""
     k = block.shape[0]
     with np.errstate(all="ignore"):
         if _cholesky_lower(block - _shift(k, BOUND_MARGIN)).item(k - 1, k - 1) > 0.0:
@@ -2488,8 +2537,11 @@ def _cholesky_partial_correlation(block: np.ndarray) -> tuple[float | None, bool
             l21 = low.item(k - 1, k - 2)
             l22 = low.item(k - 1, k - 1)
             if l22 > 0.0:
-                return l21 / math.sqrt(l21 * l21 + l22 * l22), True
-        return None, _cholesky_lower(block - _shift(k, NONSINGULAR_MARGIN)).item(k - 1, k - 1) > 0.0
+                return l21 / math.sqrt(l21 * l21 + l22 * l22), True, False
+        shifts = _shifts(k)
+        passed = _cholesky_lower(block[None] - shifts)[:, k - 1, k - 1] > 0.0
+        singular = len(shifts) == 2 and not passed[1] and _certifies_singular(block[None])
+        return None, bool(passed[0]), bool(singular)
 
 
 def _invert_nonsingular(stack: np.ndarray, certified: np.ndarray | None = None) -> np.ndarray:
@@ -2554,9 +2606,7 @@ def _raise_if_singular(stack: np.ndarray) -> None:
     """
     w = np.linalg.eigvalsh(stack)  # (N, k), ascending per row
     if (w[:, 0] <= w[:, -1] * SINGULAR_RTOL).any():
-        raise SingularCorrelationError(
-            "correlation matrix is singular; cannot run a partial-correlation test"
-        )
+        raise SingularCorrelationError(SINGULAR_MESSAGE)
 
 
 def _separating_prefix(
