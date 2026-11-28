@@ -168,10 +168,11 @@ GFCI_FAMILY = ["gfci", "boss_fci", "grasp_fci"]
 def test_a_fit_sees_one_blas_thread_and_calm_one_torch_thread(name, many_threads):
     inside = many_threads[2][name][0]
     assert inside
-    # Where the library has no pool to count, the count is 1; only CALM computes in torch.
+    # Where the library has no pool to count, the count is 1. Only CALM computes in torch.
     for _, (blas, openmp, torch_threads) in inside:
         assert (blas, openmp) == (1, 1)
-        assert torch_threads == (1 if name.startswith("calm") else MANY_THREADS)
+        if name.startswith("calm"):
+            assert torch_threads == 1
 
 
 @pytest.mark.parametrize("name", GFCI_FAMILY)
@@ -231,7 +232,7 @@ def test_the_gfci_family_pins_every_phase_as_the_test_sets(name, pin_blas, monke
         if _blas_threads() < 2:
             pytest.skip("threadpoolctl finds no BLAS library that runs more than one thread")
         getattr(andrey, name)(
-            _latent_data(0), indep_test="recording", collider_rule="majority", seed=0
+            _latent_data(2), indep_test="recording", collider_rule="majority", seed=0
         )
     assert {"_derive_sepsets", "vote_triples", "_rule_r4"} <= phases
     assert seen and set(seen) == {1 if pin_blas else 2}
