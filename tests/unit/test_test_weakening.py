@@ -350,6 +350,158 @@ FLAGGED = {
         """,
         "pytest.mark.xfail added to a test that existed",
     ),
+    "parametrize case replaced by another": (
+        """
+        @pytest.mark.parametrize("kind", ["edge", "common"])
+        def test_fit(kind):
+            assert fit(kind)
+        """,
+        """
+        @pytest.mark.parametrize("kind", ["common", "other"])
+        def test_fit(kind):
+            assert fit(kind)
+        """,
+        "1 parametrize case(s) removed",
+    ),
+    "places of assertAlmostEqual left to the default": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, places=2)
+        """,
+        "places loosened from 7 to 2",
+    ),
+    "skip through a module alias": (
+        """
+        SKIP = pytest.mark.skip(reason="slow")
+
+        @SKIP
+        def test_other():
+            assert other()
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        SKIP = pytest.mark.skip(reason="slow")
+
+        @SKIP
+        def test_other():
+            assert other()
+
+        @SKIP
+        def test_fit():
+            assert fit()
+        """,
+        "pytest.mark.skip added to a test that existed",
+    ),
+    "skip through an imported mark": (
+        """
+        from pytest import mark
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from pytest import mark
+
+        @mark.skip
+        def test_fit():
+            assert fit()
+        """,
+        "pytest.mark.skip added to a test that existed",
+    ),
+    "pytest.fail removed": (
+        """
+        def test_fit():
+            if reached():
+                pytest.fail("unreachable")
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+        """,
+        "assertion removed",
+    ),
+    "raises accepts one more exception": (
+        """
+        def test_fit():
+            with pytest.raises(ValueError):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises((ValueError, TypeError)):
+                fit(None)
+        """,
+        "pytest.raises accepts TypeError as well",
+    ),
+    "raises in a tuple widened to Exception": (
+        """
+        def test_fit():
+            with pytest.raises((ValueError, TypeError)):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises((ValueError, TypeError, Exception)):
+                fit(None)
+        """,
+        "pytest.raises accepts Exception as well",
+    ),
+    "parametrized fixture deleted": (
+        """
+        @pytest.fixture(params=["a", "b", "c"])
+        def kind(request):
+            return request.param
+
+        def test_fit(kind):
+            assert fit(kind)
+        """,
+        """
+        def test_fit():
+            assert fit("a")
+        """,
+        "parametrized fixture deleted",
+    ),
+    "test deleted from a class pytest collects": (
+        """
+        class TestFit:
+            def test_a(self):
+                assert a()
+
+            def test_b(self):
+                assert b()
+        """,
+        """
+        class TestFit:
+            def test_a(self):
+                assert a()
+        """,
+        "test deleted",
+    ),
+    "test deleted from a TestCase": (
+        """
+        class Fits(unittest.TestCase):
+            def test_a(self):
+                self.assertTrue(a())
+
+            def test_b(self):
+                self.assertTrue(b())
+        """,
+        """
+        class Fits(unittest.TestCase):
+            def test_a(self):
+                self.assertTrue(a())
+        """,
+        "test deleted",
+    ),
     "module constant": (
         """
         RTOL = 1e-8
@@ -784,6 +936,103 @@ NOT_FLAGGED = {
                 assert fit(n)
         """,
     ),
+    "parametrize cases reordered": (
+        """
+        @pytest.mark.parametrize("kind", ["edge", "common"])
+        def test_fit(kind):
+            assert fit(kind)
+        """,
+        """
+        @pytest.mark.parametrize("kind", ["common", "edge"])
+        def test_fit(kind):
+            assert fit(kind)
+        """,
+    ),
+    "raises exception swapped": (
+        """
+        def test_fit():
+            with pytest.raises(ValueError):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(TypeError):
+                fit(None)
+        """,
+    ),
+    "raises exceptions narrowed": (
+        """
+        def test_fit():
+            with pytest.raises((ValueError, TypeError)):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(ValueError):
+                fit(None)
+        """,
+    ),
+    "method named test of a class pytest does not collect": (
+        """
+        class Helper:
+            def test_value(self):
+                return 1
+
+            def other(self):
+                return 2
+        """,
+        """
+        class Helper:
+            def other(self):
+                return 2
+        """,
+    ),
+    "skip alias used by an added test only": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        SKIP = pytest.mark.skip(reason="slow")
+
+        def test_fit():
+            assert fit()
+
+        @SKIP
+        def test_new():
+            assert new()
+        """,
+    ),
+    "skip alias used as before": (
+        """
+        SKIP = pytest.mark.skip(reason="slow")
+
+        @SKIP
+        def test_fit():
+            assert fit()
+        """,
+        """
+        SKIP = pytest.mark.skip(reason="slow")
+
+        @SKIP
+        def test_fit():
+            assert fit()
+            assert fit() == 1
+        """,
+    ),
+    "pytest.fail kept": (
+        """
+        def test_fit():
+            if reached():
+                pytest.fail("unreachable")
+        """,
+        """
+        def test_fit():
+            if reached():
+                pytest.fail("never")
+            assert fit()
+        """,
+    ),
     "added parametrize cases": (
         """
         @pytest.mark.parametrize("n", [1, 2])
@@ -956,6 +1205,23 @@ def test_a_file_renamed_into_the_collected_names_is_not_flagged(check):
         check.analyze([check.Change("tests/unit/test_fit.py", "tests/unit/fit.py", source, source)])
         == []
     )
+
+
+def test_a_parametrized_fixture_that_moved_is_not_deleted(check):
+    fixture = textwrap.dedent("""
+    @pytest.fixture(params=["a", "b", "c"])
+    def kind(request):
+        return request.param
+    """)
+    test = "def test_fit(kind):\n    assert fit(kind)\n"
+    a, conftest = "tests/unit/test_a.py", "tests/unit/conftest.py"
+    moved = [
+        check.Change(a, a, fixture + test, test),
+        check.Change(conftest, conftest, None, fixture),
+    ]
+    assert check.analyze(moved) == []
+    gone = [check.Change(a, a, fixture + test, test)]
+    assert [f.reason for f in check.analyze(gone)] == ["parametrized fixture deleted"]
 
 
 def test_a_flag_names_the_file_the_test_and_the_code(check):
@@ -1135,6 +1401,22 @@ def test_a_baseline_moved_within_its_folder_is_not_flagged(check, repo):
     git(repo, "mv", "tests/recovery/baselines/PC/gauss.json", "tests/recovery/baselines/FCI/g.json")
     commit(repo)
     assert check.load("main", "HEAD", str(repo)) == ([], [])
+
+
+def test_a_binary_baseline_that_changed_one_invalid_byte_is_flagged(check, repo):
+    path = repo / "tests/recovery/baselines/PC/x.npz"
+    git(repo, "checkout", "-q", "main")
+    path.write_bytes(b"\x93NUMPY\x80data")
+    commit(repo)
+    git(repo, "checkout", "-q", "feature")
+    git(repo, "merge", "-q", "--ff-only", "main")
+    path.write_bytes(b"\x93NUMPY\x81data")
+    commit(repo)
+    changes, baselines = check.load("main", "HEAD", str(repo))
+    assert [(f.path, f.reason) for f in baselines] == [
+        ("tests/recovery/baselines/PC/x.npz", "baseline re-recorded")
+    ]
+    assert changes == []
 
 
 def test_a_change_outside_tests_and_qa_is_not_read(check, repo):

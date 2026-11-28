@@ -5,15 +5,18 @@ record the new output as the baseline, and each of these passes the check withou
 right. This script compares the base and the head of ``tests/`` and ``qa/`` by their syntax trees,
 function by function, and flags:
 
-- a removed ``assert`` statement, ``assert_*`` call, ``pytest.raises`` check, or ``pytest.approx``
-  assertion, and a ``pytest.raises`` that lost its ``match`` or widened to ``Exception``;
+- a removed ``assert`` statement, ``assert_*`` or ``pytest.fail`` call, ``pytest.raises`` check, or
+  ``pytest.approx`` assertion, and a ``pytest.raises`` that lost its ``match``, widened to
+  ``Exception``, or lists more exceptions;
 - a looser tolerance or bound: a larger ``rtol``, ``atol``, ``abs``, ``rel``, ``tol``, or ``delta``,
   a smaller ``decimal`` or ``places``, a looser bound in a comparison, an exact comparison turned
   into ``pytest.approx``, in a call, a default, a module constant, or a tolerance table;
 - a new ``skip``, ``skipif``, or ``xfail`` marker or call, or a new ``release`` marker (a pull
-  request into a release branch skips those tests), on a test that existed in the base;
-- a deleted test function, a test file renamed out of the names pytest collects, or fewer
-  ``parametrize`` cases (a literal list, tuple, set, or ``range``);
+  request into a release branch skips those tests), on a test that existed in the base, written out
+  or through a module name bound to one;
+- a deleted test function or parametrized fixture, a test file renamed out of the names pytest
+  collects, or a removed ``parametrize`` case (a literal list, tuple, set, or ``range``; a case
+  that another replaced counts as removed);
 - a re-recorded baseline file: a changed or deleted file of ``baselines/`` or named for one, and a
   JSON baseline whose recorded values changed.
 
@@ -87,6 +90,7 @@ DEFAULTS = {
     "assert_approx_equal": {"significant": 7},
     "assert_array_almost_equal_nulp": {"nulp": 1},
     "assert_array_max_ulp": {"maxulp": 1},
+    "assertAlmostEqual": {"places": 7},
 }
 APPROX_DEFAULT_REL, APPROX_DEFAULT_ABS = 1e-6, 1e-12
 RAISES = frozenset({"raises", "warns", "deprecated_call"})
@@ -136,6 +140,8 @@ class Unit(NamedTuple):
     nodes: list[ast.AST]
     source: str
     constants: dict[str, ast.AST]
+    aliases: dict[str, str] = {}
+    collected: bool = True
 
     @property
     def is_function(self) -> bool:
@@ -144,12 +150,13 @@ class Unit(NamedTuple):
 
     @property
     def is_test(self) -> bool:
-        """Whether the unit is a function named ``test...``."""
-        return self.is_function and self.qualname.rsplit(".", 1)[-1].startswith("test")
+        """Whether the unit is a function named ``test...`` that pytest collects."""
+        name = self.qualname.rsplit(".", 1)[-1]
+        return self.is_function and self.collected and name.startswith("test")
 
 
 class Check(NamedTuple):
-    """An assertion-like node: an assert, an ``assert_*`` call, or a ``pytest.raises``."""
+    """An assertion-like node: an assert, an ``assert_*`` or ``pytest.fail`` call, or a raises."""
 
     kind: str
     node: ast.AST
@@ -249,6 +256,26 @@ def _scope_nodes(root: ast.AST, definitions: list[ast.AST]) -> Iterator[ast.AST]
         stack.extend(ast.iter_child_nodes(node))
 
 
+def _marker_kind(node: ast.AST) -> str:
+    """Return ``pytest.mark.skip`` and the like for ``pytest.mark.skip`` or ``mark.skip``."""
+    if (
+        isinstance(node, ast.Attribute)
+        and node.attr in MARKERS
+        and (
+            (isinstance(node.value, ast.Attribute) and node.value.attr == "mark")
+            or (isinstance(node.value, ast.Name) and node.value.id == "mark")
+        )
+    ):
+        return f"pytest.mark.{node.attr}"
+    return ""
+
+
+def _collected_class(node: ast.ClassDef) -> bool:
+    """Whether pytest collects the methods of a class: named ``Test...`` or a ``TestCase``."""
+    bases = {_callee(base) for base in node.bases}
+    return node.name.startswith("Test") or "TestCase" in bases
+
+
 def collect(path: str, source: str) -> dict[str, Unit]:
     """Every unit of a source file, by qualified name; ``<module>`` holds the module's own code."""
     tree = ast.parse(source)
@@ -262,28 +289,51 @@ def collect(path: str, source: str) -> dict[str, Unit]:
             continue
         if isinstance(target, ast.Name):
             constants[target.id] = value
+    # A module name bound to a marker, such as ``SKIP = pytest.mark.skip(reason="slow")``.
+    aliases = {}
+    for name, value in constants.items():
+        kind = _marker_kind(value.func if isinstance(value, ast.Call) else value)
+        if kind:
+            aliases[name] = kind
     units: dict[str, Unit] = {}
 
-    def add(root: ast.AST, qualname: str) -> None:
+    def add(root: ast.AST, qualname: str, collected: bool = True) -> None:
         definitions: list[ast.AST] = []
         if isinstance(root, ast.ClassDef | ast.Module):
             nodes = list(_scope_nodes(root, definitions))
         else:
             nodes = list(ast.walk(root))
-        units[qualname] = Unit(path, qualname, root, nodes, source, constants)
+        units[qualname] = Unit(path, qualname, root, nodes, source, constants, aliases, collected)
         for child in definitions:
             name = getattr(child, "name", "")
-            add(child, name if qualname == "<module>" else f"{qualname}.{name}")
+            inside = isinstance(child, ast.ClassDef) and not _collected_class(child)
+            add(
+                child,
+                name if qualname == "<module>" else f"{qualname}.{name}",
+                collected and not inside,
+            )
 
     add(tree, "<module>")
     return units
+
+
+def _pytest_call(node: ast.AST) -> str:
+    """Return ``fail`` for the call ``pytest.fail(...)`` and so on, else an empty string."""
+    func = node.func if isinstance(node, ast.Call) else None
+    if isinstance(func, ast.Attribute) and _callee(func.value) == "pytest":
+        return func.attr
+    return ""
 
 
 def _checks(unit: Unit) -> list[Check]:
     checks = []
     for node in sorted(unit.nodes, key=_position):
         name = _callee(node) if isinstance(node, ast.Call) else ""
-        if isinstance(node, ast.Assert) or name.startswith("assert"):
+        if (
+            isinstance(node, ast.Assert)
+            or name.startswith("assert")
+            or _pytest_call(node) == "fail"
+        ):
             checks.append(Check("assert", node, _key(node)))
         elif name in RAISES:
             checks.append(Check("raises", node, "raises"))
@@ -425,6 +475,15 @@ def _first_name(call: ast.Call) -> str:
     return _callee(call.args[0]) if call.args else ""
 
 
+def _accepted(call: ast.Call) -> frozenset[str] | None:
+    """Return the exception names a ``pytest.raises`` lists, or None when it does not name them."""
+    first = call.args[0] if call.args else None
+    names = [
+        _callee(n) for n in (first.elts if isinstance(first, ast.Tuple | ast.List) else [first])
+    ]
+    return frozenset(names) if first is not None and all(names) else None
+
+
 def _raises_reasons(before: ast.Call, after: ast.Call) -> list[str]:
     reasons = []
     if any(k.arg == "match" for k in before.keywords) and not any(
@@ -433,6 +492,9 @@ def _raises_reasons(before: ast.Call, after: ast.Call) -> list[str]:
         reasons.append("pytest.raises lost its match")
     if _first_name(after) in BROAD and _first_name(before) not in BROAD:
         reasons.append(f"pytest.raises widened to {_first_name(after)}")
+    old, new = _accepted(before), _accepted(after)
+    if old is not None and new is not None and old < new:
+        reasons.append(f"pytest.raises accepts {', '.join(sorted(new - old))} as well")
     return reasons
 
 
@@ -453,26 +515,22 @@ def _exempt_nodes(unit: Unit, exempt: frozenset[str]) -> set[int]:
 
 
 def _markers(unit: Unit, exempt: frozenset[str] = frozenset()) -> dict[str, list[ast.AST]]:
+    """Return a unit's markers by kind: written out, or used through a module name bound to one."""
     found: dict[str, list[ast.AST]] = defaultdict(list)
     skipped = _exempt_nodes(unit, exempt)
     for node in sorted(unit.nodes, key=_position):
         if id(node) in skipped:
             continue
-        if (
-            isinstance(node, ast.Attribute)
-            and node.attr in MARKERS
-            and isinstance(node.value, ast.Attribute)
-            and node.value.attr == "mark"
-        ):
-            found[f"pytest.mark.{node.attr}"].append(node)
+        if kind := _marker_kind(node):
+            found[kind].append(node)
         elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in SKIP_CALLS
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "pytest"
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Load)
+            and node.id in unit.aliases
         ):
-            found[f"pytest.{node.func.attr}()"].append(node)
+            found[unit.aliases[node.id]].append(node)
+        elif (call := _pytest_call(node)) in SKIP_CALLS:
+            found[f"pytest.{call}()"].append(node)
     return found
 
 
@@ -483,16 +541,22 @@ def _integers(arguments: list[ast.expr]) -> list[int] | None:
     return None
 
 
+NUMBER = _key(ast.Constant(value=0))
+
+
 def _elements(
     node: ast.AST | None, constants: dict[str, ast.AST], depth: int = 0
-) -> Sequence[object] | None:
-    """Return the cases a parametrize argument lists, when the source states them, else None."""
+) -> Counter[str] | None:
+    """Return the cases a parametrize argument lists, when the source states them, else None.
+
+    Each case is its syntax tree without its numbers, so a case counts as one of its kind.
+    """
     if isinstance(node, ast.List | ast.Tuple | ast.Set):
         if any(isinstance(element, ast.Starred) for element in node.elts):
             return None
-        return [ast.dump(element) for element in node.elts]
+        return Counter(_key(element) for element in node.elts)
     if isinstance(node, ast.Dict):
-        return [ast.dump(key) for key in node.keys if key is not None]
+        return Counter(_key(key) for key in node.keys if key is not None)
     if isinstance(node, ast.Name) and node.id in constants and depth < 2:
         return _elements(constants[node.id], constants, depth + 1)
     if isinstance(node, ast.Call) and _callee(node) in {"list", "tuple", "set"} and node.args:
@@ -500,7 +564,7 @@ def _elements(
     if isinstance(node, ast.Call) and _callee(node) == "range" and 1 <= len(node.args) <= 3:
         integers = _integers(node.args)
         try:
-            return range(len(range(*integers))) if integers is not None else None
+            return Counter({NUMBER: len(range(*integers))}) if integers is not None else None
         except (ValueError, OverflowError):
             return None
     return None
@@ -521,7 +585,7 @@ def _argnames(node: ast.AST) -> tuple[str, ...]:
 
 def _parametrizations(
     unit: Unit,
-) -> list[tuple[tuple[str, ...], Sequence[object] | None, ast.Call]]:
+) -> list[tuple[tuple[str, ...], Counter[str] | None, ast.Call]]:
     """List the parametrizations of a unit: argument names, the cases when known, and the call."""
     found = []
     for node in sorted(unit.nodes, key=_position):
@@ -597,7 +661,7 @@ def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -
 
 def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
     """Flag the cases a unit's parametrizations lost and an argument left without one."""
-    pool: dict[tuple[str, ...], list[tuple[Sequence[object] | None, ast.Call]]] = defaultdict(list)
+    pool: dict[tuple[str, ...], list[tuple[Counter[str] | None, ast.Call]]] = defaultdict(list)
     kept = set()
     for names, elements, node in _parametrizations(new):
         pool[names].append((elements, node))
@@ -606,7 +670,7 @@ def _parametrize_findings(old: Unit, new: Unit, flag: Flag) -> None:
         if pool[names]:
             after_elements, after_node = pool[names].pop(0)
             if elements is not None and after_elements is not None:
-                fewer = len(elements) - len(after_elements)
+                fewer = sum((elements - after_elements).values())
                 if fewer > 0:
                     flag(
                         after_node,
@@ -675,14 +739,20 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
     """Return the weakenings in the changed Python files of a pull request."""
     findings: list[Finding] = []
     deleted: list[tuple[Unit, str]] = []
+    fixtures: list[Unit] = []
     added: list[Unit] = []
+    names: set[str] = (
+        set()
+    )  # every function of the new files, to tell a moved fixture from a gone one
     for change in changes:
         if change.old is None:
             # A new file has nothing to compare with, but a test moved into it is not a deletion.
             try:
-                added += [u for u in collect(change.path, change.new or "").values() if u.is_test]
+                new_file = collect(change.path, change.new or "")
             except (SyntaxError, ValueError):
-                pass
+                continue
+            added += [u for u in new_file.values() if u.is_test]
+            names.update(u.qualname.rsplit(".", 1)[-1] for u in new_file.values() if u.is_function)
             continue
         try:
             old_units = collect(change.old_path, change.old)
@@ -699,6 +769,7 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             # Renamed out of the names pytest collects: the tests are gone, not moved.
             reason = f"test no longer collected: the file was renamed to {change.path}"
             new_units = {}
+        names.update(u.qualname.rsplit(".", 1)[-1] for u in new_units.values() if u.is_function)
         exempt = _only_added_tests(old_units, new_units)
         for name, unit in old_units.items():
             if name in new_units:
@@ -707,7 +778,16 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 )
             elif unit.is_test:
                 deleted.append((unit, reason))
+            elif unit.is_function and any(n == ("params",) for n, _, _ in _parametrizations(unit)):
+                fixtures.append(unit)
         added += [u for n, u in new_units.items() if n not in old_units and u.is_test]
+    for unit in fixtures:
+        if unit.qualname.rsplit(".", 1)[-1] not in names:
+            line = _position(unit.node)[0]
+            reason = "parametrized fixture deleted"
+            findings.append(
+                Finding(unit.path, line, unit.qualname, reason, _clip(_text(unit, unit.node)))
+            )
     for unit, reason in deleted:
         key = _body_key(unit)
         name = unit.qualname.rsplit(".", 1)[-1]
@@ -754,7 +834,7 @@ def _changed_values(old: Any, new: Any, path: str = "") -> list[str]:
     return [] if old == new else [path or "(value)"]
 
 
-def baseline_findings(path: str, old: str | None, new: str | None) -> list[Finding]:
+def baseline_findings(path: str, old: str | bytes | None, new: str | bytes | None) -> list[Finding]:
     """Flag a baseline that was deleted, or changed (a JSON one: its old values changed)."""
     if old is None:
         return []
@@ -778,8 +858,12 @@ def _git(*args: str, root: str | None = None) -> bytes:
     return subprocess.run(["git", *args], check=True, capture_output=True, cwd=root).stdout
 
 
-def _show(root: str, revision: str, path: str) -> str:
-    return _git("show", f"{revision}:{path}", root=root).decode("utf-8", "replace")
+def _show(root: str, revision: str, path: str) -> bytes:
+    return _git("show", f"{revision}:{path}", root=root)
+
+
+def _text_of(blob: bytes | None) -> str | None:
+    return None if blob is None else blob.decode("utf-8", "replace")
 
 
 def changed_files(base: str, head: str, root: str) -> list[tuple[str, str, str, str]]:
@@ -807,7 +891,7 @@ def load(base: str, head: str, root: str) -> tuple[list[Change], list[Finding]]:
         if old is not None and _is_baseline(old_path) and not _is_baseline(path):
             findings += baseline_findings(old_path, old, None)  # renamed out of the baselines
         elif path.endswith(".py") and path.split("/")[0] in ROOTS:
-            changes.append(Change(path, old_path, old, new))
+            changes.append(Change(path, old_path, _text_of(old), _text_of(new)))
         elif _is_baseline(path):
             findings += baseline_findings(path, old, new)
     return changes, findings
