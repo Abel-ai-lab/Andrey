@@ -281,6 +281,13 @@ names its pull request.
   return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
   there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
   free cores. ([#1369])
+- For contributors, the `test-weakening` job of a pull request into a release or topic branch runs
+  `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
+  tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
+  a warning filter that lets a warning pass, a deleted test or `parametrize` case, and a re-recorded
+  baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it and flags a
+  change to the script or to its workflow job, it is a required check, `.github/` and the script
+  have code owners, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
 
 ### Fixed
 
@@ -3302,6 +3309,7 @@ First alpha release.
 [#1351]: https://github.com/Abel-ai-lab/Andrey/pull/1351
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
+[#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
