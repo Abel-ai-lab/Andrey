@@ -146,6 +146,23 @@ def test_residualize_is_the_residual_loop(n: int) -> None:
             assert _same_bits(X, want), (n, order_of_memory, m)
 
 
+@pytest.mark.parametrize("n", [7, 300, 1000])
+def test_center_columns_has_the_bits_of_each_columns_own_mean(n: int) -> None:
+    """Whatever the memory layout of the input, each column loses the mean of its contiguous copy,
+    where ``X.mean(axis=0)`` of a C-ordered array sums the rows one after the other."""
+    rng = np.random.default_rng(n)
+    raw = rng.standard_normal((n, 9)) * 3 + rng.choice([0.0, 1e3, 0.37], 9)
+    want = np.column_stack([c - np.ascontiguousarray(c).mean() for c in raw.T])
+    layouts = {
+        "C": np.ascontiguousarray(raw),
+        "F": np.asfortranarray(raw),
+        "fancy index": raw[:, list(range(9))],
+    }
+    for name, X in layouts.items():
+        pwling.center_columns(X)
+        assert _same_bits(X, want), name
+
+
 def test_residualize_computes_nothing_when_no_column_remains() -> None:
     """The last pick has nothing to residualize, as the empty loop did no arithmetic."""
     X = np.array([[0.0, 1.0], [1e308, 2.0]])

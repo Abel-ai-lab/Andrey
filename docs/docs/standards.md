@@ -101,7 +101,10 @@ same graph, mark for mark. The registry marks {{ reads_units_names }} as `reads_
 change its graph there instead, so the mark cannot go stale, and its page says how it reads the
 units. `tests/unit/test_offset_invariance.py` shifts every column, or scales and shifts them all
 alike, and requires the same graph from every method. Each check runs on one small dataset per kind
-of input, so it covers the code those data reach.
+of input, so it covers the code those data reach. The order search of DirectLiNGAM and
+MultiGroupDirectLiNGAM has a wider check of its own in the same file: exchangeable, binary,
+mirrored, and skewed columns on many seeds, offsets from `1e3` to `1e9`, and all three measures. It
+catches the search reading an offset; it does not show that no other step does.
 
 **Benchmark data.** A benchmark must not reward a method for reading the simulation's units: in
 linear data drawn with the usual weights, a variable's variance, and the share of it the other
