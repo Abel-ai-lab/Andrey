@@ -112,6 +112,22 @@ METHODS = {
         timers=lambda workers: [blanket_timers(m, s, workers) for m, s in BLANKET_FITS],
         sizes=((50, 100, 200, 400), 10, 800),
     ),
+    "resit": Method(
+        "ANDREY_RESIT_PARALLEL_MIN_WORK",
+        "RESIT",
+        at_cutoff=True,
+        default=_constant("andrey.fcm._parallel", "MIN_POOL_RESIT_WORK"),
+        timers=lambda workers: [regression_timers("resit", workers, RESIT_ROWS, resit_regressions)],
+        sizes=((6, 8, 10, 12, 16), 4, 20),
+    ),
+    "cpcm": Method(
+        "ANDREY_CPCM_PARALLEL_MIN_WORK",
+        "The exact search of CPCM",
+        at_cutoff=True,
+        default=_constant("andrey.fcm._parallel", "MIN_POOL_CPCM_WORK"),
+        timers=lambda workers: [regression_timers("cpcm_graph", workers, CPCM_ROWS, cpcm_fits)],
+        sizes=((3, 4), 3, 4),
+    ),
 }
 NOTE = (
     "This value suits many fits in one process. Starting the first pool in a process costs more, "
@@ -577,6 +593,45 @@ def blanket_timers(method: str, structure: str, workers: int) -> Timers:
             return _time(lambda: fit(x, structure=structure), _REPEATS)
 
     return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0")), lambda d: d * (d - 1)
+
+
+# The rows of the RESIT and CPCM probes. The exact search of CPCM stops at 4 variables and uses no
+# workers for 2, so its probe sizes are 3 and 4 variables.
+RESIT_ROWS = 300
+CPCM_ROWS = 200
+
+
+def resit_regressions(d: int) -> int:
+    """The regressions of RESIT's causal order over ``d`` variables: ``d + (d - 1) + ... + 2``."""
+    return d * (d + 1) // 2 - 1
+
+
+def cpcm_fits(d: int) -> int:
+    """The fits of the exact search of CPCM over ``d`` variables: each variable on every nonempty
+    set of the others."""
+    return d * (2 ** (d - 1) - 1)
+
+
+def regression_timers(method: str, workers: int, rows: int, fits: Callable[[int], int]) -> Timers:
+    """Serial and pooled timing functions for a whole ``method`` fit (``resit`` or ``cpcm_graph``)
+    on :func:`sample` data of ``rows`` rows.
+
+    The serial arm fits in this process; the pooled arm runs ``workers`` processes with the cutoff
+    set to 0, so every regression goes to the pool and the time includes starting and closing it.
+    Times are as in :func:`fit_timers`. The third function gives the fit's work, ``fits(d)``
+    regressions times ``rows``, as the gate counts it.
+    """
+    import andrey
+
+    fit = getattr(andrey, method)
+    var = METHODS["cpcm" if method == "cpcm_graph" else method].variable
+
+    def run(d: int, n_workers: int, cutoff: str | None) -> float:
+        x = sample(d, rows=rows)
+        with _cutoff(var, cutoff), andrey.config(n_jobs=n_workers):
+            return _time(lambda: fit(x), _REPEATS)
+
+    return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0")), lambda d: fits(d) * rows
 
 
 def calibrate(workers: int, methods: Sequence[str] = tuple(METHODS)) -> dict[str, Crossover]:

@@ -383,6 +383,14 @@ def resit(
     column changes no step; the centering also keeps a large offset from canceling the distances'
     digits. The fit draws no random numbers and runs on one BLAS thread.
 
+    **Workers.** With ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``), the regressions
+    and tests of the causal order and of the edge removal run on that many worker processes, each
+    on one BLAS thread, when the regressions of the causal order times the rows,
+    ``(n_variables * (n_variables + 1) / 2 - 1) * n_samples``, reach
+    ``ANDREY_RESIT_PARALLEL_MIN_WORK``; ``andrey calibrate --method resit`` measures the value for
+    a machine. The sinks and the removed edges are chosen in the calling process from the same
+    numbers, so the result is the same bit for bit with any number of workers.
+
     **Ties.** p-values are compared as their logarithms rounded to 9 decimal places, as
     :func:`~andrey.hc` compares its score changes per row, so two p-values that differ only in
     their rounding tie. The logarithms are computed directly, so p-values below the smallest
@@ -546,6 +554,16 @@ def cpcm_graph(
     jointly with each column scaled to unit standard deviation, then the complete DAG of the order
     loses, one at a time, the edge whose removal lowers the score most, while one does [1]_ [3]_.
     The columns are read in rank order, so the result does not depend on their order.
+
+    **Workers.** With ``n_jobs`` above 1 (``andrey.config`` or ``ANDREY_N_JOBS``), the exact search
+    over 3 or 4 variables fits every column under ``"gaussian"``, ``"gamma"``, or ``"gumbel"`` on
+    every set of the others on that many worker processes, each on one BLAS thread, when those
+    fits times the rows, ``n_variables * (2 ** (n_variables - 1) - 1) * n_samples`` with all columns
+    under such families, reach ``ANDREY_CPCM_PARALLEL_MIN_WORK``; the fits under any other family
+    cost less than starting the workers and run in the calling process.
+    ``andrey calibrate --method cpcm`` measures the value for a machine. The scores and the search
+    run in the calling process on the same residuals, so the result is the same bit for bit with any
+    number of workers. The greedy search above 4 variables runs in the calling process.
 
     **Units.** As for :func:`~andrey.cpcm`: the result does not depend on any column's units under
     the Gaussian, Gumbel, exponential, and gamma families, of which the last two read its origin;

@@ -687,8 +687,9 @@ Andrey reads its numeric backend and its worker count from `andrey.config`, or f
 `ANDREY_BACKEND` and `ANDREY_N_JOBS` environment variables;
 [Configuration](../configuration.md) lists every setting. With more than one
 worker, GES, GFCI, the skeleton search of PC and the methods built on it, the
-possible-d-separation step of FCI, FCI-JCI, and GFCI, and the full-graph search of IAMB, Inter-IAMB,
-and MMPC run their larger passes in worker processes and return the same graph as with one worker;
+possible-d-separation step of FCI, FCI-JCI, and GFCI, the full-graph search of IAMB, Inter-IAMB,
+and MMPC, RESIT, and the exact search of CPCM run their larger passes in worker processes and return
+the same graph as with one worker;
 [Parallel search](../configuration.md#parallel-search) lists the methods and tests that use them.
 
 Starting the worker processes re-imports the script that started them. A script that runs with
