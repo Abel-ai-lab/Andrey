@@ -277,6 +277,26 @@ def test_the_model_is_the_one_linprog_hands_to_highs(monkeypatch) -> None:
         assert passed == dict(rpcmci._HIGHS_OPTIONS)
 
 
+def same_program(a: rpcmci._Program, b: rpcmci._Program) -> bool:
+    """Equal in every array, in dtype and bytes, and in the entries of the sparse matrices."""
+    arrays = ("b_ub", "b_eq", "indptr", "indices", "data", "row_lower", "row_upper", "col_lower")
+    arrays += ("col_upper",)
+    return (
+        (a.n_gamma, a.n_eta) == (b.n_gamma, b.n_eta)
+        and a.bounds == b.bounds
+        and all(
+            getattr(a, name).dtype == getattr(b, name).dtype
+            and getattr(a, name).tobytes() == getattr(b, name).tobytes()
+            for name in arrays
+        )
+        and all(
+            getattr(a, name).data.tobytes() == getattr(b, name).data.tobytes()
+            and (getattr(a, name) != getattr(b, name)).nnz == 0
+            for name in ("A_ub", "A_eq")
+        )
+    )
+
+
 def test_the_arrays_of_a_shape_are_built_once_and_solves_leave_them_as_they_were() -> None:
     first = rpcmci._program(2, 40, 3)
     assert rpcmci._program(2, 40, 3) is first
@@ -284,16 +304,18 @@ def test_the_arrays_of_a_shape_are_built_once_and_solves_leave_them_as_they_were
     rng = np.random.default_rng(0)
     for _ in range(3):
         regime_lp(rng.uniform(0.0, 4.0, (2, 40)), 3)
-    fresh = rpcmci._build_program(2, 40, 3)
-    cached = rpcmci._program(2, 40, 3)
-    for name in ("b_ub", "b_eq", "indptr", "indices", "data", "row_lower", "row_upper"):
-        assert getattr(cached, name).tobytes() == getattr(fresh, name).tobytes()
-    for name in ("col_lower", "col_upper"):
-        assert getattr(cached, name).tobytes() == getattr(fresh, name).tobytes()
-    for name in ("A_ub", "A_eq"):
-        assert getattr(cached, name).data.tobytes() == getattr(fresh, name).data.tobytes()
-        assert (getattr(cached, name) != getattr(fresh, name)).nnz == 0
-    assert cached.bounds == fresh.bounds
+    assert same_program(rpcmci._program(2, 40, 3), rpcmci._build_program(2, 40, 3))
+
+
+def test_the_program_cache_misses_when_any_argument_changes() -> None:
+    rpcmci._program.cache_clear()
+    rpcmci._program(2, 40, 3)
+    for args in ((3, 40, 3), (2, 41, 3), (2, 40, 4)):
+        misses = rpcmci._program.cache_info().misses
+        found = rpcmci._program(*args)
+        assert rpcmci._program.cache_info().misses == misses + 1
+        assert same_program(found, rpcmci._build_program(*args))
+    rpcmci._program.cache_clear()
 
 
 def test_without_the_bindings_linprog_solves_every_program(monkeypatch, recorded) -> None:
