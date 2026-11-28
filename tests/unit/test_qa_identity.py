@@ -953,6 +953,44 @@ def test_hc_records_its_perturbations_and_climbs(x: np.ndarray) -> None:
     assert {"hc.climb", "hc.perturb"} <= {r.stage for r in recorder.records}
 
 
+def test_hc_records_the_total_of_each_start(x: np.ndarray) -> None:
+    with identity.checkpointing(True) as recorder:
+        out = andrey.hc(x, n_starts=3, n_perturbations=2, seed=0)
+    totals = [r for r in recorder.records if r.stage == "hc.total"]
+    assert len(totals) == 3 and all([p.name for p in r.pieces] == ["total"] for r in totals)
+    best = min(float(r.pieces[0].array[0]) for r in totals)
+    assert best == pytest.approx(out.metadata["score"], abs=1e-9)
+
+
+def test_tabu_records_the_total_after_each_move(x: np.ndarray) -> None:
+    with identity.checkpointing(True) as recorder:
+        out = andrey.tabu(x, n_starts=2, seed=0)
+    moves = [r for r in recorder.records if r.stage == "tabu.move"]
+    assert moves and all([p.name for p in r.pieces] == ["move", "parents", "total"] for r in moves)
+    best = min(float(r.pieces[2].array[0]) for r in moves)
+    assert best == pytest.approx(out.metadata["score"], abs=1e-9)
+
+
+def test_ges_records_only_the_moves_the_knowledge_admits(monkeypatch) -> None:
+    """A move whose class holds no DAG that satisfies the knowledge is skipped for the next best
+    one, and changes nothing, so no checkpoint is recorded for it."""
+    ges_module = importlib.import_module("andrey.search._parallel_ges")
+    real, verdicts = ges_module.admits, []
+
+    def rejecting_every_other_move(cpdag: np.ndarray, constraints: Any) -> bool:
+        verdicts.append(len(verdicts) % 2 == 1 and real(cpdag, constraints))
+        return verdicts[-1]
+
+    monkeypatch.setattr(ges_module, "admits", rejecting_every_other_move)
+    data = np.ascontiguousarray(identity.draws("linear_gauss_er_d20")[0].data)
+    with identity.checkpointing(True) as recorder:
+        andrey.ges(data, knowledge=andrey.Knowledge(forbidden=[(0, 1)]))
+    stages = [r.stage for r in recorder.records]
+    assert not all(verdicts) and any(verdicts)
+    assert len(stages) == sum(verdicts)
+    assert {"ges.forward", "ges.backward"} <= set(stages)
+
+
 @pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
 def test_calm_records_each_outer_round_without_changing_the_answer(x: np.ndarray) -> None:
     pytest.importorskip("torch")
@@ -1376,6 +1414,45 @@ def test_a_manifest_and_its_sidecar_compare_end_to_end(tmp_path, monkeypatch, ca
     assert identity.main(["--compare", str(base), str(head)]) == 1
     out = capsys.readouterr().out
     assert "first checkpoint difference: PC asia_gauss 0 0 1: record " in out and "pc.meek" in out
+
+
+def _checkpointed_pc_manifests(tmp_path, monkeypatch) -> tuple[Path, Path, Path]:
+    """The manifests of two plain fits and of a third that parts at its second stage, each with
+    its sidecar."""
+    monkeypatch.setattr(identity, "datasets", lambda method: ("asia_gauss",))
+    paths = tuple(tmp_path / f"{name}.json" for name in ("base", "head", "other"))
+    for path in paths[:2]:
+        assert identity.main(["PC", "-o", str(path), "--checkpoints", "--seeds", "1"]) == 0
+    with monkeypatch.context() as patched:
+        _end_the_first_directed_edge_after_meek(patched)
+        assert identity.main(["PC", "-o", str(paths[2]), "--checkpoints", "--seeds", "1"]) == 0
+    return paths
+
+
+def test_a_sidecar_that_is_not_the_manifests_is_refused(tmp_path, monkeypatch) -> None:
+    base, _, other = _checkpointed_pc_manifests(tmp_path, monkeypatch)
+    rows = json.loads(base.read_text())["rows"]
+    identity.read_stages(tmp_path / identity.sidecar_name(base), rows)
+    with pytest.raises(ValueError, match="not the manifest's"):
+        identity.read_stages(tmp_path / identity.sidecar_name(other), rows)
+    moved = [{**r, "seed": 99} for r in rows]
+    with pytest.raises(ValueError, match="has no checkpoints"):
+        identity.read_stages(tmp_path / identity.sidecar_name(base), moved)
+
+
+def test_compare_says_when_a_sidecar_is_not_its_manifests_and_still_compares_the_outputs(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    base, head, other = _checkpointed_pc_manifests(tmp_path, monkeypatch)
+    (tmp_path / identity.sidecar_name(head)).write_bytes(
+        (tmp_path / identity.sidecar_name(other)).read_bytes()
+    )
+    capsys.readouterr()
+    assert identity.main(["--compare", str(base), str(head)]) == 0
+    out = capsys.readouterr().out
+    assert "checkpoints not compared: the sidecar's checkpoints of the fit" in out
+    assert "first checkpoint difference" not in out
+    assert "0 with a different graph, 0 with only different bits" in out
 
 
 def test_the_checkpoint_mode_needs_a_manifest_and_a_package_that_has_the_sink(

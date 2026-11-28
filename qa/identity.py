@@ -1365,7 +1365,14 @@ def read_stages(path: Path, rows: Iterable[dict]) -> dict[tuple, Stages]:
         key = tuple(r[k] for k in KEY)
         name = _array_key(key)
         if "checkpoints" in r:
-            fit = [Label(*entry) for entry in json.loads(str(npz[f"{name}/labels"]))]
+            if f"{name}/labels" not in npz:
+                raise ValueError(f"the sidecar has no checkpoints for the fit {name}")
+            text = str(npz[f"{name}/labels"])
+            if hashlib.sha256(text.encode()).hexdigest() != r["checkpoints"]:
+                raise ValueError(
+                    f"the sidecar's checkpoints of the fit {name} are not the manifest's"
+                )
+            fit = [Label(*entry) for entry in json.loads(text)]
             out[key] = Stages(fit, functools.partial(_load, npz, name))
     return out
 
@@ -1999,7 +2006,13 @@ def _sidecar_stages(
     sidecars = [path.with_name(name) for path, name in zip(paths, names, strict=True)]
     if not all(s.is_file() for s in sidecars):
         return None
-    before, after = (read_stages(s, m["rows"]) for s, m in zip(sidecars, manifests, strict=True))
+    try:
+        before, after = (
+            read_stages(s, m["rows"]) for s, m in zip(sidecars, manifests, strict=True)
+        )
+    except ValueError as error:
+        print(f"checkpoints not compared: {error}")
+        return None
     return before, after
 
 

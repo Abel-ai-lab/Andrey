@@ -657,6 +657,8 @@ def greedy_search(
             moves = search(scanner, adj_int, parents_of, max_iter)
         capped |= max_iter is not None and moves == max_iter
         total = float(sum(score.score(i, parents_of[i]) for i in range(d)))
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("hc.total", total=total)
         if best is None or total < best[2] - START_EPS:
             best = (adj_int, parents_of, total)
         del scanner

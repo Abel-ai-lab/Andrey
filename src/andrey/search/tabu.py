@@ -62,13 +62,13 @@ def _search(
                 break
         move = found[4]
         apply_move(adj_int, parents_of, move)
-        if (take := _checkpoint.TAKE.get()) is not None:
-            take("tabu.move", move=move, parents=adj_int)
         moves += 1
         op, u, v = move
         for node in (u, v) if op == "reverse" else (v,):
             local[node] = score.score(node, parents_of[node])
         total = math.fsum(local)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("tabu.move", move=move, parents=adj_int, total=total)
         if total < best_total - EPS_IMPROVE:
             best_key, best_total, losses = tuple(adj_int), total, 0
     adj_int[:] = best_key
