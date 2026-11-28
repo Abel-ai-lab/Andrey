@@ -112,6 +112,14 @@ METHODS = {
         timers=lambda workers: [blanket_timers(m, s, workers) for m, s in BLANKET_FITS],
         sizes=((50, 100, 200, 400), 10, 800),
     ),
+    "rpcmci": Method(
+        "ANDREY_RPCMCI_PARALLEL_MIN_WORK",
+        "Regime-PCMCI",
+        at_cutoff=True,
+        default=_constant("andrey.temporal._parallel_rpcmci", "MIN_POOL_RPCMCI_WORK"),
+        timers=lambda workers: [rpcmci_timers(workers)],
+        sizes=((4, 8, 16, 32), 2, 128),
+    ),
     "resit": Method(
         "ANDREY_RESIT_PARALLEL_MIN_WORK",
         "RESIT",
@@ -593,6 +601,54 @@ def blanket_timers(method: str, structure: str, workers: int) -> Timers:
             return _time(lambda: fit(x, structure=structure), _REPEATS)
 
     return (lambda d: run(d, 1, None)), (lambda d: run(d, workers, "0")), lambda d: d * (d - 1)
+
+
+# The series of the Regime-PCMCI probe: two variables whose lagged link changes sign every
+# RPCMCI_REGIME_STEPS steps, RPCMCI_ROWS steps in all, fitted with two regimes.
+RPCMCI_ROWS = 500
+RPCMCI_REGIME_STEPS = 100
+RPCMCI_REGIMES = 2
+
+
+def regime_sample(rows: int = RPCMCI_ROWS, seed: int = 0) -> np.ndarray:
+    """``rows`` steps of two variables with one lagged link, which changes sign every
+    :data:`RPCMCI_REGIME_STEPS` steps."""
+    noise = np.random.default_rng(seed).standard_normal((rows, 2))
+    x = np.zeros((rows, 2))
+    for t in range(1, rows):
+        sign = 1.0 if (t // RPCMCI_REGIME_STEPS) % 2 == 0 else -1.0
+        x[t] = [0.2 * x[t - 1, 0], 0.2 * x[t - 1, 1] + sign * 0.8 * x[t - 1, 0]]
+        x[t] += noise[t]
+    return x
+
+
+def rpcmci_timers(workers: int) -> Timers:
+    """Serial and pooled timing functions for a whole Regime-PCMCI fit of ``d`` starts on
+    :func:`regime_sample` data of :data:`RPCMCI_ROWS` steps.
+
+    The serial arm fits in this process; the pooled arm runs ``workers`` processes with the cutoff
+    set to 0, so every start goes to the pool and the time includes starting and closing it. Both
+    arms run on NumPy, the backend whose fits use the pool. Times are as in :func:`fit_timers`. The
+    third function gives the fit's work, ``d * regimes * steps``, as the gate counts it.
+    """
+    import andrey
+
+    var = METHODS["rpcmci"].variable
+    x = regime_sample()
+    transitions = RPCMCI_ROWS // RPCMCI_REGIME_STEPS + 1
+
+    def run(d: int, n_workers: int, cutoff: str | None) -> float:
+        with _cutoff(var, cutoff), andrey.config(n_jobs=n_workers, backend="numpy"):
+            return _time(
+                lambda: andrey.rpcmci(x, n_starts=d, max_transitions=transitions, seed=0),
+                _REPEATS,
+            )
+
+    return (
+        (lambda d: run(d, 1, None)),
+        (lambda d: run(d, workers, "0")),
+        lambda d: d * RPCMCI_REGIMES * RPCMCI_ROWS,
+    )
 
 
 # The rows of the RESIT and CPCM probes. The exact search of CPCM stops at 4 variables and uses no

@@ -823,8 +823,10 @@ alternates PCMCI on each regime's time steps with a linear program that reassign
 regime whose linear model predicts them best, with at most `max_transitions` switches per regime;
 the lowest-objective start returns each step's regime and one lagged graph per regime in a
 {py:class}`~andrey.RegimeOutput`. SciPy's HiGHS solver solves the linear program exactly, so it
-needs no further package. It is experimental until its benchmark in the paper's setting is
-published.
+needs no further package. With `andrey.config(n_jobs=...)` above 1, the starts run on that many
+worker processes once `n_starts * n_regimes * T` for a series of `T` steps reaches
+`ANDREY_RPCMCI_PARALLEL_MIN_WORK`, with the same result at any number of workers. It is
+experimental until its benchmark in the paper's setting is published.
 
 A method becomes supported once it has:
 
@@ -1639,7 +1641,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT, possible-d-separation, full-graph IAMB, Inter-IAMB, and MMPC, RESIT, and the CPCM exact search) for this machine, as settings to export |
+| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT, possible-d-separation, full-graph IAMB, Inter-IAMB, and MMPC, Regime-PCMCI, RESIT, and the CPCM exact search) for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or

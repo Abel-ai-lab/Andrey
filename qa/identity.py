@@ -3,8 +3,9 @@
 Every supported method of the quality gate (:mod:`qa.quality_gate`) is fitted on the first draws of
 its gate datasets and of one larger dataset (:data:`LARGER`), and UT-IGSP and GnIES on the gate's
 smaller interventional dataset (:data:`UNKNOWN_TARGETS`), on the numpy backend with one worker and
-one BLAS thread. The options 0.19.0 added (:data:`OPTIONS`) have fits of their own on data where
-they change the answer. A fit's hash covers its whole output: the graph, the edge weights, the
+one BLAS thread. Regime-PCMCI, which the gate does not run, is fitted on two series of its own
+(:data:`EXPERIMENTAL`). The options 0.19.0 added (:data:`OPTIONS`) have fits of their own on data
+where they change the answer. A fit's hash covers its whole output: the graph, the edge weights, the
 causal order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats
 enter as their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so
 equal hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each
@@ -24,11 +25,11 @@ of ICP and IGSP and the contexts of J-PCMCI+ with the columns, and maps each ans
 original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
 ``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, every
-possible-d-sep search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, and every regression of
-RESIT and of the exact search of CPCM sent to the pool. Both report each refit whose answer differs
-from the first fit. A different worker count must not
-change a bit, so any difference fails it. A column order
-fails the check when a graph or a causal order differs (:data:`STRUCTURE`) or when an edge weight or
+possible-d-sep search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, every fit of
+Regime-PCMCI, and every regression of RESIT and of the exact search of CPCM sent to the pool. Both
+report each refit whose answer differs from the first fit. A different worker count must not change
+a bit, so any difference fails it. A column order fails the check when a graph or a causal order
+differs (:data:`STRUCTURE`) or when an edge weight or
 metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near zero). The last
 bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
 only by rounding is reported as information.
@@ -118,6 +119,9 @@ _CDNOD = qg.AndreyCDNOD().params()
 _GROUPS = qg.AndreyMultiGroupDirectLiNGAM().params()["n_groups"]
 _VARMA = qg.AndreyVarmaLiNGAM().params()
 _DYNOTEARS = qg.DYNOTEARS.params()
+#: Regime-PCMCI's settings: 20 starts, so ties and failed starts occur, and up to 8 switches per
+#: regime, the most the series of :data:`EXPERIMENTAL` hold.
+_RPCMCI = {"n_starts": 20, "max_transitions": 8, "tau_max": 1, "seed": 0}
 
 
 def _domains(x: np.ndarray) -> Any:
@@ -305,6 +309,8 @@ FITS: dict[str, Fit] = {
     "IGSP": Fit(qg.igsp_fit, refit=_igsp_refit),
     "CAM-UV": Fit(andrey.camuv),
     "DYNOTEARS": Fit(lambda x: andrey.dynotears(x, **_DYNOTEARS)),
+    # A column order is not refitted: the output of Regime-PCMCI is not a StructureOutput.
+    "RPCMCI": Fit(functools.partial(andrey.rpcmci, **_RPCMCI), shuffled=False),
 }
 
 
@@ -391,11 +397,40 @@ def sparse_discrete_draws() -> tuple[qg.Draw, ...]:
     return tuple(qg.Draw(sample.data, sample.graph) for sample in out)
 
 
-#: The datasets of the option fits, which the gate does not draw.
+def regime_draws(kind: str, n_steps: int, n_vars: int) -> tuple[qg.Draw, ...]:
+    """Return a draw per seed of a series that switches between two regimes in runs of 70 to 100
+    steps, with no true graph.
+
+    ``"sign"``: two variables, the first driving the second at lag 1 with a coefficient that
+    changes sign between the regimes; ``"wide"``: a chain of ``n_vars`` variables whose first-lag
+    links change sign, and whose variable ranks differ from their positions.
+    """
+    out = []
+    for seed in qg.SEEDS:
+        rng = np.random.default_rng(seed)
+        path: list[int] = []
+        while len(path) < n_steps:
+            path += [len(path) % 2 if not path else 1 - path[-1]] * int(rng.integers(70, 101))
+        sign = np.where(np.array(path[:n_steps]) == 0, 1.0, -1.0)
+        x = rng.standard_normal((n_steps, n_vars))
+        for t in range(1, n_steps):
+            if kind == "wide":
+                x[t] += 0.3 * x[t - 1]
+                x[t, 1:] += sign[t] * 0.7 * x[t - 1, :-1]
+            else:
+                x[t, 0] += 0.2 * x[t - 1, 0]
+                x[t, 1] += sign[t] * 0.8 * x[t - 1, 0] + 0.2 * x[t - 1, 1]
+        out.append(qg.Draw(x, None))
+    return tuple(out)
+
+
+#: The datasets the gate does not draw: those of the option fits and of :data:`EXPERIMENTAL`.
 OPTION_DRAWS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "cohorts_d14_n2000": functools.partial(cohort_draws, 2000),
     "gapped_series_d6_n600": functools.partial(gapped_series_draws, 6, 600),
     "discrete_sparse_d12_n250": sparse_discrete_draws,
+    "regime_sign_d2_n600": functools.partial(regime_draws, "sign", 600, 2),
+    "regime_wide_d3_n600": functools.partial(regime_draws, "wide", 600, 3),
 }
 
 
@@ -527,9 +562,9 @@ FITS |= {name: Fit(_with_missing(search), shuffled=False) for name, search in EM
 #: ``GES-em``, GFCI's GES phase, the skeleton searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and
 #: RSMAX2's PC phase, the possible-d-sep searches of FCI, FCI-JCI, and GFCI, the full-graph
 #: searches of IAMB, Inter-IAMB, and MMPC, which MMHC and RSMAX2's restrict phase run, and the
-#: regressions of RESIT and of the exact search of CPCM, in worker processes, PNL's two directions
-#: on threads, and the lists of targets of :data:`TARGET_LISTS`, and the option fits of those
-#: methods.
+#: starts of Regime-PCMCI and the regressions of RESIT and of the exact search of CPCM, in worker
+#: processes, PNL's two directions on threads, and the lists of targets of :data:`TARGET_LISTS`, and
+#: the option fits of those methods.
 _WORKERS = (
     "PC",
     "FCI",
@@ -544,6 +579,7 @@ _WORKERS = (
     "InterIAMB",
     "MMPC",
     "MMHC",
+    "RPCMCI",
     "RESIT",
     "CPCMGraph",
 )
@@ -676,11 +712,20 @@ UNKNOWN_TARGETS: dict[str, tuple[str, ...]] = dict.fromkeys(
 )
 
 
+#: The experimental methods the gate does not run, with their datasets: two series that switch
+#: between two regimes, one of them with variable ranks that differ from the positions.
+EXPERIMENTAL: dict[str, tuple[str, ...]] = {
+    "RPCMCI": ("regime_sign_d2_n600", "regime_wide_d3_n600")
+}
+
+
 def datasets(method: str) -> tuple[str, ...]:
     """Return the datasets ``method`` is fitted on: its gate datasets, its larger dataset, and any
     of :data:`EXACT_SEARCH_DATASETS`."""
     if method in OPTIONS:
         return (OPTIONS[method].dataset,)
+    if method in EXPERIMENTAL:
+        return EXPERIMENTAL[method]
     if method in EM_FITS:
         return (EM_DATASET,)
     method = TARGET_LISTS.get(method, method)
@@ -769,7 +814,7 @@ def graphs(obj: Any) -> Iterator[GraphStructure]:
     occasion, and each group's graph in a list of results."""
     if isinstance(obj, GraphStructure):
         yield obj
-    elif isinstance(obj, (StructureOutput, TemporalStructure)):
+    elif isinstance(obj, (StructureOutput, TemporalStructure, andrey.RegimeOutput)):
         for field in dataclasses.fields(obj):
             yield from graphs(getattr(obj, field.name))
     elif isinstance(obj, (list, tuple)):
@@ -788,6 +833,12 @@ def parts(out: Any) -> dict[str, str]:
     metadata value; a list of results prefixes each result's parts with its position."""
     if isinstance(out, list):
         return {f"{i}.{name}": d for i, o in enumerate(out) for name, d in parts(o).items()}
+    if isinstance(out, andrey.RegimeOutput):  # the regime weights, then each regime's output
+        return {
+            "regimes": digest(out.weights),
+            **parts(list(out.outputs)),
+            **{f"metadata.{key}": digest(value) for key, value in out.metadata.items()},
+        }
     return {
         "graph": graph_digest(out),
         "kind": digest([g.kind for g in graphs(out)]),
@@ -1489,12 +1540,13 @@ def header(
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
         # A refit on more workers sends every GES pass, every skeleton pass, every possible-d-sep
-        # search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, and every regression of RESIT
-        # and of the exact search of CPCM to the worker pool.
+        # search, every full-graph fit of IAMB, Inter-IAMB, and MMPC, every fit of Regime-PCMCI, and
+        # every regression of RESIT and of the exact search of CPCM to the worker pool.
         "refit_ges_parallel_min_work": "0" if workers > 1 else None,
         "refit_skeleton_min_pool_queries": 0 if workers > 1 else None,
         "refit_possible_dsep_min_pool_subsets": 0 if workers > 1 else None,
         "refit_blanket_parallel_min_work": 0 if workers > 1 else None,
+        "refit_rpcmci_parallel_min_work": 0 if workers > 1 else None,
         "refit_resit_parallel_min_work": 0 if workers > 1 else None,
         "refit_cpcm_parallel_min_work": 0 if workers > 1 else None,
         **({} if checkpoints is None else {"checkpoints": checkpoints}),
@@ -1657,8 +1709,8 @@ def run(
     hashes each answer mapped back (:func:`unpermute`). ``workers`` above 1 refits
     :data:`WORKER_METHODS` on that many workers, with every GES pass, every skeleton pass of
     conditioning size two or more, every possible-d-sep search, every full-graph fit of IAMB,
-    Inter-IAMB, and MMPC, and every regression of RESIT and of the exact search of CPCM sent to the
-    worker pool. A refit
+    Inter-IAMB, and MMPC, every fit of Regime-PCMCI, and every regression of RESIT and of the exact
+    search of CPCM sent to the worker pool. A refit
     differs when one of its
     :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
     difference is reported as ``(kind, description)``, naming the parts that changed, with the kind
@@ -1701,6 +1753,7 @@ def run(
                     _environ("ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_BLANKET_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_RPCMCI_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_RESIT_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_CPCM_PARALLEL_MIN_WORK", "0"),
                 ):

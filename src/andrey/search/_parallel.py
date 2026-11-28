@@ -126,6 +126,8 @@ _FORKSERVER_PRELOAD = (
     "andrey.fcm._parallel",
     "andrey.fcm.cpcm",
     "andrey.fcm.resit",
+    "andrey.temporal._parallel_rpcmci",
+    "andrey.temporal.rpcmci",
     "andrey.resample",
     "andrey.core.ci_kernel",
     "andrey.spec.registry",

@@ -55,20 +55,24 @@ requested backend uses `auto`, without a warning.
   list of two or more targets over them with the `fisherz`, `student_t`, and `normal_scores` tests
   on complete data, with the same results for any number of workers, and with those tests and no
   target they send the search of every variable to them, as do MMHC and RSMAX2 for a restrict phase
-  that reads those sets, only when the data hold enough variables to repay them. `resit` sends the
+  that reads those sets, only when the data hold enough variables to repay them. `rpcmci` runs its
+  starts on them, one per task, only when the fit holds enough starts and time steps to repay them,
+  with the same result for any number of workers, whichever worker finishes first. A fit on a
+  backend pinned to a `cuda` or `mps` device the machine has, or on `auto` once a CUDA runtime is
+  running in the calling process, runs its starts in the calling process. `resit` sends the
   regressions and tests of its causal order and of its edge removal to them, and the exact search of
   `cpcm_graph` (up to 4 variables) its fits of every variable on every set of the others, with the
-  same results bit for bit, only when the fit has enough regressions to repay them. `andrey.bootstrap`
-  fits one resample per worker, with the same result at any number. `1` (the default) and `0` run
-  serially; `-1` uses every usable core. `pnl` runs on one BLAS thread with any number of workers,
-  so its p-values and statistics do not depend on the worker count or on the machine's BLAS thread
-  count. Each `pnl` thread holds three n x n float64 matrices; when the threads you ask for would
-  hold more than 4 GiB, fewer run, with a `PerformanceWarning`. `skewd` runs its two directions and
-  their searches on the threads, and `skewd_mv` its conditional models and their searches; every
-  search draws from its own random stream, so the results are the same bit for bit with any number
-  of workers. Like `pnl`, both run on one BLAS thread with any number of workers, so their results
-  do not depend on the BLAS thread count either; the limit applies to the whole process while a fit
-  runs.
+  same results bit for bit, only when the fit has enough regressions to repay them.
+  `andrey.bootstrap` fits one resample per worker, with the same result at any number. `1` (the
+  default) and `0` run serially; `-1` uses every usable core. `pnl` runs on one BLAS thread with any
+  number of workers, so its p-values and statistics do not depend on the worker count or on the
+  machine's BLAS thread count. Each `pnl` thread holds three n x n float64 matrices; when the
+  threads you ask for would hold more than 4 GiB, fewer run, with a `PerformanceWarning`. `skewd`
+  runs its two directions and their searches on the threads, and `skewd_mv` its conditional models
+  and their searches; every search draws from its own random stream, so the results are the same bit
+  for bit with any number of workers. Like `pnl`, both run on one BLAS thread with any number of
+  workers, so their results do not depend on the BLAS thread count either; the limit applies to the
+  whole process while a fit runs.
 - `ANDREY_GES_PARALLEL_MIN_WORK`: a GES pass uses the workers only when it expects to evaluate more
   candidates than this. The default is `10000`; `0` always uses them.
 - `ANDREY_SKELETON_PARALLEL_MIN_WORK`: a conditioning-size pass of the skeleton search of PC, FCI,
@@ -85,6 +89,14 @@ requested backend uses `auto`, without a warning.
   `d` variables. The default is `350000`, measured on an Intel Xeon Gold 6542Y server running Linux
   with 2, 4, and 8 workers; `0` always uses them. The pruning of spouses and the collider tests of
   the fit stay in the calling process.
+- `ANDREY_RPCMCI_PARALLEL_MIN_WORK`: `rpcmci` runs its starts on the workers only when
+  `n_starts * n_regimes * T` for a series of `T` time steps is at least this. The default is
+  `150000`, measured on an AMD EPYC 9534 server running Linux with 2, 4, and 8 workers; `0` always
+  uses them. A start costs more than in proportion to `T`, so the workers repay themselves from
+  about 27,000 for a series of 2,400 steps and from about 108,000 for one of 150 steps, with 2
+  workers and less with more. The default is above both, so no fit runs slower than on one process,
+  and a long series gains from a smaller value. More variables or lags make a start cost more, so
+  the workers repay themselves sooner.
 - `ANDREY_RESIT_PARALLEL_MIN_WORK`: `resit` sends the regressions and tests of its causal order and
   edge removal to the workers only when the regressions of the causal order times the rows reach
   this value, `(d * (d + 1) / 2 - 1) * n` for `d` variables and `n` rows. The default is `50000`,
@@ -104,14 +116,14 @@ requested backend uses `auto`, without a warning.
   far more than a Fisher's z test and its cost grows with the rows. The default is `2000000`,
   measured on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
-The cutoffs matter only with more than one worker. `andrey calibrate` measures all seven for your
+The cutoffs matter only with more than one worker. `andrey calibrate` measures all eight for your
 machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
 alone, `--method rcot` RCoT's, `--method possible_dsep` the possible-d-separation search's,
-`--method blanket` the full-graph search of IAMB, Inter-IAMB, and MMPC, `--method resit` RESIT's,
-and `--method cpcm` the exact search of CPCM. With more than one worker and a default cutoff, a fit
-warns once when a pass, a possible-d-separation search, a full-graph search, or the regressions of
-RESIT or of the CPCM search reach a tenth of it; setting the variable, to any value, silences the
-warning.
+`--method blanket` the full-graph search of IAMB, Inter-IAMB, and MMPC, `--method rpcmci` the starts
+of Regime-PCMCI, `--method resit` RESIT's, and `--method cpcm` the exact search of CPCM. With more
+than one worker and a default cutoff, a fit warns once when a pass, a possible-d-separation search,
+a full-graph search, the starts of a Regime-PCMCI fit, or the regressions of RESIT or of the CPCM
+search reach a tenth of it; setting the variable, to any value, silences the warning.
 
 The workers start from a forkserver, whose socket goes in your temporary directory (`TMPDIR`). If
 that directory is on a file system that rejects the socket, as some cluster file systems do, we
