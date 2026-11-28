@@ -248,6 +248,12 @@ names its pull request.
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
+- `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, and `longitudinal_lingam` run faster,
+  with the same output bit for bit: the least-squares fits of their adaptive Lasso weights and
+  refits solve a finite float64 design with the steps of scikit-learn's `LinearRegression`
+  (centering, `scipy.linalg.lstsq` with its `tol` as `cond`, and its intercept) without the
+  estimator's input checks, and any other input still goes through it. `bottom_up_parce_lingam`,
+  `varma_lingam`, and `rcd` fit the same way and return the same output bit for bit. ([#1359])
 - For contributors, the lint job of a pull request into a release or topic branch runs
   `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
   tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
@@ -3272,5 +3278,6 @@ First alpha release.
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
 [#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358
+[#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
