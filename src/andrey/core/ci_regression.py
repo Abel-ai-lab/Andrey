@@ -15,14 +15,18 @@ columns' values, regardless of row, column, or argument order, other columns, or
 
 from __future__ import annotations
 
+import functools
+import importlib
 import math
 from collections.abc import Callable, Iterable
+from typing import NamedTuple
 
 import numpy as np
 import sklearn
 from scipy.optimize import brentq
 from scipy.special import ndtr
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
 
 from andrey.core.ties import tie_ranks
 from andrey.fcm import cpcm
@@ -52,6 +56,8 @@ _BOOST_PATIENCE = 10
 _MEAN_CV_RATES = (0.1, 0.2, 0.3, 0.5)
 _MEAN_CV_DEPTHS = (1, 2, 3, 4, 5, 6, 7)
 _MEAN_CV_ROUNDS = 500
+# The folds' models grow this many rounds between the refits that resume them.
+_WARM_START_ROUNDS = _BOOST_PATIENCE
 # A random forest as in the PCM authors' code: 500 trees, every predictor tried at each split, and
 # nodes of 5 rows or fewer unsplit. Node size counts distinct rows; the authors' forest counts a row
 # drawn twice as two.
@@ -100,15 +106,94 @@ def _boosting(
     )
 
 
-def _fold_curve(
+class _Kernels(NamedTuple):
+    """scikit-learn's compiled staged prediction of boosted trees.
+
+    ``predict_stage(trees, stage, features, scale, out)`` adds ``scale`` times the leaf values of
+    one round's trees to the rows of ``out``, and ``predict_stages(trees, features, scale, out)``
+    does so for every round of ``trees`` in turn. It is the arithmetic of the finished model's
+    ``predict`` and ``staged_predict``, which a platform may compile as a fused multiply-add.
+    """
+
+    predict_stage: Callable[..., None]
+    predict_stages: Callable[..., None]
+
+
+class _Boosted:
+    """Boosted regression trees of ``depth`` under squared error, grown one round at a time.
+
+    A round fits a tree to the negative gradient of the training rows and adds ``rate`` times the
+    tree's prediction to their predictions, from the mean of ``target``. These are the steps of a
+    :class:`~sklearn.ensemble.GradientBoostingRegressor` fit without its loss, weights, and checks
+    at each round: the trees draw from one ``RandomState(0)`` in turn, read float32 features, and
+    the predictions add in NumPy, so the trees equal those of a fit with the same ``depth`` and
+    ``rate``.
+    """
+
+    def __init__(
+        self, features: np.ndarray, target: np.ndarray, depth: int, rate: float, rounds: int
+    ) -> None:
+        self.features = np.ascontiguousarray(features, dtype=np.float32)
+        self.target = target
+        self.depth = depth
+        self.rate = rate
+        # The mean as the fit's starting model takes it, over a column.
+        self.init = float(target.reshape(-1, 1).mean(axis=0)[0])
+        self.raw = np.full((target.size, 1), self.init)
+        self.trees = np.empty((rounds, 1), dtype=object)
+        self.grown = 0
+        self._random_state = np.random.RandomState(0)
+
+    def grow(self) -> DecisionTreeRegressor:
+        """Fit the next round's tree, add its prediction, and return it."""
+        tree = DecisionTreeRegressor(max_depth=self.depth, random_state=self._random_state)
+        tree.fit(self.features, -(self.raw[:, 0] - self.target), check_input=False)
+        self.raw[:, 0] += self.rate * tree.predict(self.features, check_input=False)
+        self.trees[self.grown, 0] = tree
+        self.grown += 1
+        return tree
+
+    def resume(self, kernels: _Kernels) -> None:
+        """Replace the predictions with the sum of the grown rounds, from the compiled kernel.
+
+        A warm-start refit of scikit-learn's model resumes from this sum, not from the NumPy sum
+        that the rounds before it added.
+        """
+        self.raw = np.full((self.target.size, 1), self.init)
+        kernels.predict_stages(self.trees[: self.grown], self.features, self.rate, self.raw)
+
+
+def _lean_fold_curve(
+    features: np.ndarray, target: np.ndarray, held: np.ndarray, depth: int, kernels: _Kernels
+) -> np.ndarray:
+    """The curve of :func:`_gbr_fold_curve` from :class:`_Boosted` trees, with each round's
+    held-out prediction added by the compiled kernel, as ``staged_predict`` adds it."""
+    model = _Boosted(features[~held], target[~held], depth, _BOOST_RATE, _BOOST_ROUNDS)
+    held_features = np.ascontiguousarray(features[held], dtype=np.float32)
+    held_target = target[held]
+    prediction = np.full((held_target.size, 1), model.init)
+    curve = np.full(_BOOST_ROUNDS, np.inf)
+    best = 0
+    for i in range(_BOOST_ROUNDS):
+        model.grow()
+        kernels.predict_stage(model.trees, i, held_features, model.rate, prediction)
+        curve[i] = np.sqrt(np.mean((held_target - prediction[:, 0]) ** 2))
+        if curve[i] < curve[best]:
+            best = i
+        if i - best >= _BOOST_PATIENCE:
+            break
+    return curve
+
+
+def _gbr_fold_curve(
     features: np.ndarray, target: np.ndarray, held: np.ndarray, depth: int
 ) -> np.ndarray:
     """The held-out error after each round of boosted trees of ``depth`` fit on the other rows,
     with every round after the stop set to infinity, as :func:`_early_stopped` gives.
 
-    The model grows only through the stop round: a callback reads each new round's prediction of
-    the held-out rows from the model's own ``staged_predict``, so the curve is the one the finished
-    model gives on any platform, records the error, and stops the fit.
+    The model is scikit-learn's, grown only through the stop round: a callback reads each new
+    round's prediction of the held-out rows from the model's own ``staged_predict``, so the curve
+    is the one the finished model gives on any platform, records the error, and stops the fit.
     """
     held_features = features[held]
     held_target = target[held]
@@ -130,6 +215,22 @@ def _fold_curve(
     return curve
 
 
+def _fold_curve(
+    features: np.ndarray, target: np.ndarray, held: np.ndarray, depth: int
+) -> np.ndarray:
+    """The held-out error after each round of boosted trees of ``depth`` fit on the other rows,
+    with every round after the stop set to infinity, as :func:`_early_stopped` gives.
+
+    The curve is the one :func:`_gbr_fold_curve` returns, bit for bit: a lean loop grows the trees
+    where :func:`_lean_kernels` finds scikit-learn's compiled prediction, and scikit-learn's own
+    fit grows them elsewhere.
+    """
+    kernels = _lean_kernels()
+    if kernels is None:
+        return _gbr_fold_curve(features, target, held, depth)
+    return _lean_fold_curve(features, target, held, depth, kernels)
+
+
 def _fit_boosting(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -> Predictor:
     """Boosted trees whose depth and number of rounds minimize the cross-validated error."""
     if not (np.isfinite(features).all() and np.isfinite(target).all()):
@@ -146,13 +247,56 @@ def _fit_boosting(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -
         return _boosting(_BOOST_DEPTHS[j], rounds + 1).fit(features, target).predict
 
 
-def _mean_cv_error(
+def _lean_mean_cv_error(
+    features: np.ndarray,
+    target: np.ndarray,
+    folds: np.ndarray,
+    rate: float,
+    depth: int,
+    kernels: _Kernels,
+) -> tuple[float, int]:
+    """The result of :func:`_gbr_mean_cv_error` from :class:`_Boosted` trees.
+
+    The folds grow in step, one round at a time, and the fold errors of a round add in fold order,
+    as the mean over the rows of the earlier error array does. Every ``_WARM_START_ROUNDS`` rounds
+    each fold's training predictions are summed again by the compiled kernel, where the earlier
+    loop's warm-start refit resumes. The held-out predictions add in NumPy, as in the earlier loop.
+    """
+    n_folds = int(folds.max()) + 1
+    held = [folds == fold for fold in range(n_folds)]
+    models = [_Boosted(features[~h], target[~h], depth, rate, _MEAN_CV_ROUNDS) for h in held]
+    held_features = [np.ascontiguousarray(features[h], dtype=np.float32) for h in held]
+    held_target = [target[h] for h in held]
+    predictions = [np.full(y.size, m.init) for m, y in zip(models, held_target, strict=True)]
+    best_error, best = np.inf, 0
+    # The many small fits skip scikit-learn's repeated input and parameter checks.
+    with sklearn.config_context(assume_finite=True, skip_parameter_validation=True):
+        for r in range(_MEAN_CV_ROUNDS):
+            total = 0.0
+            for k, model in enumerate(models):
+                if r and r % _WARM_START_ROUNDS == 0:
+                    model.resume(kernels)
+                tree = model.grow()
+                predictions[k] = predictions[k] + rate * tree.predict(
+                    held_features[k], check_input=False
+                )
+                total = total + np.sqrt(np.mean((held_target[k] - predictions[k]) ** 2))
+            error = total / n_folds
+            if error < best_error:
+                best_error, best = float(error), r
+            elif r - best >= _BOOST_PATIENCE:
+                break
+    return best_error, best + 1
+
+
+def _gbr_mean_cv_error(
     features: np.ndarray, target: np.ndarray, folds: np.ndarray, rate: float, depth: int
 ) -> tuple[float, int]:
     """The least mean cross-validated error of boosted trees at ``rate`` and ``depth``, and the
     number of rounds that first reaches it.
 
-    The folds' models grow together, and the rounds stop once ``_BOOST_PATIENCE`` rounds in a row
+    The folds' models are scikit-learn's. They grow together, refit with a warm start every
+    ``_WARM_START_ROUNDS`` rounds, and the rounds stop once ``_BOOST_PATIENCE`` rounds in a row
     have not lowered the best mean error, or at ``_MEAN_CV_ROUNDS``.
     """
     n_folds = int(folds.max()) + 1
@@ -165,7 +309,7 @@ def _mean_cv_error(
     # The inputs are checked once here, not at each of the many small fits.
     with sklearn.config_context(assume_finite=True, skip_parameter_validation=True):
         while grown < _MEAN_CV_ROUNDS:
-            stop = min(grown + _BOOST_PATIENCE, _MEAN_CV_ROUNDS)
+            stop = min(grown + _WARM_START_ROUNDS, _MEAN_CV_ROUNDS)
             errors = np.empty((n_folds, stop - grown))
             for k, (model, h) in enumerate(zip(models, held, strict=True)):
                 model.set_params(n_estimators=stop).fit(features[~h], target[~h])
@@ -185,6 +329,57 @@ def _mean_cv_error(
                     return best_error, best + 1
             grown = stop
     return best_error, best + 1
+
+
+def _mean_cv_error(
+    features: np.ndarray, target: np.ndarray, folds: np.ndarray, rate: float, depth: int
+) -> tuple[float, int]:
+    """The least mean cross-validated error of boosted trees at ``rate`` and ``depth``, and the
+    number of rounds that first reaches it.
+
+    The result is the one :func:`_gbr_mean_cv_error` returns, bit for bit: a lean loop grows the
+    trees where :func:`_lean_kernels` finds scikit-learn's compiled prediction, and scikit-learn's
+    own fit grows them elsewhere.
+    """
+    kernels = _lean_kernels()
+    if kernels is None:
+        return _gbr_mean_cv_error(features, target, folds, rate, depth)
+    return _lean_mean_cv_error(features, target, folds, rate, depth, kernels)
+
+
+def _kernels_agree(kernels: _Kernels) -> bool:
+    """Whether the lean loops return the bytes of the loops over scikit-learn's fits.
+
+    The case is 15 smooth rows in 3 folds: one fold's curve at depth 3, and one search at rate 0.3
+    and depth 2 that runs past two warm-start refits.
+    """
+    grid = np.linspace(-2.0, 2.0, 15)
+    features = np.column_stack([grid, np.sin(3.0 * grid)])
+    target = np.cos(grid) + 0.1 * np.sin(17.0 * grid)
+    folds = np.arange(15) % 3
+    with sklearn.config_context(assume_finite=True, skip_parameter_validation=True):
+        curve = _lean_fold_curve(features, target, folds == 1, 3, kernels)
+        if curve.tobytes() != _gbr_fold_curve(features, target, folds == 1, 3).tobytes():
+            return False
+        lean = _lean_mean_cv_error(features, target, folds, 0.3, 2, kernels)
+        return lean == _gbr_mean_cv_error(features, target, folds, 0.3, 2)
+
+
+@functools.cache
+def _lean_kernels() -> _Kernels | None:
+    """scikit-learn's compiled staged prediction, when the lean loops reproduce its fits with it.
+
+    The kernels are private to scikit-learn. They are used only when the lean loops return the bytes
+    of the loops over scikit-learn's own fits on the case of :func:`_kernels_agree`, so any other
+    scikit-learn, and any failure of the import or of a kernel, leaves those loops. The answer is
+    computed at the first fit and kept.
+    """
+    try:
+        compiled = importlib.import_module("sklearn.ensemble._gradient_boosting")
+        kernels = _Kernels(compiled.predict_stage, compiled.predict_stages)
+        return kernels if _kernels_agree(kernels) else None
+    except Exception:
+        return None
 
 
 def _fit_boosting_mean_cv(features: np.ndarray, target: np.ndarray, folds: np.ndarray) -> Predictor:

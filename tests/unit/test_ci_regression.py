@@ -6,6 +6,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from scipy.special import ndtr
+from sklearn.ensemble import _gradient_boosting as sklearn_kernels
 
 from andrey.core import ci
 from andrey.core import ci_regression as cr
@@ -254,7 +255,26 @@ def test_early_stopping_keeps_ten_rounds_past_the_best():
     assert np.array_equal(cr._early_stopped(curve[:12]), curve[:12])
 
 
-def test_mean_cv_error_equals_the_staged_curves(monkeypatch):
+@pytest.fixture(params=["lean", "sklearn"])
+def route(request, monkeypatch):
+    """The boosting search by each of its routes: the lean loops over scikit-learn's compiled
+    prediction, and the loops over scikit-learn's own fits that stand where it is missing."""
+    if request.param == "lean":
+        assert cr._lean_kernels() is not None, "the lean loops must run on this scikit-learn"
+    else:
+        monkeypatch.setattr(cr, "_lean_kernels", lambda: None)
+    return request.param
+
+
+@pytest.fixture
+def fresh_kernels():
+    """``_lean_kernels`` answers again, and answers again after the test."""
+    cr._lean_kernels.cache_clear()
+    yield
+    cr._lean_kernels.cache_clear()
+
+
+def test_mean_cv_error_equals_the_staged_curves(route, monkeypatch):
     """The folds grown together in steps give the error and rounds of each fold's full staged
     curve, averaged over the folds and stopped 10 rounds after its best."""
     monkeypatch.setattr(cr, "_MEAN_CV_ROUNDS", 60)
@@ -284,6 +304,12 @@ def _boosting_case(kind: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     elif kind == "tied codes":  # three-level columns: every split threshold is shared by many rows
         z = rng.integers(0, 3, size=(80, 2)).astype(float)
         y = (z[:, 0] == 1) + rng.integers(0, 3, size=80)
+    elif kind == "duplicated column":  # two features split alike, so every split ties
+        z = np.repeat(rng.standard_normal((80, 1)), 2, axis=1)
+        y = np.sin(2 * z[:, 0]) + 0.3 * rng.standard_normal(80)
+    elif kind == "binary codes":  # two-level columns: the splits of the two features tie in gain
+        z = rng.integers(0, 2, size=(80, 2)).astype(float)
+        y = z[:, 0] * z[:, 1] + 0.3 * rng.standard_normal(80)
     elif kind == "constant fold":  # fold 3 holds both rows of the rare value, so its model sees 0
         z = rng.standard_normal((60, 2))
         y = np.zeros(60)
@@ -320,9 +346,18 @@ def _staged_boosting(features, target, folds):
 
 
 @pytest.mark.parametrize(
-    "kind", ["smooth", "tied codes", "constant fold", "four rows", "twelve rows"]
+    "kind",
+    [
+        "smooth",
+        "tied codes",
+        "duplicated column",
+        "binary codes",
+        "constant fold",
+        "four rows",
+        "twelve rows",
+    ],
 )
-def test_boosting_equals_the_staged_loop_bit_for_bit(kind, monkeypatch):
+def test_boosting_equals_the_staged_loop_bit_for_bit(kind, route, monkeypatch):
     """Each fold's curve, and the predictor fitted from them, equal the earlier loop's."""
     features, target, folds = _boosting_case(kind)
     curves, predict = _staged_boosting(features, target, folds)
@@ -350,20 +385,136 @@ def test_boosting_equals_the_staged_loop_bit_for_bit(kind, monkeypatch):
         assert finite.size == cr._BOOST_PATIENCE + 1 and np.ptp(finite) == 0
 
 
-def test_a_fold_grows_only_through_its_stop(monkeypatch):
+def test_a_fold_grows_only_through_its_stop(route, monkeypatch):
     features, target, folds = _boosting_case("smooth")
     grown = []
-    boosting = cr._boosting
+    if route == "lean":
+        grow = cr._Boosted.grow
 
-    def record(*args, **kwargs):
-        grown.append(boosting(*args, **kwargs))
-        return grown[-1]
+        def record_round(self):
+            grown.append(grow(self))
+            return grown[-1]
 
-    monkeypatch.setattr(cr, "_boosting", record)
+        monkeypatch.setattr(cr._Boosted, "grow", record_round)
+    else:
+        boosting = cr._boosting
+
+        def record_fit(*args, **kwargs):
+            grown.append(boosting(*args, **kwargs))
+            return grown[-1]
+
+        monkeypatch.setattr(cr, "_boosting", record_fit)
     curve = cr._fold_curve(features, target, folds == 0, cr._BOOST_DEPTHS[-1])
     stop = int(np.isfinite(curve).sum())
     assert 0 < stop < cr._BOOST_ROUNDS
-    assert grown[0].estimators_.shape[0] == stop
+    assert (len(grown) if route == "lean" else grown[0].estimators_.shape[0]) == stop
+
+
+@pytest.mark.parametrize("depth", [1, 3, 6])
+def test_lean_trees_and_predictions_equal_the_staged_fit(depth):
+    """The lean trees are the fit's trees, and the compiled kernel adds each round's prediction as
+    the fit's ``staged_predict`` does."""
+    kernels = cr._lean_kernels()
+    assert kernels is not None
+    features, target, _ = _boosting_case("smooth")
+    rounds = 20
+    fit = cr._boosting(depth, rounds).fit(features, target)
+    lean = cr._Boosted(features, target, depth, cr._BOOST_RATE, rounds)
+    rows = np.ascontiguousarray(features, dtype=np.float32)
+    prediction = np.full((len(target), 1), lean.init)
+    for i, staged in enumerate(fit.staged_predict(features)):
+        tree = lean.grow().tree_
+        expected = fit.estimators_[i, 0].tree_
+        for name in ("feature", "threshold", "value"):
+            assert getattr(tree, name).tobytes() == getattr(expected, name).tobytes()
+        kernels.predict_stage(lean.trees, i, rows, lean.rate, prediction)
+        assert prediction[:, 0].tobytes() == staged.tobytes()
+
+
+@pytest.mark.parametrize("rows", [7, 130, 1000, 5001])
+def test_the_lean_start_is_the_fits_mean(rows):
+    rng = np.random.default_rng(rows)
+    target = rng.standard_normal(rows) * 10.0 ** rng.integers(-3, 4, size=rows)
+    features = rng.standard_normal((rows, 2))
+    fit = cr._boosting(1, 1).fit(features, target)
+    start = cr._Boosted(features, target, 1, cr._BOOST_RATE, 1).init
+    assert np.float64(start).tobytes() == fit.init_.constant_.tobytes()
+
+
+def test_resume_sums_the_rounds_as_the_finished_model_predicts():
+    """A warm-start refit resumes from the compiled sum, which the finished model's ``predict``
+    returns; on a platform that fuses the multiply and the add it differs from the NumPy sum."""
+    kernels = cr._lean_kernels()
+    assert kernels is not None
+    features, target, _ = _boosting_case("smooth")
+    fit = cr._boosting(3, 15).fit(features, target)
+    lean = cr._Boosted(features, target, 3, cr._BOOST_RATE, 15)
+    for _ in range(15):
+        lean.grow()
+    lean.resume(kernels)
+    assert lean.raw[:, 0].tobytes() == fit.predict(features).tobytes()
+
+
+def _mean_cv_case(kind: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The features, target, and folds of one wGCM search of 60 rows."""
+    rng = np.random.default_rng(3)
+    if kind == "smooth":
+        z = rng.standard_normal((60, 2))
+        y = np.sin(2 * z[:, 0]) + 0.3 * rng.standard_normal(60)
+    else:  # two binary features, where a split of either feature ties with the other's
+        z = rng.integers(0, 2, size=(60, 2)).astype(float)
+        y = z[:, 0] * z[:, 1] + 0.3 * rng.standard_normal(60)
+    block = cr._canonical_columns(np.column_stack([y, z]))
+    return block[:, 1:], block[:, 0], rng.permutation(np.arange(60) % 10)
+
+
+@pytest.mark.parametrize("kind", ["smooth", "binary"])
+def test_the_lean_mean_cv_error_equals_the_sklearn_loop(kind, monkeypatch):
+    """At each learning rate, the lean search returns the error and rounds of the loop over
+    scikit-learn's fits bit for bit, past the refits at rounds 10, 20, and 40."""
+    monkeypatch.setattr(cr, "_MEAN_CV_ROUNDS", 80)
+    kernels = cr._lean_kernels()
+    assert kernels is not None
+    features, target, folds = _mean_cv_case(kind)
+    reached = []
+    for rate in cr._MEAN_CV_RATES:
+        for depth in (1, 3):
+            lean = cr._lean_mean_cv_error(features, target, folds, rate, depth, kernels)
+            error, rounds = cr._gbr_mean_cv_error(features, target, folds, rate, depth)
+            assert np.float64(lean[0]).tobytes() == np.float64(error).tobytes()
+            assert lean[1] == rounds
+            reached.append(rounds + cr._BOOST_PATIENCE)
+    assert max(reached) > 4 * cr._WARM_START_ROUNDS
+    assert min(reached) < 2 * cr._WARM_START_ROUNDS
+
+
+def test_wgcm_boosting_selection_equals_the_sklearn_loop(monkeypatch):
+    """The learning rate, depth, and rounds that the lean search picks, and the predictor fitted
+    with them, equal the loop over scikit-learn's fits, on a case of tied splits."""
+    monkeypatch.setattr(cr, "_MEAN_CV_ROUNDS", 60)
+    features, target, folds = _mean_cv_case("binary")
+    lean = cr._fit_boosting_mean_cv(features, target, folds)
+    monkeypatch.setattr(cr, "_lean_kernels", lambda: None)
+    expected = cr._fit_boosting_mean_cv(features, target, folds)
+    assert lean(features).tobytes() == expected(features).tobytes()
+
+
+def test_the_lean_loops_need_the_kernel_to_reproduce_the_fits(monkeypatch, fresh_kernels):
+    assert cr._lean_kernels() is not None
+    cr._lean_kernels.cache_clear()
+    predict_stage = sklearn_kernels.predict_stage
+
+    def shifted(trees, stage, features, scale, out):
+        predict_stage(trees, stage, features, scale, out)
+        out += 1e-12
+
+    monkeypatch.setattr(sklearn_kernels, "predict_stage", shifted)
+    assert cr._lean_kernels() is None
+
+
+def test_the_lean_loops_are_not_used_without_the_kernel(monkeypatch, fresh_kernels):
+    monkeypatch.delattr(sklearn_kernels, "predict_stages")
+    assert cr._lean_kernels() is None
 
 
 def test_gcm_boosting_p_value_equals_the_staged_loop(monkeypatch):
