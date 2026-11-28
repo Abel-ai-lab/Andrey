@@ -520,6 +520,16 @@ def test_the_calibrator_counts_the_regressions_the_gate_counts():
 
 
 @pytest.mark.parametrize(
+    "name, rows, fits",
+    [("resit", "RESIT_ROWS", cal.resit_regressions), ("cpcm", "CPCM_ROWS", cal.cpcm_fits)],
+)
+def test_the_largest_probe_is_above_the_built_in_cutoff(name, rows, fits):
+    """A machine whose crossover lies above the default shows it: the probes reach past it."""
+    method = cal.METHODS[name]
+    assert fits(method.sizes[2]) * getattr(cal, rows) > method.default()
+
+
+@pytest.mark.parametrize(
     "name, variable, default",
     [("resit", RESIT, "MIN_POOL_RESIT_WORK"), ("cpcm", CPCM, "MIN_POOL_CPCM_WORK")],
 )

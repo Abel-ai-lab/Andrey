@@ -596,9 +596,10 @@ def blanket_timers(method: str, structure: str, workers: int) -> Timers:
 
 
 # The rows of the RESIT and CPCM probes. The exact search of CPCM stops at 4 variables and uses no
-# workers for 2, so its probe sizes are 3 and 4 variables.
+# workers for 2, so its probe sizes are 3 and 4 variables, and its rows put the work of the larger
+# above the built-in cutoff, so a machine that needs more than the default shows it.
 RESIT_ROWS = 300
-CPCM_ROWS = 200
+CPCM_ROWS = 400
 
 
 def resit_regressions(d: int) -> int:
