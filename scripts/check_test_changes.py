@@ -93,7 +93,13 @@ WORKFLOW = ".github/workflows/ci.yml"
 # The conftest names that make pytest skip collecting from a path, and the xunit-style setups.
 COLLECT_IGNORES = frozenset({"collect_ignore", "collect_ignore_glob"})
 PYTEST_FIXTURES = frozenset({"pytest.fixture", "pytest.yield_fixture"})
-XUNIT_SETUPS = frozenset({"setup_module", "setup_class", "setup_method", "setup_function"})
+# The xunit-style setups, and whether pytest runs each in a class (else at the top of a module).
+XUNIT_SETUPS = {
+    "setup_module": False,
+    "setup_function": False,
+    "setup_class": True,
+    "setup_method": True,
+}
 # The pytest options (``pyproject.toml``) that choose which tests run, and how a failure counts.
 PYTEST_OPTIONS = (
     "addopts",
@@ -1048,21 +1054,26 @@ def _keywords(use: ast.expr) -> dict[str, ast.expr]:
     return {k.arg: k.value for k in use.keywords if k.arg} if isinstance(use, ast.Call) else {}
 
 
-def _applies(condition: ast.expr | None, kind: str) -> bool:
-    """Whether a condition is a literal that makes the skip or ``xfail`` apply every time.
+def _literal(condition: ast.expr | None, pytest_marker: bool) -> bool | None:
+    """Return the truth of a condition that is a literal, else None.
 
     pytest evaluates the string condition of its markers as Python code, so a string counts only
     when it is a literal (``"True"``); ``unittest`` reads a non-empty string as true.
     """
     if not isinstance(condition, ast.Constant):
-        return False
+        return None
     value = condition.value
-    if isinstance(value, str) and kind.startswith("pytest."):
+    if isinstance(value, str) and pytest_marker:
         try:
             value = ast.literal_eval(value.strip())
         except (ValueError, SyntaxError):
-            return False
-    return bool(value) == SKIP_WHEN[kind]
+            return None
+    return bool(value)
+
+
+def _applies(condition: ast.expr | None, kind: str) -> bool:
+    """Whether a condition is a literal that makes the skip or ``xfail`` apply every time."""
+    return _literal(condition, kind.startswith("pytest.")) == SKIP_WHEN[kind]
 
 
 def _skipifs(unit: Unit, kind: str) -> list[tuple[ast.expr, bool]]:
@@ -1091,9 +1102,16 @@ def _strict(use: ast.expr) -> bool | None:
 
 
 def _stops_running(use: ast.expr) -> bool:
-    """Whether an ``xfail`` marker has the literal ``run=False``, which skips running the test."""
+    """Whether an ``xfail`` marker has the literal ``run=False`` and a condition that can apply."""
     run = _keywords(use).get("run")
-    return isinstance(run, ast.Constant) and run.value is False
+    condition = (
+        use.args[0] if isinstance(use, ast.Call) and use.args else _keywords(use).get("condition")
+    )
+    return (
+        isinstance(run, ast.Constant)
+        and run.value is False
+        and _literal(condition, True) is not False
+    )
 
 
 def _xfail_reasons(before: ast.expr, after: ast.expr) -> list[str]:
@@ -1171,6 +1189,14 @@ def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -
 
 
 EMPTY = "parametrization with no case added: pytest skips the test"
+
+
+def _empty_params(unit: Unit) -> bool:
+    """Whether a fixture is parametrized by pytest with no case at all."""
+    return any(
+        elements is not None and not elements and _pytest_parametrization(call, unit.imports)
+        for _, elements, call in _parametrizations(unit)
+    )
 
 
 def _pytest_parametrization(call: ast.Call, imports: dict[str, str]) -> bool:
@@ -1357,8 +1383,8 @@ def _loaded_conftest(path: str) -> bool:
 
 
 def _in_qa(unit: Unit) -> bool:
-    """Whether a unit is a function of ``qa/`` that is no test, such as a validation ``main()``."""
-    return unit.is_function and unit.path.split("/")[0] == "qa" and not unit.is_test
+    """Whether a unit is a function of ``qa/``, such as a validation ``main()``, test-named or not."""
+    return unit.is_function and unit.path.split("/")[0] == "qa"
 
 
 def compare(old: Unit, new: Unit, exempt: frozenset[str] = frozenset()) -> list[Finding]:
@@ -1452,34 +1478,39 @@ def _hook(unit: Unit) -> bool:
 
 def _xunit(unit: Unit) -> bool:
     """Whether a unit is an xunit-style setup that pytest runs: ``setup_module`` and the like."""
-    return unit.is_function and unit.collected and unit.qualname.rsplit(".", 1)[-1] in XUNIT_SETUPS
+    in_class = XUNIT_SETUPS.get(unit.qualname.rsplit(".", 1)[-1])
+    return unit.is_function and unit.collected and in_class == ("." in unit.qualname)
+
+
+def _stops_tests(unit: Unit, was: Unit | None) -> str:
+    """Return why a unit, new or changed, stops tests that exist from running; "" if it does not."""
+    if _hook(unit):
+        same = was is not None and _hook(was) and ast.dump(was.node) == ast.dump(unit.node)
+        return "" if same else "pytest hook added or changed"
+    skips = any(_markers(unit._replace(inherited=[])).values())
+    if skips and _autouse(unit) and not (was is not None and _autouse(was)):
+        return "autouse fixture that skips tests added"
+    if skips and _xunit(unit) and was is None:
+        return f"{unit.qualname.rsplit('.', 1)[-1]} that skips tests added"
+    if was is None and _declares_fixture(unit) and _empty_params(unit):
+        return EMPTY
+    return ""
 
 
 def _skipping(units: dict[str, Unit], old_units: dict[str, Unit]) -> list[Finding]:
-    """Flag the autouse fixtures and xunit setups that skip tests and the hooks the change added.
+    """Flag the autouse fixtures, xunit setups, and fixtures that stop tests, and the new hooks.
 
     An autouse fixture or a hook of a ``conftest.py`` reaches the tests that already exist, so a
     skip in one skips them without a marker on any test, and a hook can deselect, skip, or pass
     them in ways a reader of the tests does not see: a hook that is new or whose code changed is
-    flagged. An autouse fixture that skipped before is compared with its old self, like any unit,
-    and so is a ``setup_module``, ``setup_class``, ``setup_method``, or ``setup_function`` that
-    existed: only a new one that skips is flagged here.
+    flagged. A fixture with no ``params`` skips every test that uses it, so a new one is flagged.
+    An autouse fixture that skipped before is compared with its old self, like any unit, and so
+    is a ``setup_module``, ``setup_class``, ``setup_method``, or ``setup_function`` that existed:
+    only a new one that skips is flagged here.
     """
     findings = []
     for name, unit in units.items():
-        was = old_units.get(name)
-        if _hook(unit):
-            same = was is not None and _hook(was) and ast.dump(was.node) == ast.dump(unit.node)
-            reason = "" if same else "pytest hook added or changed"
-        elif _autouse(unit) and not (was is not None and _autouse(was)):
-            skips = any(_markers(unit._replace(inherited=[])).values())
-            reason = "autouse fixture that skips tests added" if skips else ""
-        elif _xunit(unit) and was is None:
-            skips = any(_markers(unit._replace(inherited=[])).values())
-            reason = f"{unit.qualname.rsplit('.', 1)[-1]} that skips tests added" if skips else ""
-        else:
-            reason = ""
-        if reason:
+        if reason := _stops_tests(unit, old_units.get(name)):
             line = _position(unit.node)[0]
             findings.append(
                 Finding(unit.path, line, unit.qualname, reason, "", _clip(_text(unit, unit.node)))
@@ -1565,12 +1596,12 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                         Finding(now.path, line, name, reason, _clip(_text(unit, unit.node)))
                     )
                 findings += compare(unit, now, exempt if name == "<module>" else frozenset())
+            elif _in_qa(unit):
+                lost.append(unit)
             elif unit.is_test:
                 deleted.append((unit, reason))
             elif _is_fixture(unit):
                 fixtures.append(unit)
-            elif _in_qa(unit):
-                lost.append(unit)
         added += [
             u
             for n, u in new_units.items()
@@ -1592,8 +1623,8 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 Finding(unit.path, line, unit.qualname, reason, _clip(_text(unit, unit.node)))
             )
     for unit, reason in [*deleted, *((u, QA_DELETED) for u in lost)]:
-        pool = added if unit.is_test else added_functions
-        match = _moved(unit, pool, scoped=not unit.is_test)
+        pool = added_functions if _in_qa(unit) else added
+        match = _moved(unit, pool, scoped=_in_qa(unit))
         if match is None:
             line = _position(unit.node)[0]
             findings.append(

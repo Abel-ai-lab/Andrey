@@ -1729,6 +1729,51 @@ FLAGGED = {
         """,
         "test no longer collected: it became a fixture",
     ),
+    "xfail with a condition made not to run": (
+        """
+        @pytest.mark.xfail(sys.platform == "win32", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(sys.platform == "win32", reason="windows", run=False)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail made not to run the test",
+    ),
+    "setup_class that skips added to a class": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            @classmethod
+            def setup_class(cls):
+                pytest.skip("slow")
+
+            def test_fit(self):
+                assert fit()
+        """,
+        "setup_class that skips tests added",
+    ),
+    "autouse fixture with no params added": (
+        """
+        def helper():
+            return 1
+        """,
+        """
+        def helper():
+            return 1
+
+        @pytest.fixture(autouse=True, params=[])
+        def gpu(request):
+            return request.param
+        """,
+        "parametrization with no case added",
+    ),
     "empty parametrization added": (
         """
         def test_fit(n):
@@ -3134,6 +3179,72 @@ NOT_FLAGGED = {
                 return 1
         """,
     ),
+    "xfail with a false condition made not to run": (
+        """
+        @pytest.mark.xfail(False, reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(False, reason="windows", run=False)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "xfail with the string False made not to run": (
+        """
+        @pytest.mark.xfail("False", reason="windows")
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(condition="False", reason="windows", run=False)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "setup_method at the top of a module that skips": (
+        """
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def setup_method(method):
+            pytest.skip("slow")
+
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "setup_module in a class that skips": (
+        """
+        class TestFit:
+            def test_fit(self):
+                assert fit()
+        """,
+        """
+        class TestFit:
+            def setup_module(self):
+                pytest.skip("slow")
+
+            def test_fit(self):
+                assert fit()
+        """,
+    ),
+    "fixture with params added": (
+        """
+        def helper():
+            return 1
+        """,
+        """
+        def helper():
+            return 1
+
+        @pytest.fixture(autouse=True, params=[1, 2])
+        def size(request):
+            return request.param
+        """,
+    ),
     "parametrization with a case added": (
         """
         def test_fit(n):
@@ -3633,6 +3744,27 @@ FLAGGED_AT = {
     "function of qa deleted while a method of that name is added": (
         "def main():\n    run()\n    return 0\n",
         "class Check:\n    def main(self):\n        stop()\n        return 1\n",
+        QA,
+        "function of qa/ deleted",
+    ),
+    "empty-params fixture in a new conftest": (
+        None,
+        (
+            "import pytest\n\n@pytest.fixture(autouse=True, params=[])\n"
+            "def gpu(request):\n    return 1\n"
+        ),
+        CONFTEST,
+        "parametrization with no case added",
+    ),
+    "function of qa named like a test emptied": (
+        "def test_validation():\n    run()\n    report()\n",
+        "def test_validation():\n    pass\n",
+        QA,
+        "function of qa/ emptied",
+    ),
+    "function of qa named like a test deleted": (
+        "def test_validation():\n    run()\n    report()\n",
+        "x = 1\n",
         QA,
         "function of qa/ deleted",
     ),
