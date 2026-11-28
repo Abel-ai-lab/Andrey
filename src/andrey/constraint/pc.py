@@ -633,9 +633,7 @@ def adjacency_search(
                 removals = (
                     None
                     if pool is None
-                    else pool.scan(
-                        pairs, neighbors, support.copy(), size, alpha, record_pvalues, weights
-                    )
+                    else pool.scan(pairs, neighbors, support, size, alpha, record_pvalues, weights)
                 )
                 if removals is None:
                     # Pin BLAS to one thread for a test built on matrix algebra: its p-values then
