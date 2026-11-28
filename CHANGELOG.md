@@ -259,6 +259,23 @@ names its pull request.
   (centering, `scipy.linalg.lstsq` with its `tol` as `cond`, and its intercept) without the
   estimator's input checks, and any other input still goes through it. `bottom_up_parce_lingam`,
   `varma_lingam`, and `rcd` fit the same way and return the same output bit for bit. ([#1359])
+- `iamb`, `inter_iamb`, and `mmpc` without a target, and the restrict phase of `mmhc` and `rsmax2`
+  that reads their sets, make the search of every variable on the `andrey.config(n_jobs=...)`
+  worker processes with `fisherz`, `student_t`, or `normal_scores` on complete data, so they run
+  faster on many variables with more than one worker, with the same sets and graph bit for bit at
+  any number of workers. A fit uses the workers only when the data hold at least
+  `ANDREY_BLANKET_PARALLEL_MIN_WORK` target and candidate pairs, `d * (d - 1)` for `d` variables;
+  `andrey calibrate --method blanket` measures the value for a machine, and a fit with more than
+  one worker warns once when it nears the default. ([#1371])
+- `calm`, `anm`, `loci`, and `pnl`, and the separating sets, collider votes, and orientation rules
+  of `gfci`, `boss_fci`, and `grasp_fci`, run on one BLAS thread, and on one torch thread where
+  torch computes, in `calm` and under `backend="cpu"`, so each returns the result it gives on one
+  thread whatever the machine's thread count, and `pnl` returns the same bits with one worker and
+  with several. KCI from 2,000 rows keeps every thread in the GFCI family, as it does in `pc`. On a
+  machine with several BLAS threads their results can change in the last digits, and `calm` can
+  return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
+  there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
+  free cores. ([#1369])
 - For contributors, the `test-weakening` job of a pull request into a release or topic branch runs
   `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
   tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
@@ -306,6 +323,10 @@ names its pull request.
   key, then their index, which is the order NumPy 2 returned at the default `k_perm` on the CPUs
   tried, so those p-values do not change. `ica_lingam` zeroes weights of equal magnitude in
   row-major order; it took them in the order of NumPy's default sort. ([#1366])
+- The worker processes that answer a list of targets of `iamb`, `inter_iamb`, and `mmpc` read the
+  `ANDREY_SHARED_SCAN_MIN_WORK` that the caller has. A value set after the first pool started did
+  not reach them, so their p-values could differ in the last bits from a call for one target.
+  ([#1371])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3287,4 +3308,6 @@ First alpha release.
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
+[#1369]: https://github.com/Abel-ai-lab/Andrey/pull/1369
 [#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
+[#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371

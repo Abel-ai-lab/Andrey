@@ -1143,9 +1143,15 @@ class LocalSearch:
 
     def structure(self, method: str, structure: str) -> np.ndarray:
         """Every variable's set by the learner ``method`` joined into the graph ``structure``
-        names, as an endpoint-mark matrix (:func:`local_structure`)."""
+        names, as an endpoint-mark matrix (:func:`local_structure`).
+
+        With more than one worker, a large enough fit makes the variables' runs on the worker
+        processes (:func:`~andrey.constraint._parallel_targets.pooled_runs`), and the sets and bits
+        are the ones a single process gives.
+        """
         learner = LEARNERS[method]
         name = method if learner.pc is None else learner.pc
+        self._make_runs(name)
         sets = self._sets(lambda i: self.run(name, i)[0])
         if learner.kind == "pc":
             skeleton, blankets = sets & sets.T, reach(sets)
@@ -1167,6 +1173,17 @@ class LocalSearch:
         return blanket_cpdag(
             self.test, skeleton, blankets, self.alpha, self.max_depth, self.constraints
         )
+
+    def _make_runs(self, method: str) -> None:
+        """Make every run of ``method`` the search has not made, on the worker pool when the fit
+        is large enough (:func:`~andrey.constraint._parallel_targets.pooled_runs`); otherwise
+        :meth:`run` makes each when it is read."""
+        from andrey.constraint._parallel_targets import pooled_runs
+
+        targets = [t for t in range(self.d) if (method, t) not in self._runs]
+        runs = pooled_runs(self, method, targets)
+        if runs is not None:
+            self._runs.update(zip(((method, t) for t in targets), runs, strict=True))
 
     def _sets(self, members: Callable[[int], list[int]]) -> np.ndarray:
         """``[i, j]`` when ``j`` is in ``members(i)``, a boolean ``(d, d)`` matrix."""

@@ -836,3 +836,22 @@ def test_compare_ignores_the_package_header(capsys) -> None:
     after["header"].update(andrey_path="/b/src/andrey", andrey_commit=None)
     assert identity.compare(before, after) == 0
     assert "0 with a different graph, 0 with only different bits" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name", ["IAMB", "InterIAMB", "MMPC", "MMHC"])
+def test_the_full_graph_searches_are_refitted_on_workers_through_the_pool(
+    name, monkeypatch
+) -> None:
+    """The refit sends every fit to the pool, so the check compares pooled runs, not serial ones."""
+    from andrey.constraint import _parallel_targets as tg
+
+    assert name in identity.WORKER_METHODS
+    started: list[int] = []
+    real = tg.ProcessPoolExecutor
+    monkeypatch.setattr(
+        tg, "ProcessPoolExecutor", lambda *a, **k: started.append(1) or real(*a, **k)
+    )
+    rows, findings = identity.run([name], seeds=1, workers=2)
+    assert findings == []
+    assert {r["workers"] for r in rows} == {1, 2}
+    assert started
