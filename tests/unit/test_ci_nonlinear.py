@@ -509,6 +509,19 @@ def _joint_kernel_builds(monkeypatch) -> list[tuple[int, tuple[int, ...]]]:
     return built
 
 
+@pytest.mark.parametrize(("budget_entries", "per_kind"), [(9, 3), (10, 3), (2, 1), (0, 1)], ids=str)
+def test_kci_shares_its_cache_budget_among_its_three_kinds_of_matrix(
+    monkeypatch, budget_entries, per_kind
+):
+    """The residual maker and the residualized kernels of ``x`` and of ``y`` hold a third of the
+    budget each, at least one entry each, so the three together stay within it."""
+    n = 40
+    monkeypatch.setattr(ci_kernel, "_CACHE_BYTES", budget_entries * 8 * n * n)
+    test = KCI(_common_cause(seed=3, n=n, n_cond=2))
+    for cache in (test._resid, test._resid_x, test._resid_y):
+        assert cache.cache_parameters()["maxsize"] == per_kind
+
+
 @pytest.mark.parametrize("cache_bytes", [None, 0], ids=["default caches", "one entry each"])
 def test_kci_builds_each_joint_kernel_once_and_the_cache_changes_no_bit(monkeypatch, cache_bytes):
     """Queries with the same ``x`` and conditioning set share ``A = R Kxs R``. Each statistic and
