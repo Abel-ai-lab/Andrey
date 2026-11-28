@@ -23,9 +23,10 @@ compare names every row where one changed and fails on any change, a fall as wel
 of ICP and IGSP and the contexts of J-PCMCI+ with the columns, and maps each answer back to the
 original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
-``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
-possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
-fit. A different worker count must not change a bit, so any difference fails it. A column order
+``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, every
+possible-d-sep search, and every full-graph fit of IAMB, Inter-IAMB, and MMPC sent to the pool. Both
+report each refit whose answer differs from the first fit. A different worker count must not
+change a bit, so any difference fails it. A column order
 fails the check when a graph or a causal order differs (:data:`STRUCTURE`) or when an edge weight or
 metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near zero). The last
 bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
@@ -474,10 +475,24 @@ OPTIONS: dict[str, OptionFit] = {**_ambiguous_fits(), **_nonempty_fits()}
 FITS |= {name: option.fit for name, option in OPTIONS.items()}
 
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
-#: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep
-#: searches of FCI, FCI-JCI, and GFCI in worker processes, PNL's two directions on threads, and the
-#: lists of targets of :data:`TARGET_LISTS`, and the option fits of those methods.
-_WORKERS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
+#: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, the possible-d-sep searches of
+#: FCI, FCI-JCI, and GFCI, and the full-graph searches of IAMB, Inter-IAMB, and MMPC, which MMHC and
+#: RSMAX2's restrict phase run, in worker processes, PNL's two directions on threads, and the lists
+#: of targets of :data:`TARGET_LISTS`, and the option fits of those methods.
+_WORKERS = (
+    "PC",
+    "FCI",
+    "FCI-JCI",
+    "GFCI",
+    "CDNOD",
+    "RSMAX2",
+    "GES",
+    "PNL",
+    "IAMB",
+    "InterIAMB",
+    "MMPC",
+    "MMHC",
+)
 WORKER_METHODS = (
     *_WORKERS,
     *TARGET_LISTS,
@@ -1118,11 +1133,12 @@ def header(code: dict[str, Any], seeds: int, shuffle: int, workers: int) -> dict
             **{name: os.environ.get(name) for name in THREAD_VARIABLES},
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
-        # A refit on more workers sends every GES pass, every skeleton pass, and every
-        # possible-d-sep search to the worker pool.
+        # A refit on more workers sends every GES pass, every skeleton pass, every possible-d-sep
+        # search, and every full-graph fit of IAMB, Inter-IAMB, and MMPC to the worker pool.
         "refit_ges_parallel_min_work": "0" if workers > 1 else None,
         "refit_skeleton_min_pool_queries": 0 if workers > 1 else None,
         "refit_possible_dsep_min_pool_subsets": 0 if workers > 1 else None,
+        "refit_blanket_parallel_min_work": 0 if workers > 1 else None,
     }
 
 
@@ -1277,7 +1293,8 @@ def run(
     orders, the k-th drawn from ``(seed, k)``, unless its :class:`Fit` is not ``shuffled``, and
     hashes each answer mapped back (:func:`unpermute`). ``workers`` above 1 refits
     :data:`WORKER_METHODS` on that many workers, with every GES pass, every skeleton pass of
-    conditioning size two or more, and every possible-d-sep search sent to the worker pool. A refit
+    conditioning size two or more, every possible-d-sep search, and every full-graph fit of IAMB,
+    Inter-IAMB, and MMPC sent to the worker pool. A refit
     differs when one of its
     :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
     difference is reported as ``(kind, description)``, naming the parts that changed, with the kind
@@ -1310,6 +1327,7 @@ def run(
                     _environ("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_BLANKET_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
             for permutation, n_workers, first, refit in refits:
