@@ -2177,7 +2177,9 @@ def rpcmci(
         a test with few rows. The two are nearly the same test.
     n_starts : int, default=50
         The number of starts, at least ``1``, each with a random regime assignment; the start with
-        the lowest objective is returned.
+        the lowest objective is returned. With more than one worker (``andrey.config.n_jobs``), the
+        starts run on worker processes once ``n_starts * n_regimes * n_samples`` reaches
+        ``ANDREY_RPCMCI_PARALLEL_MIN_WORK``.
     max_iter : int, default=20
         Maximum iterations per start, at least ``1``; one iteration learns every regime's graph and
         then reassigns the steps.
@@ -2263,6 +2265,16 @@ def rpcmci(
     steps, such as one with more conditions than steps; failed starts are skipped. The returned
     start has the lowest successful objective, breaking ties at 9 decimals per time step by the
     earliest start.
+
+    **Workers.** The starts are independent, so with more than one worker (``andrey.config.n_jobs``
+    or ``ANDREY_N_JOBS``; ``-1`` uses every usable core) a fit whose ``n_starts * n_regimes *
+    n_samples`` reaches ``ANDREY_RPCMCI_PARALLEL_MIN_WORK`` runs each start on a worker process, on
+    one BLAS thread. The best start, its weights, and the number of failed starts are the same at
+    any worker count, whichever worker finishes first. A smaller fit runs in this process, because
+    starting the workers costs more than it saves; ``andrey calibrate --method rpcmci`` measures the
+    value for a machine. A fit with the backend pinned to a ``cuda`` or ``mps`` device the machine
+    has, or on ``auto`` once a CUDA runtime is live in the calling process, runs its starts in the
+    calling process.
 
     The paper's threshold for joining a regime is ``0.5`` [1]_, the default. The paper's Eq. 11
     reads ``>=``, and Andrey follows the authors' code, which uses ``>``, so a step the linear
