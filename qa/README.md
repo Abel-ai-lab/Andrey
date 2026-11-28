@@ -95,8 +95,12 @@ piece whose elements agree to rounding. A fit's later stages follow from its fir
 they are not reported, and fixing the first can show another behind it. The report groups the rows
 by fingerprint (method, stage, level, piece, kind, first differing element, both lengths), the
 rows that part alike, and then by stage across methods and datasets, so one bug in the skeleton
-search that PC, FCI, CD-NOD, GFCI, and RSMAX2 share reads as one line. A fit whose output is equal
-and whose checkpoints differ is listed as information: the contract is the output. The exit status
+search that PC, FCI, CD-NOD, GFCI, and RSMAX2 share reads as one line. A fit whose stages are all
+equal and whose output differs parts after its last stage, and the report names the parts of the
+output that differ (the graph, its edges, the weights, a metadata key): the steps a method takes
+after its last stage, such as the conversion of a DAG to its CPDAG, are not stages of their own. A
+fit whose output is equal and whose checkpoints differ is listed as information: the contract is
+the output. The exit status
 stays the one the output hashes and counts decide. A match of every checkpoint is necessary, not
 sufficient: the corpus is public and fixed, so a change that special-cases its draws matches every
 stage, and review stays the check.

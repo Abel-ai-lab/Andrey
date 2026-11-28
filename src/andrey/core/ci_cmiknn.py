@@ -134,10 +134,22 @@ def _counts_torch(dx, dyz, dz, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarr
 
 
 def _nearest_in_z(dz: np.ndarray, k_perm: int, rng: np.random.Generator) -> np.ndarray:
-    """Each row's ``k_perm`` nearest rows in z, itself included; ties are broken at random."""
+    """Each row's ``k_perm`` nearest rows in z, itself included, nearest first.
+
+    Rows at the same distance come in the order of a random key drawn from ``rng``, and rows with
+    the same key by index, so the rows and their order do not depend on how NumPy orders a
+    partition, which differs between versions and CPUs.
+    """
     # Distances are integers, so a uniform draw below 0.5 reorders only tied entries.
     keyed = dz + 0.5 * rng.random(dz.shape)
-    return np.argpartition(keyed, k_perm - 1, axis=1)[:, :k_perm]
+    kth = np.partition(keyed, k_perm - 1, axis=1)[:, k_perm - 1 : k_perm]
+    nearer, equal = keyed < kth, keyed == kth
+    room = k_perm - nearer.sum(axis=1)  # the places left for the rows whose key equals the k-th
+    crowded = np.flatnonzero(equal.sum(axis=1) > room)
+    equal[crowded] &= np.cumsum(equal[crowded], axis=1) <= room[crowded, None]  # lower index stays
+    nearest = np.nonzero(nearer | equal)[1].reshape(len(dz), k_perm)  # each row's, by index
+    order = np.argsort(np.take_along_axis(keyed, nearest, axis=1), axis=1, kind="stable")
+    return np.take_along_axis(nearest, order, axis=1)
 
 
 def _local_permutation(nearest: np.ndarray, rng: np.random.Generator) -> np.ndarray:

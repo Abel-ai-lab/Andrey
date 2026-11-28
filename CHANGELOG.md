@@ -18,11 +18,11 @@ names its pull request.
 - Andrey needs NumPy 2.0 or later (it was 1.26), SciPy 1.14 (1.13), pandas 2.2.2 (2.2), statsmodels
   0.14.2 (0.14), networkx 3.3 (3), typer 0.26 (0.12.4), threadpoolctl 3.5 (3), and, for the `viz`
   extra, matplotlib 3.8.4 (3.7). Each is the oldest version on which the tests pass with every
-  direct dependency at its oldest allowed version. Below them, CMIknn gives other p-values (NumPy),
-  NoGAM raises on an empty system (SciPy), the tests' d-separation oracle is missing (networkx 3.3
-  adds `is_d_separator`), the command words its usage errors differently under the current click
-  (typer), and pandas, statsmodels, and matplotlib do not work with NumPy 2. An environment that
-  pins an older version of any of them must upgrade it before it installs this release. ([#1353])
+  direct dependency at its oldest allowed version. Below them, NoGAM raises on an empty system
+  (SciPy), the tests' d-separation oracle is missing (networkx 3.3 adds `is_d_separator`), the
+  command words its usage errors differently under the current click (typer), and pandas,
+  statsmodels, and matplotlib do not work with NumPy 2. An environment that pins an older version of
+  any of them must upgrade it before it installs this release. ([#1353])
 - `andrey.data.generate` and `andrey.data.Ensemble` are removed, as their warning said they would be
   in 0.16.0. A loop over `SCM.sample` draws the same datasets:
   `[scm.sample(n=500, seed=seed) for scm in scms for seed in range(10)]` replaces
@@ -106,6 +106,11 @@ names its pull request.
   knowledge, each variable's grow-shrink tree no longer stores a list of every other variable,
   which took memory quadratic in the number of variables; the trees of a search share one tuple of
   the variables. Results are unchanged, bit for bit. ([#1274])
+- The move scan of `hc`, `tabu`, `mmhc`, and `rsmax2` holds one table less, quadratic in the number
+  of variables: it no longer keeps the deltas of removing each edge in a second table, and reads
+  each from the table of single-edge moves, where it already sits. A fit's peak memory falls only
+  where the scan sets it, as with many variables and few rows. Results are unchanged, bit for bit.
+  ([#1370])
 - With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
   searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
   targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
@@ -248,10 +253,25 @@ names its pull request.
 - `calm` runs faster, with the same output bit for bit: each Adam step of its optimizer is applied
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
+- `direct_lingam`, `ica_lingam`, `multi_group_direct_lingam`, and `longitudinal_lingam` run faster,
+  with the same output bit for bit: the least-squares fits of their adaptive Lasso weights and
+  refits solve a finite float64 design with the steps of scikit-learn's `LinearRegression`
+  (centering, `scipy.linalg.lstsq` with its `tol` as `cond`, and its intercept) without the
+  estimator's input checks, and any other input still goes through it. `bottom_up_parce_lingam`,
+  `varma_lingam`, and `rcd` fit the same way and return the same output bit for bit. ([#1359])
+- `iamb`, `inter_iamb`, and `mmpc` without a target, and the restrict phase of `mmhc` and `rsmax2`
+  that reads their sets, make the search of every variable on the `andrey.config(n_jobs=...)`
+  worker processes with `fisherz`, `student_t`, or `normal_scores` on complete data, so they run
+  faster on many variables with more than one worker, with the same sets and graph bit for bit at
+  any number of workers. A fit uses the workers only when the data hold at least
+  `ANDREY_BLANKET_PARALLEL_MIN_WORK` target and candidate pairs, `d * (d - 1)` for `d` variables;
+  `andrey calibrate --method blanket` measures the value for a machine, and a fit with more than
+  one worker warns once when it nears the default. ([#1371])
 - For contributors, `qa/identity.py --checkpoints` records a digest of each algorithm's state at its
   stages, for the constraint-based, score-based, Markov blanket, structural EM, and continuous
   searches, and `--compare` of two such manifests names, for each fit that differs, the first stage
-  and piece where the builds part and groups the differences by fingerprint. A run without the mode
+  and piece where the builds part, or the output parts that differ when every stage is equal, and
+  groups the differences by fingerprint. A run without the mode
   has the rows it had, and the fits `GES-em` and `NOTEARS-em` add structural EM to the corpus, so
   record both manifests of a compare with one version of the gate. ([#1362])
 
@@ -287,6 +307,17 @@ names its pull request.
   such as exchangeable or balanced binary ones. The order search now centers each column once;
   before, its standardization and residuals took the offset's rounding, which could decide the sign
   of such a skewness. ([#1351])
+- `indep_test="cmiknn"` gives the same p-values on every NumPy version and CPU. Its local shuffles
+  took each row's nearest rows in the conditioning set in the order `np.argpartition` returned
+  them, which differs between NumPy versions and CPUs, so a p-value with a non-empty conditioning
+  set differed with it. The rows now go in the order of their distance, then their random tie
+  key, then their index, which is the order NumPy 2 returned at the default `k_perm` on the CPUs
+  tried, so those p-values do not change. `ica_lingam` zeroes weights of equal magnitude in
+  row-major order; it took them in the order of NumPy's default sort. ([#1366])
+- The worker processes that answer a list of targets of `iamb`, `inter_iamb`, and `mmpc` read the
+  `ANDREY_SHARED_SCAN_MIN_WORK` that the caller has. A value set after the first pool started did
+  not reach them, so their p-values could differ in the last bits from a call for one target.
+  ([#1371])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3264,5 +3295,9 @@ First alpha release.
 [#1351]: https://github.com/Abel-ai-lab/Andrey/pull/1351
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
+[#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1362]: https://github.com/Abel-ai-lab/Andrey/pull/1362
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
+[#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
+[#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
+[#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371

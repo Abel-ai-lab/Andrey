@@ -144,8 +144,9 @@ empty graph's.
 
 ### Can it use more CPU cores?
 
-GES, GFCI, the skeleton search of PC and the methods built on it, and the possible-d-separation
-step of FCI, FCI-JCI, and GFCI can spread their larger passes over worker processes: set
+GES, GFCI, the skeleton search of PC and the methods built on it, the possible-d-separation
+step of FCI, FCI-JCI, and GFCI, and the full-graph search of IAMB, Inter-IAMB, and MMPC can spread
+their larger passes over worker processes: set
 `ANDREY_N_JOBS` above 1. They return the same graph as with one worker;
 [Configuration](configuration.md#parallel-search) lists the methods and tests that use them. A
 script that does this must put its entry point under `if __name__ == "__main__":`, because

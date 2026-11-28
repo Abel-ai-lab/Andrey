@@ -53,13 +53,15 @@ requested backend uses `auto`, without a warning.
   complete data, and FCI-JCI with `fisherz` and `student_t`; the pairs are still searched one at a
   time, in the serial order, and every graph is the serial one. IAMB, Inter-IAMB, and MMPC split a
   list of two or more targets over them with the `fisherz`, `student_t`, and `normal_scores` tests
-  on complete data, with the same results for any number of workers. `andrey.bootstrap` fits one
-  resample per worker, with the same result at any number. `1` (the default) and `0` run serially;
-  `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads unlimited and with
-  several limits each thread to one, so on a machine with several cores its p-values and statistics
-  can differ in the last digits between one worker and several. Each `pnl` thread holds three n x n
-  float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run, with a
-  `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
+  on complete data, with the same results for any number of workers, and with those tests and no
+  target they send the search of every variable to them, as do MMHC and RSMAX2 for a restrict phase
+  that reads those sets, only when the data hold enough variables to repay them. `andrey.bootstrap`
+  fits one resample per worker, with the same result at any number. `1` (the default) and `0` run
+  serially; `-1` uses every usable core. `pnl` with one worker leaves the BLAS threads unlimited and
+  with several limits each thread to one, so on a machine with several cores its p-values and
+  statistics can differ in the last digits between one worker and several. Each `pnl` thread holds
+  three n x n float64 matrices; when the threads you ask for would hold more than 4 GiB, fewer run,
+  with a `PerformanceWarning`. `skewd` runs its two directions and their searches on the threads,
   and `skewd_mv` its conditional models and their searches; every search draws from its own random
   stream, so the results are the same bit for bit with any number of workers. Unlike `pnl`, both run
   on one BLAS thread with any number of workers, so their results do not depend on the BLAS thread
@@ -74,17 +76,23 @@ requested backend uses `auto`, without a warning.
   GFCI uses the workers only when its candidate set has at least this many subsets, counted over
   every size it tests. The default is `250000`, measured on an AMD EPYC server running Linux with 4
   and 8 workers; `0` always uses them.
+- `ANDREY_BLANKET_PARALLEL_MIN_WORK`: a full-graph fit of IAMB, Inter-IAMB, and MMPC, and the
+  restrict phase of MMHC and RSMAX2 that reads their sets, sends the search of every variable to the
+  workers only when the data hold at least this many target and candidate pairs, `d * (d - 1)` for
+  `d` variables. The default is `350000`, measured on an Intel Xeon Gold 6542Y server running Linux
+  with 2, 4, and 8 workers; `0` always uses them. The pruning of spouses and the collider tests of
+  the fit stay in the calling process.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
   far more than a Fisher's z test and its cost grows with the rows. The default is `2000000`,
   measured on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
-The cutoffs matter only with more than one worker. `andrey calibrate` measures all four for your
+The cutoffs matter only with more than one worker. `andrey calibrate` measures all five for your
 machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
-alone, `--method rcot` RCoT's, and `--method possible_dsep` the possible-d-separation search's.
-With more than one worker and a default cutoff, a fit warns once when a pass or a
-possible-d-separation search reaches a tenth of it; setting the variable, to any value, silences
-the warning.
+alone, `--method rcot` RCoT's, `--method possible_dsep` the possible-d-separation search's, and
+`--method blanket` the full-graph search of IAMB, Inter-IAMB, and MMPC. With more than one worker
+and a default cutoff, a fit warns once when a pass, a possible-d-separation search, or a
+full-graph search reaches a tenth of it; setting the variable, to any value, silences the warning.
 
 The workers start from a forkserver, whose socket goes in your temporary directory (`TMPDIR`). If
 that directory is on a file system that rejects the socket, as some cluster file systems do, we

@@ -75,19 +75,21 @@ def _key_after(adj_int: list[int], move: tuple[str, int, int]) -> StructureKey:
 class MoveScanner:
     """The best single-edge move of a pass, from delta tables kept between passes.
 
-    ``add[v, u]`` and ``rem[v, u]`` depend only on target ``v`` and its parent set. Changed parent
-    sets trigger one vectorized Schur update per affected row
+    ``add[v, u]`` and the remove delta of each parent ``u`` of ``v`` depend only on target ``v`` and
+    its parent set. Changed parent sets trigger one vectorized Schur update per affected row
     (:func:`~andrey.core.score_delta.add_deltas`, :func:`~andrey.core.score_delta.remove_deltas`).
     Every scanner computes the same deltas for the same target and parents.
 
     ``score`` is the local score of ``delta``. ``single[v, u]`` is the add or remove delta of
     ``u -> v``, or ``inf`` when ``v -> u`` exists or ``v`` reaches ``u``; ``low[v]`` is the row
-    minimum. Reverses use the edge list and sum an add of ``v`` at target ``u`` with a remove of
-    ``u`` at target ``v``. A covered edge ``u -> v`` (``pa(v) = pa(u) + u``) reverses to a Markov
-    equivalent DAG with equal score under BIC, the categorical scores, and the mixed-data scores,
-    all score-equivalent. Its finite delta is set to zero to prevent rounding noise exceeding
-    ``EPS_IMPROVE`` from creating a false improvement. A BIC delta is ``inf`` when the move enters
-    an unavailable family (:func:`~andrey.core.score.local_score_bic`), so no move does.
+    minimum. A remove delta lives only there, at its edge, where it is ``inf`` if it is NaN or the
+    edge is required. Reverses use the edge list and sum an add of ``v`` at target ``u`` with the
+    remove of ``u`` at target ``v``, read from ``single``. A covered edge ``u -> v``
+    (``pa(v) = pa(u) + u``) reverses to a Markov equivalent DAG with equal score under BIC, the
+    categorical scores, and the mixed-data scores, all score-equivalent. Its finite delta is set to
+    zero to prevent rounding noise exceeding ``EPS_IMPROVE`` from creating a false improvement. A
+    BIC delta is ``inf`` when the move enters an unavailable family
+    (:func:`~andrey.core.score.local_score_bic`), so no move does.
 
     ``forbidden[v, u]`` marks edges ``u -> v`` no add or reverse creates; removing one stays
     legal. ``None`` forbids none. ``required[v, u]`` marks edges ``u -> v`` no move removes or
@@ -119,7 +121,6 @@ class MoveScanner:
         self._inv_n = 1.0 / self.score.n
         self._ranks: list[int] = np.asarray(ranks).tolist()
         self._add = np.full((d, d), np.inf)
-        self._rem = np.full((d, d), np.inf)
         self._parent = np.zeros((d, d), dtype=bool)  # [v, u]: the edge u -> v exists
         self._single = np.full((d, d), np.inf)
         self._low = np.full(d, np.inf)
@@ -159,14 +160,14 @@ class MoveScanner:
         low = self._low.copy()
         tails, heads = self._tails, self._heads
         with np.errstate(invalid="ignore"):  # a degenerate row's deltas may be infinite
-            rev = self._add[tails, heads] + self._rem[heads, tails]
+            rev = self._add[tails, heads] + self._single[heads, tails]
         rev[(self._set_of[heads] == self._set_with[tails]) & np.isfinite(rev)] = 0.0
         rev[np.isnan(rev) | self._cyclic | self._forbidden[tails, heads]] = np.inf
         if self._required is not None:
             rev[self._required[heads, tails]] = np.inf
         if self._max_parents is not None:  # a reverse gives the tail a parent
             rev[self._parent[tails].sum(axis=1) >= self._max_parents] = np.inf
-        held: list[tuple[int, int, float]] = []  # tabu moves set aside for this call
+        held: list[tuple[int, int, float]] = []  # tabu moves set aside, after ``rev`` read single
         try:
             while True:
                 best = self._pick(low, rev, floor)
@@ -199,7 +200,8 @@ class MoveScanner:
             lost += [(u, v) for v in nodes(old[u] & ~adj_int[u])]
         for v in range(d) if first else {v for _, v in gained + lost}:
             pa = parents_of[v]
-            self._add[v], self._rem[v] = self._deltas(v, pa)
+            self._add[v], rem = self._deltas(v, pa)
+            self._single[v, pa] = rem[pa]  # the row below keeps each parent's remove delta here
             ids = self._ids
             self._set_of[v] = ids.setdefault(tuple(pa), len(ids))
             self._set_with[v] = ids.setdefault(tuple(sorted([*pa, v])), len(ids))
@@ -227,7 +229,7 @@ class MoveScanner:
         self._heads = np.concatenate((self._heads, pairs[:, 1]))
         self._cyclic = np.concatenate((self._cyclic, np.zeros(len(gained), dtype=bool)))
         for v in rows:
-            row = np.where(self._parent[v], self._rem[v], self._add[v])
+            row = np.where(self._parent[v], self._single[v], self._add[v])
             row[self._parent[:, v] | reach[v] | np.isnan(row)] = np.inf
             row[self._forbidden[v] & ~self._parent[v]] = np.inf  # forbidden adds; removes stay
             if self._required is not None:

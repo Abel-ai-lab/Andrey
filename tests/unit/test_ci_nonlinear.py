@@ -372,6 +372,72 @@ def test_cmiknn_local_shuffle_stays_near_in_z():
     assert np.corrcoef(x[perm], z)[0, 1] == pytest.approx(np.corrcoef(x, z)[0, 1], abs=0.02)
 
 
+class _EqualKeys:
+    """A generator whose draws are all equal, so every row at the same distance has the same key."""
+
+    @staticmethod
+    def random(shape):
+        return np.full(shape, 0.5)
+
+
+def _keys(kind: str):
+    """The generator of the tie-breaking keys: a seeded one, or :class:`_EqualKeys`."""
+    return np.random.default_rng(7) if kind == "random" else _EqualKeys()
+
+
+def _two_variable_distances(seed: int, n: int) -> np.ndarray:
+    """The max-norm distances of the ranks of two columns of ``n`` rows: many equal distances."""
+    columns = np.random.default_rng(seed).standard_normal((n, 2))
+    ranks = _rank_columns(columns, np.random.default_rng(seed))
+    return np.maximum(_distances(ranks[:, 0], np.int16), _distances(ranks[:, 1], np.int16))
+
+
+def _nearest_by_distance_key_and_index(dz, k_perm, rng) -> np.ndarray:
+    """Each row's ``k_perm`` nearest rows sorted by distance, then the random key, then index."""
+    keyed = dz + 0.5 * rng.random(dz.shape)
+    return np.array([sorted(range(len(r)), key=lambda j: (r[j], j))[:k_perm] for r in keyed])
+
+
+@pytest.mark.parametrize("keys", ["random", "equal"])
+@pytest.mark.parametrize("k_perm", [1, 4, 5, 9, 60])
+def test_cmiknn_nearest_rows_sort_by_distance_key_and_index(keys, k_perm):
+    """Rows at the same distance in z come in the order of their random key, and those with the
+    same key (all of them under ``equal``) by index, nearest first."""
+    dz = _two_variable_distances(seed=2, n=60)
+    got = _nearest_in_z(dz, k_perm, _keys(keys))
+    assert got.tolist() == _nearest_by_distance_key_and_index(dz, k_perm, _keys(keys)).tolist()
+
+
+def _scrambled_partition(a: np.ndarray, kth: int, axis: int = -1, **_) -> np.ndarray:
+    """What ``np.argpartition(a, kth, axis=1)`` may return that differs from NumPy's: each row's
+    indices before and after the ``kth`` place reversed, and of equal values the higher index
+    first."""
+    assert axis == 1
+    out = np.empty(a.shape, dtype=np.intp)
+    for i, row in enumerate(a):
+        order = np.lexsort((-np.arange(len(row)), row))
+        out[i] = np.concatenate([order[:kth][::-1], order[kth : kth + 1], order[kth + 1 :][::-1]])
+    return out
+
+
+def test_cmiknn_nearest_rows_do_not_depend_on_the_order_numpy_partitions(monkeypatch):
+    """The neighbors and the p-values stay the same when ``np.partition`` and ``np.argpartition``
+    return another valid arrangement of each row, as other NumPy versions and CPUs do."""
+    dz = _two_variable_distances(seed=2, n=60)
+    data = _common_cause(seed=3, n=120, n_cond=2)
+    queries = [(0, 1, (2,)), (0, 1, (2, 3)), (1, 3, (2,))]
+    nearest = [_nearest_in_z(dz, k, _keys("random")).tolist() for k in (4, 5)]
+    pvalues = [CMIknn(data, n_permutations=100)(*query) for query in queries]
+    monkeypatch.setattr(np, "argpartition", _scrambled_partition)
+    monkeypatch.setattr(
+        np,
+        "partition",
+        lambda a, kth, axis=-1: np.take_along_axis(a, _scrambled_partition(a, kth, axis), axis),
+    )
+    assert [_nearest_in_z(dz, k, _keys("random")).tolist() for k in (4, 5)] == nearest
+    assert [CMIknn(data, n_permutations=100)(*query) for query in queries] == pvalues
+
+
 def test_gpdc_statistic_is_the_squared_distance_correlation():
     """The V-statistic ``dCov^2 = S1 + S2 - 2 S3`` of Szekely, Rizzo, and Bakirov (2007), over the
     product of the two distance variances."""

@@ -1340,6 +1340,89 @@ def test_compare_says_so_when_only_one_manifest_has_checkpoints(capsys) -> None:
     assert "checkpoints: only one manifest has them" in capsys.readouterr().out
 
 
+def test_an_array_of_more_than_two_dimensions_keeps_its_shape_as_a_piece() -> None:
+    block = np.arange(24.0)
+    base = _fit_record([("a", None, {"weights": block.reshape(2, 3, 4)})])
+    same = _fit_record([("a", None, {"weights": block.reshape(2, 3, 4)})])
+    reshaped = _fit_record([("a", None, {"weights": block.reshape(3, 2, 4)})])
+    assert [p.name for p in base[0].pieces] == ["weights", "weights.shape"]
+    assert base[0].pieces[1].array.tolist() == [2, 3, 4]
+    assert identity.first_difference(identity.stages_of(base), identity.stages_of(same)) is None
+    found = identity.first_difference(identity.stages_of(base), identity.stages_of(reshaped))
+    assert found is not None and found.piece == "weights.shape" and found.kind == "value"
+    assert identity.labels(base)[0].digest == identity.labels(reshaped)[0].digest
+    for shape in ((24,), (4, 6)):
+        flat = _fit_record([("a", None, {"weights": block.reshape(shape)})])
+        assert [p.name for p in flat[0].pieces] == ["weights"]
+
+
+def test_the_report_gives_the_record_counts_of_both_fits_when_they_differ(capsys) -> None:
+    one = _fit_record([("a", None, {"total": 1.0})])
+    two = _fit_record([("a", None, {"total": 1.0}), ("a", None, {"total": 2.0})])
+    _, out = _compared(one, two, capsys)
+    assert "GES d 0 0 1: record 2 (1 before, 2 after), a, total: in one fit only" in out
+    _, out = _compared(two, one, capsys)
+    assert "GES d 0 0 1: record 2 (2 before, 1 after), a, total: in one fit only" in out
+    _, out = _compared([], one, capsys)
+    assert "GES d 0 0 1: record 1 (0 before, 1 after), a, total: in one fit only" in out
+    assert " of 1," not in out and " of 0," not in out
+
+
+def _compared_rows(pairs: list[tuple[dict, dict]], capsys) -> tuple[int, str]:
+    """Compare the manifests whose rows are the first and the second of each pair, each row with
+    the stages it carries under ``_records``."""
+    sides: tuple[list, list] = ([], [])
+    stages: tuple[dict, dict] = ({}, {})
+    for pair in pairs:
+        for side, row in enumerate(pair):
+            records = row.pop("_records")
+            sides[side].append(row)
+            stages[side][tuple(row[k] for k in identity.KEY)] = identity.stages_of(records)
+    rc = identity.compare(
+        {"header": {}, "rows": sides[0]}, {"header": {}, "rows": sides[1]}, stages=stages
+    )
+    return rc, capsys.readouterr().out
+
+
+def _with_parts(method: str, records: list, output: str, **parts: str) -> dict:
+    return {**_row(method, "a", records, output), "parts": parts, "_records": records}
+
+
+def test_a_fit_with_equal_stages_and_a_different_output_parts_after_the_last_stage(capsys) -> None:
+    records = _fit_record(
+        [("hc.climb", None, {"parents": [0b10, 0]}), ("hc.total", None, {"total": 1.0})]
+    )
+    pairs = [
+        (
+            _with_parts(method, records, "h1", graph="g", edges="e", weights="w"),
+            _with_parts(method, records, "h2", graph="g2", edges="e2", weights="w"),
+        )
+        for method in ("HC", "Tabu")
+    ]
+    rc, out = _compared_rows(pairs, capsys)
+    assert rc == 1
+    assert "first checkpoint difference: HC a 0 0 1: after all 2 records, the output differs" in out
+    assert "in edges, graph (after)" in out and "Tabu a 0 0 1: after all 2 records" in out
+    assert "fingerprint 1 rows: HC output edges, graph after - 0 0" in out
+    assert "by stage 2 rows: output edges, graph after -- HC (a), Tabu (a)" in out
+
+
+def test_a_fit_with_equal_stages_and_equal_output_or_no_stages_is_not_reported(capsys) -> None:
+    records = _fit_record([("hc.total", None, {"total": 1.0})])
+    equal = (_with_parts("HC", records, "h", graph="g"), _with_parts("HC", records, "h", graph="g"))
+    rc, out = _compared_rows([equal], capsys)
+    assert rc == 0 and "checkpoint difference" not in out and "by stage" not in out
+    plain = [
+        {**_row("MMPC", "a", [], output), "parts": {"graph": output}, "_records": []}
+        for output in ("h1", "h2")
+    ]
+    rc, out = _compared_rows([(plain[0], plain[1])], capsys)
+    assert rc == 1 and "checkpoint difference" not in out and "by stage" not in out
+    bare = (_with_parts("HC", records, "h1"), _with_parts("HC", records, "h2"))
+    _, out = _compared_rows([bare], capsys)
+    assert "after all 1 records, the output differs in hash (after)" in out
+
+
 # ---- a stage a planted change reaches --------------------------------------------------------
 
 
@@ -1607,3 +1690,22 @@ def test_a_plain_manifest_compares_from_the_command_line_with_no_checkpoint_repo
     manifest.write_text(json.dumps(_manifest()))
     assert identity.main(["--compare", str(manifest), str(manifest)]) == 0
     assert "checkpoint" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name", ["IAMB", "InterIAMB", "MMPC", "MMHC"])
+def test_the_full_graph_searches_are_refitted_on_workers_through_the_pool(
+    name, monkeypatch
+) -> None:
+    """The refit sends every fit to the pool, so the check compares pooled runs, not serial ones."""
+    from andrey.constraint import _parallel_targets as tg
+
+    assert name in identity.WORKER_METHODS
+    started: list[int] = []
+    real = tg.ProcessPoolExecutor
+    monkeypatch.setattr(
+        tg, "ProcessPoolExecutor", lambda *a, **k: started.append(1) or real(*a, **k)
+    )
+    rows, findings = identity.run([name], seeds=1, workers=2)
+    assert findings == []
+    assert {r["workers"] for r in rows} == {1, 2}
+    assert started

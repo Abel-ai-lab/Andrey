@@ -23,9 +23,10 @@ compare names every row where one changed and fails on any change, a fall as wel
 of ICP and IGSP and the contexts of J-PCMCI+ with the columns, and maps each answer back to the
 original columns before hashing it;
 ``--workers N`` refits the methods that run worker processes or threads (:data:`WORKER_METHODS`) on
-``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, and every
-possible-d-sep search sent to the pool. Both report each refit whose answer differs from the first
-fit. A different worker count must not change a bit, so any difference fails it. A column order
+``N`` workers, with every GES pass, every skeleton pass of conditioning size two or more, every
+possible-d-sep search, and every full-graph fit of IAMB, Inter-IAMB, and MMPC sent to the pool. Both
+report each refit whose answer differs from the first fit. A different worker count must not
+change a bit, so any difference fails it. A column order
 fails the check when a graph or a causal order differs (:data:`STRUCTURE`) or when an edge weight or
 metadata value differs by more than rounding (:data:`RTOL`, or :data:`ATOL` near zero). The last
 bits of such values, such as p-values, depend on the order a sum runs in, so a refit that differs
@@ -516,10 +517,25 @@ FITS |= {name: Fit(_with_missing(search), shuffled=False) for name, search in EM
 
 #: The methods that run on ``andrey.config(n_jobs=...)``: GES, GES in each structural-EM round of
 #: ``GES-em``, GFCI's GES phase, the skeleton searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and
-#: RSMAX2's PC phase, and the possible-d-sep searches of FCI, FCI-JCI, and GFCI in worker processes,
-#: PNL's two directions on threads, and the lists of targets of :data:`TARGET_LISTS`, and the option
-#: fits of those methods.
-_WORKERS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "GES-em", "PNL")
+#: RSMAX2's PC phase, the possible-d-sep searches of FCI, FCI-JCI, and GFCI, and the full-graph
+#: searches of IAMB, Inter-IAMB, and MMPC, which MMHC and RSMAX2's restrict phase run, in worker
+#: processes, PNL's two directions on threads, and the lists of targets of :data:`TARGET_LISTS`,
+#: and the option fits of those methods.
+_WORKERS = (
+    "PC",
+    "FCI",
+    "FCI-JCI",
+    "GFCI",
+    "CDNOD",
+    "RSMAX2",
+    "GES",
+    "GES-em",
+    "PNL",
+    "IAMB",
+    "InterIAMB",
+    "MMPC",
+    "MMHC",
+)
 WORKER_METHODS = (
     *_WORKERS,
     *TARGET_LISTS,
@@ -1247,10 +1263,16 @@ def _canonical(name: str, value: Any) -> tuple[str, int, np.ndarray]:
     return "list", 0, _numbers(_flat(value))
 
 
+def _piece(name: str, form: str, width: int, array: np.ndarray) -> Piece:
+    return Piece(name, form, width, digest(array), array)
+
+
 class Checkpoints:
     """The recorder of :func:`checkpointing`: called as ``take(stage, level, **pieces)``, it
     serializes each piece at once (:func:`_canonical`), since the search rewrites its state in
-    place, and keeps the :class:`Record`. A piece that is ``None`` is left out.
+    place, and keeps the :class:`Record`. A piece that is ``None`` is left out. An array of more
+    than two dimensions is flattened, so its shape follows it as a piece of its own,
+    ``<name>.shape``.
 
     A skeleton search's ``skeleton.size`` record holds the whole adjacency but only the pairs the
     size removed, with their separating sets and p-values, read from the cumulative mappings;
@@ -1269,8 +1291,10 @@ class Checkpoints:
         kept = []
         for name, value in pieces.items():
             if value is not None:
-                form, width, array = _canonical(name, value)
-                kept.append(Piece(name, form, width, digest(array), array))
+                kept.append(_piece(name, *_canonical(name, value)))
+                if isinstance(value, np.ndarray) and value.ndim > 2:
+                    shape = np.array(value.shape, dtype=np.int64)
+                    kept.append(_piece(f"{name}.shape", "list", 0, shape))
         self.records.append(Record(stage, level, tuple(kept)))
 
     def _removed_at_this_size(self, pieces: dict[str, Any]) -> dict[str, Any]:
@@ -1445,11 +1469,12 @@ def header(
             **{name: os.environ.get(name) for name in THREAD_VARIABLES},
         },
         "corpus": {"seeds": seeds, "shuffle": shuffle, "workers": workers},
-        # A refit on more workers sends every GES pass, every skeleton pass, and every
-        # possible-d-sep search to the worker pool.
+        # A refit on more workers sends every GES pass, every skeleton pass, every possible-d-sep
+        # search, and every full-graph fit of IAMB, Inter-IAMB, and MMPC to the worker pool.
         "refit_ges_parallel_min_work": "0" if workers > 1 else None,
         "refit_skeleton_min_pool_queries": 0 if workers > 1 else None,
         "refit_possible_dsep_min_pool_subsets": 0 if workers > 1 else None,
+        "refit_blanket_parallel_min_work": 0 if workers > 1 else None,
         **({} if checkpoints is None else {"checkpoints": checkpoints}),
     }
 
@@ -1609,7 +1634,8 @@ def run(
     orders, the k-th drawn from ``(seed, k)``, unless its :class:`Fit` is not ``shuffled``, and
     hashes each answer mapped back (:func:`unpermute`). ``workers`` above 1 refits
     :data:`WORKER_METHODS` on that many workers, with every GES pass, every skeleton pass of
-    conditioning size two or more, and every possible-d-sep search sent to the worker pool. A refit
+    conditioning size two or more, every possible-d-sep search, and every full-graph fit of IAMB,
+    Inter-IAMB, and MMPC sent to the worker pool. A refit
     differs when one of its
     :func:`parts` differs from the first fit's, mapped back the same way for a column order; each
     difference is reported as ``(kind, description)``, naming the parts that changed, with the kind
@@ -1651,6 +1677,7 @@ def run(
                     _environ("ANDREY_SKELETON_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_POSSIBLE_DSEP_PARALLEL_MIN_WORK", "0"),
                     _environ("ANDREY_RCOT_PARALLEL_MIN_WORK", "0"),
+                    _environ("ANDREY_BLANKET_PARALLEL_MIN_WORK", "0"),
                 ):
                     refits.append((0, workers, out, fit.call(x)))
             for permutation, n_workers, first, refit in refits:
@@ -1809,10 +1836,11 @@ class Difference:
 
     ``kind`` is ``"value"``, the same piece with different elements; ``"bits"``, a float piece
     whose differing elements all agree up to :data:`RTOL` and :data:`ATOL`; ``"sequence"``, another
-    stage or piece at that position, or the same bytes under another record, form, or width; or
-    ``"missing"``, a fit that ends first. ``index`` is the first element whose bytes differ,
-    ``where`` reads it by the piece's form, ``change`` shows the two values, and ``lengths`` are the
-    arrays' lengths (:data:`FORMS`).
+    stage or piece at that position, or the same bytes under another record, form, or width;
+    ``"missing"``, a fit that ends first; or ``"after"``, fits whose stages are all equal and whose
+    outputs differ, so they part after the last stage (:func:`_after_the_last`). ``index`` is the
+    first element whose bytes differ, ``where`` reads it by the piece's form, ``change`` shows the
+    two values, and ``lengths`` are the arrays' lengths (:data:`FORMS`).
     """
 
     record: int
@@ -1927,8 +1955,27 @@ def first_difference(before: Stages, after: Stages) -> Difference | None:
     return None
 
 
+def _after_the_last(a: dict, b: dict) -> Difference:
+    """The difference of two fits with equal stages and different outputs: the stage ``output``,
+    and as its piece the :func:`parts` of the output that differ, or ``hash`` when the rows record
+    none. The steps a method takes after its last stage, such as the conversion of a DAG to its
+    CPDAG, show here."""
+    before, after = a.get("parts", {}), b.get("parts", {})
+    changed = sorted(n for n in before.keys() | after.keys() if before.get(n) != after.get(n))
+    return Difference(
+        a.get("checkpoint_records", 0), "output", None, ", ".join(changed) or "hash", "after"
+    )
+
+
+def _records(before: int, after: int) -> str:
+    """Which record of how many: the count when both fits have as many, else each fit's."""
+    return f"of {before}" if before == after else f"({before} before, {after} after)"
+
+
 def _describe(d: Difference) -> str:
     where = f"{d.stage_text()}, {d.piece}"
+    if d.kind == "after":
+        return f"the output differs in {d.piece} (after)"
     if d.kind == "sequence":
         return f"{where}: the builds record another stage here, {d.where} (sequence)"
     if d.kind == "missing":
@@ -1949,27 +1996,32 @@ def report_checkpoints(
     old: Mapping[tuple, dict], new: Mapping[tuple, dict], stages: tuple[Mapping, Mapping]
 ) -> None:
     """Print, for each row in both manifests whose checkpoints differ and whose output differs, the
-    first stage and piece that differ; the rows grouped by fingerprint and by stage; and, as
-    information, the rows whose output is equal. Later stages follow from the first and are not
-    reported. A sidecar piece that cannot be read ends the report with a line saying so. The exit
-    status of the compare does not read it."""
+    first stage and piece that differ; for each row whose checkpoints are all equal and whose output
+    differs, the parts of the output that differ (:func:`_after_the_last`); the rows grouped by
+    fingerprint and by stage; and, as information, the rows whose output is equal. Later stages
+    follow from the first and are not reported. A sidecar piece that cannot be read ends the report
+    with a line saying so. The exit status of the compare does not read it."""
     empty = Stages([], lambda i: np.empty(0, dtype=np.int64))
     found, equal = [], []
     try:
         for key in sorted(old.keys() & new.keys(), key=str):
             a, b = old[key], new[key]
+            counts = (a.get("checkpoint_records", 0), b.get("checkpoint_records", 0))
             if a.get("checkpoints") == b.get("checkpoints"):
+                if "checkpoints" in a and a["hash"] != b["hash"]:
+                    found.append((key, counts, _after_the_last(a, b)))
                 continue
             difference = first_difference(stages[0].get(key, empty), stages[1].get(key, empty))
             if difference is not None:
-                (equal if a["hash"] == b["hash"] else found).append((key, a, difference))
+                (equal if a["hash"] == b["hash"] else found).append((key, counts, difference))
     except SIDECAR_ERRORS as error:
         print(f"checkpoints not compared: a sidecar piece cannot be read ({error!r})")
         return
-    for key, a, d in found:
-        n = a.get("checkpoint_records", 0)
+    for key, counts, d in found:
         label = " ".join(map(str, key))
-        print(f"first checkpoint difference: {label}: record {d.record + 1} of {n}, {_describe(d)}")
+        at = f"after all {counts[0]} records" if d.kind == "after" else None
+        at = at or f"record {d.record + 1} {_records(*counts)}"
+        print(f"first checkpoint difference: {label}: {at}, {_describe(d)}")
     prints = Counter(d.fingerprint(key[0]) for key, _, d in found)
     for fingerprint, count in sorted(prints.items(), key=lambda kv: (-kv[1], _text(kv[0]))):
         print(f"fingerprint {count} rows: {_text(fingerprint)}")
