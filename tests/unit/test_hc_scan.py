@@ -31,6 +31,48 @@ from andrey.search.tabu import tabu
 from qa import identity
 
 
+def _reference_scan(score, adj_int, parents_of, d, floor, tabu, ranks):
+    """Every legal move with delta below ``floor``, rescanned u-major, v-minor."""
+    add = [add_deltas(score, v, parents_of[v]) for v in range(d)]
+    remove = [remove_deltas(score, v, parents_of[v]) for v in range(d)]
+
+    def reaches(a, b):
+        seen, todo = 0, adj_int[a]
+        while todo:
+            lsb = todo & -todo
+            todo ^= lsb
+            if not seen & lsb:
+                seen |= lsb
+                todo |= adj_int[lsb.bit_length() - 1]
+        return bool(seen >> b & 1)
+
+    inv_n = 1.0 / score.n
+    best = None
+
+    def offer(value, u, v, rank, op):
+        nonlocal best
+        if value < floor and _key_after(adj_int, (op, u, v)) not in tabu:
+            cand = (round(value * inv_n, KEY_DP), u, v, rank, (op, u, v))
+            key = (cand[0], ranks[u], ranks[v], rank)
+            if best is None or key < (best[0], ranks[best[1]], ranks[best[2]], best[3]):
+                best = cand
+
+    for u in range(d):
+        for v in range(d):
+            if u == v:
+                continue
+            if adj_int[u] >> v & 1:
+                offer(remove[v][u], u, v, 0, "remove")
+                others = adj_int[u] & ~(1 << v)
+                if not any(others >> c & 1 and reaches(c, v) for c in range(d)):
+                    covered = parents_of[v] == sorted([*parents_of[u], u])
+                    value = 0.0 if covered else add[u][v] + remove[v][u]
+                    offer(value, u, v, 1, "reverse")
+            elif not adj_int[v] >> u & 1 and not reaches(v, u):
+                offer(add[v][u], u, v, 0, "add")
+    return best
+
+
 def _fresh_deltas(score, v, parents, d):
     """The add deltas and the remove deltas at target ``v`` with ``parents``, from ``score`` alone.
 
@@ -63,7 +105,7 @@ def _reachable(adj_int, d):
     return reach
 
 
-def _reference_scan(
+def _reference_scan_under_rules(
     score,
     adj_int,
     parents_of,
@@ -287,8 +329,8 @@ def test_scanner_keeps_every_delta_exactly(seed, score_func, rules, max_parents,
         want = None
         for floor in (-EPS_IMPROVE, math.inf):
             args = (reference, adj_int, parents_of, d, floor)
-            want = _reference_scan(*args, tabu, ranks, fresh=fresh, **kwargs)
-            free = _reference_scan(*args, set(), ranks, fresh=fresh, **kwargs)
+            want = _reference_scan_under_rules(*args, tabu, ranks, fresh=fresh, **kwargs)
+            free = _reference_scan_under_rules(*args, set(), ranks, fresh=fresh, **kwargs)
             assert scanner.best(adj_int, parents_of, floor=floor, tabu=tabu) == want
             if free != want and free is not None:
                 held[free[4][0]] += 1
