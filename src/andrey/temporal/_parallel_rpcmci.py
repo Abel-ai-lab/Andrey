@@ -9,13 +9,15 @@ order. A fit reduces them in that order (:func:`~andrey.temporal.rpcmci.best_sta
 start, its objective, and the number of failed starts do not depend on the order the workers finish
 in, and are those of a fit in the calling process.
 
-A worker holds the caller's series, ranks, and settings, its ``tie_break`` rule, and its numeric
-backend, and runs on one BLAS thread with one worker of its own, as a fit in the calling process
-does inside :func:`~andrey.core.backend.one_blas_thread`. A fit reads no other setting.
+A worker holds the caller's series, ranks, and settings, and every setting a start reads: its
+``tie_break`` rule, its numeric backend, and the environment variables of :data:`ENVIRONMENT`. It
+runs on one BLAS thread with no workers of its own, as a fit in the calling process does inside
+:func:`~andrey.core.backend.one_blas_thread`.
 """
 
 from __future__ import annotations
 
+import os
 from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING
 
@@ -31,16 +33,24 @@ if TYPE_CHECKING:
 #: measures the value for a machine. @RPCMCI_DEFAULT_COMMENT@
 MIN_POOL_RPCMCI_WORK: int = 20_000
 
+#: The environment variables a start reads besides the ones ``andrey.config`` holds: the
+#: covariance's GPU cutoff and its calibration. A worker the forkserver started earlier does not see
+#: a value the caller set or removed since, so each fit hands over the caller's.
+ENVIRONMENT = (env.COV_GPU_THRESHOLD, env.GPU_CALIBRATE)
+
 _WORKER_STARTS: Starts | None = None
 _WORKER_BLAS: object = None  # a held threadpoolctl controller capping this worker's BLAS
 
 
-def _init_worker(starts: Starts, tie_break: str, numeric_backend: str) -> None:
+def _init_worker(
+    starts: Starts,
+    tie_break: str,
+    numeric_backend: str,
+    environment: tuple[tuple[str, str | None], ...],
+) -> None:
     """Keep the caller's ``starts`` for the life of the worker, on one BLAS thread, with the
-    caller's ``tie_break`` rule and numeric backend and no workers of its own.
-
-    A worker the forkserver started earlier does not read the configuration the caller reads now.
-    """
+    caller's ``tie_break`` rule, numeric backend, and ``environment`` (:data:`ENVIRONMENT`, as
+    ``(name, value or None)``), and no workers of its own."""
     global _WORKER_STARTS, _WORKER_BLAS
     from threadpoolctl import threadpool_limits
 
@@ -48,6 +58,11 @@ def _init_worker(starts: Starts, tie_break: str, numeric_backend: str) -> None:
     backend.config.n_jobs = 1
     backend.config.backend = numeric_backend
     backend.config.tie_break = tie_break
+    for name, value in environment:
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
     _WORKER_STARTS = starts
 
 
@@ -86,7 +101,12 @@ def pooled_starts(starts: Starts, n_starts: int) -> list[RPCMCIResult | None] | 
         max_workers=min(workers, n_starts),
         mp_context=pick_context(),
         initializer=_init_worker,
-        initargs=(starts, backend.config.tie_break, backend.config.backend),
+        initargs=(
+            starts,
+            backend.config.tie_break,
+            backend.config.backend,
+            tuple((setting.name, os.environ.get(setting.name)) for setting in ENVIRONMENT),
+        ),
     )
     try:
         return collect([pool.submit(_run, a) for a in range(n_starts)], ordered=True)

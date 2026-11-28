@@ -55,7 +55,9 @@ requested backend uses `auto`, without a warning.
   list of two or more targets over them with the `fisherz`, `student_t`, and `normal_scores` tests
   on complete data, with the same results for any number of workers, and with those tests and no
   target they send the search of every variable to them, as do MMHC and RSMAX2 for a restrict phase
-  that reads those sets, only when the data hold enough variables to repay them. `andrey.bootstrap`
+  that reads those sets, only when the data hold enough variables to repay them. `rpcmci` runs its
+  starts on them, one per task, only when the fit holds enough starts and time steps to repay them,
+  with the same result for any number of workers, whichever worker finishes first. `andrey.bootstrap`
   fits one resample per worker, with the same result at any number. `1` (the default) and `0` run
   serially; `-1` uses every usable core. `pnl` runs on one BLAS thread with any number of workers,
   so its p-values and statistics do not depend on the worker count or on the machine's BLAS thread
@@ -82,17 +84,24 @@ requested backend uses `auto`, without a warning.
   `d` variables. The default is `350000`, measured on an Intel Xeon Gold 6542Y server running Linux
   with 2, 4, and 8 workers; `0` always uses them. The pruning of spouses and the collider tests of
   the fit stay in the calling process.
+- `ANDREY_RPCMCI_PARALLEL_MIN_WORK`: `rpcmci` runs its starts on the workers only when
+  `n_starts * n_regimes * T` for a series of `T` time steps is at least this. The default is
+  `@RPCMCI_DEFAULT@`, measured on @MACHINE@ running Linux with 2, 4, and 8 workers; `0` always uses
+  them. The length of the series, the number of regimes, and the number of starts all set what a
+  start costs, so one value serves them all; more variables make a start cost more, so the pool
+  repays itself sooner.
 - `ANDREY_RCOT_PARALLEL_MIN_WORK`: with `rcot`, a conditioning-size pass of the skeleton search uses
   the workers only when its tests times the data's rows reach this value, since an RCoT test costs
   far more than a Fisher's z test and its cost grows with the rows. The default is `2000000`,
   measured on an Intel Core i7-7820X running Linux with 4 workers; `0` always uses them.
 
-The cutoffs matter only with more than one worker. `andrey calibrate` measures all five for your
+The cutoffs matter only with more than one worker. `andrey calibrate` measures all six for your
 machine and prints the values to set; `andrey calibrate --method skeleton` measures the skeleton's
-alone, `--method rcot` RCoT's, `--method possible_dsep` the possible-d-separation search's, and
-`--method blanket` the full-graph search of IAMB, Inter-IAMB, and MMPC. With more than one worker
-and a default cutoff, a fit warns once when a pass, a possible-d-separation search, or a
-full-graph search reaches a tenth of it; setting the variable, to any value, silences the warning.
+alone, `--method rcot` RCoT's, `--method possible_dsep` the possible-d-separation search's,
+`--method blanket` the full-graph search of IAMB, Inter-IAMB, and MMPC, and `--method rpcmci` the
+starts of Regime-PCMCI. With more than one worker and a default cutoff, a fit warns once when a
+pass, a possible-d-separation search, a full-graph search, or the starts of a Regime-PCMCI fit reach
+a tenth of it; setting the variable, to any value, silences the warning.
 
 The workers start from a forkserver, whose socket goes in your temporary directory (`TMPDIR`). If
 that directory is on a file system that rejects the socket, as some cluster file systems do, we
