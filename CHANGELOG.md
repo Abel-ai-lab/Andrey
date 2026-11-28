@@ -302,6 +302,12 @@ names its pull request.
   groups the differences by fingerprint. A run without the mode has the rows it had, and the fits
   `GES-em` and `NOTEARS-em` add structural EM to the corpus, so record both manifests of a compare
   with one version of the gate. ([#1362])
+- `rpcmci` solves the regime-learning linear program of each iteration through the HiGHS bindings
+  that SciPy bundles, in place of `scipy.optimize.linprog`, so a fit runs faster with the same
+  weights, objective, and PCMCI results bit for bit. The bindings are private to SciPy: Andrey uses
+  them only after a check at import that they return the bytes of `linprog` on small programs of the
+  same form, and `linprog` solves the program with SciPy before 1.15 and wherever the check fails.
+  ([#1383])
 - For contributors, the `check-test-changes` job also flags a `conftest.py` that sets
   `collect_ignore` or `collect_ignore_glob`, a `__test__ = False` added to a module or a function, a
   string `skipif` or `xfail` condition made `True`, a `pytest.raises` widened from `Exception` to
@@ -3339,4 +3345,5 @@ First alpha release.
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371
 [#1378]: https://github.com/Abel-ai-lab/Andrey/pull/1378
 [#1373]: https://github.com/Abel-ai-lab/Andrey/pull/1373
+[#1383]: https://github.com/Abel-ai-lab/Andrey/pull/1383
 [#1381]: https://github.com/Abel-ai-lab/Andrey/pull/1381

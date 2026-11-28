@@ -63,6 +63,7 @@ MODULE_CACHES = {
     "andrey.core.score.ebic_penalty": "n_parents, n_variables, ebic_gamma",
     "andrey.search._parallel._forkserver_starts": "the temporary directory, fixed for the process",
     "andrey.search.operators._position_plan": "m",
+    "andrey.temporal.rpcmci._program": "n_regimes, n_steps, max_transitions",
 }
 
 
