@@ -611,9 +611,9 @@ def rpcmci_timers(workers: int) -> Timers:
     :func:`regime_sample` data of :data:`RPCMCI_ROWS` steps.
 
     The serial arm fits in this process; the pooled arm runs ``workers`` processes with the cutoff
-    set to 0, so every start goes to the pool and the time includes starting and closing it. Times
-    are as in :func:`fit_timers`. The third function gives the fit's work, ``d * regimes * steps``,
-    as the gate counts it.
+    set to 0, so every start goes to the pool and the time includes starting and closing it. Both
+    arms run on NumPy, the backend whose fits use the pool. Times are as in :func:`fit_timers`. The
+    third function gives the fit's work, ``d * regimes * steps``, as the gate counts it.
     """
     import andrey
 
@@ -622,7 +622,7 @@ def rpcmci_timers(workers: int) -> Timers:
     transitions = RPCMCI_ROWS // RPCMCI_REGIME_STEPS + 1
 
     def run(d: int, n_workers: int, cutoff: str | None) -> float:
-        with _cutoff(var, cutoff), andrey.config(n_jobs=n_workers):
+        with _cutoff(var, cutoff), andrey.config(n_jobs=n_workers, backend="numpy"):
             return _time(
                 lambda: andrey.rpcmci(x, n_starts=d, max_transitions=transitions, seed=0),
                 _REPEATS,

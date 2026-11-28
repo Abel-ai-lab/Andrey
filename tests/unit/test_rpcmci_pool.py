@@ -11,6 +11,7 @@ import contextlib
 import dataclasses
 import os
 import warnings
+import weakref
 from concurrent.futures import Future
 from concurrent.futures.process import BrokenProcessPool
 
@@ -134,11 +135,14 @@ def worker_state(monkeypatch):
     config = backend.config
     saved = (config._backend, config._n_jobs, config._tie_break)
     environ = {name: os.environ.get(name) for name in GPU_VARIABLES}
+    blas = [(lib, lib.num_threads) for lib in threadpoolctl.ThreadpoolController().lib_controllers]
     monkeypatch.setattr(pr, "_WORKER_STARTS", None)
     yield
     if pr._WORKER_BLAS is not None:
         pr._WORKER_BLAS.restore_original_limits()
         monkeypatch.setattr(pr, "_WORKER_BLAS", None)
+    for lib, n_threads in blas:  # a fit that starts the pool inside its one-BLAS-thread block
+        lib.set_num_threads(n_threads)  # leaves the worker's own limit at one thread
     config._backend, config._n_jobs, config._tie_break = saved
     for name, value in environ.items():
         if value is None:
@@ -485,12 +489,163 @@ def test_the_default_cutoff_keeps_a_small_fit_in_this_process(pool_started):
     assert not pool_started
 
 
+def _starts() -> rp.Starts:
+    """The starts of a fit of :data:`WORK`: :data:`N_REGIMES` regimes over :data:`N_STEPS` steps."""
+    x, _ = series("sign", N_STEPS)
+    return rp.Starts(
+        data=x,
+        ranks=tie_ranks(x),
+        seed=0,
+        n_regimes=N_REGIMES,
+        max_transitions=3,
+        switch_threshold=0.5,
+        max_iter=20,
+        tau_max=1,
+        pcmci_args=dict(pc_alpha=0.2, alpha_level=0.01, fdr_method="none", indep_test="student_t"),
+    )
+
+
+@pytest.mark.parametrize(
+    "preference, live, pooled",
+    [
+        ("numpy", None, True),
+        ("numpy", "cuda", True),
+        ("auto", None, True),
+        ("auto", "mps", True),
+        ("auto", "cuda", False),
+        ("cpu", None, False),
+        ("cuda", None, False),
+        ("mps", None, False),
+    ],
+)
+def test_a_fit_that_can_use_a_device_runs_its_starts_in_this_process(
+    preference, live, pooled, monkeypatch
+):
+    """``auto`` takes only CUDA, and only once its runtime is live, and a pinned PyTorch backend is
+    a device or PyTorch itself; a NumPy fit takes the pool whatever runtime is live."""
+    monkeypatch.setenv(VARIABLE, "0")
+    monkeypatch.setattr(backend, "_is_live", lambda device: device == live)
+    with andrey.config(n_jobs=4, backend=preference):
+        runs = pr.pooled_starts(_starts(), N_STARTS)
+    assert (runs is not None) is pooled
+
+
+def test_a_fit_with_a_live_cuda_runtime_gives_the_result_of_a_fit_in_this_process(
+    pools, monkeypatch
+):
+    monkeypatch.setenv(VARIABLE, "0")
+    serial = _outcome("two lags", 1)
+    monkeypatch.setattr(backend, "_is_live", lambda device: device == "cuda")
+    with_runtime = _outcome("two lags", 3)
+    assert not pools
+    _same(with_runtime, serial)
+
+
 def test_a_single_worker_or_a_single_start_never_uses_the_pool(pool_started, monkeypatch):
     monkeypatch.setenv(VARIABLE, "0")
     assert not _gate(workers=1)
     assert not _gate(workers=0)
     assert not _gate(workers=4, n_starts=1)
     assert not pool_started
+
+
+# --- the reduction -------------------------------------------------------------------------------
+
+
+class _Start:
+    """A stand-in for a start's result that a weak reference can follow."""
+
+
+class FinishedPool:
+    """An executor whose tasks are done at once, each result held by its future alone."""
+
+    made: list[FinishedPool]
+    fail_submit = False
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.refs: list[weakref.ref] = []
+        self.shut_down: list[dict] = []
+        self.made.append(self)
+
+    def submit(self, fn, a):
+        if self.fail_submit:
+            raise RuntimeError("cannot submit")
+        result = _Start()
+        self.refs.append(weakref.ref(result))
+        future = Future()
+        future.set_result(result)
+        return future
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        self.shut_down.append({"wait": wait, "cancel_futures": cancel_futures})
+
+
+@pytest.fixture
+def finished(monkeypatch):
+    FinishedPool.made, FinishedPool.fail_submit = [], False
+    monkeypatch.setenv(VARIABLE, "0")
+    monkeypatch.setattr(pr, "ProcessPoolExecutor", FinishedPool)
+    return FinishedPool
+
+
+def _pooled(n_starts: int, **settings):
+    """The iterator over ``n_starts`` pooled starts, made under ``settings`` and read after them."""
+    with andrey.config(n_jobs=2, **settings):
+        runs = pr.pooled_starts(_starts(), n_starts)
+    assert runs is not None
+    return runs
+
+
+def test_the_pool_starts_when_the_first_start_is_read_with_the_settings_of_the_call(finished):
+    runs = _pooled(3, tie_break="position", backend="numpy")
+    assert not finished.made  # a fit that never reads its starts starts no pool
+    next(runs)
+    [pool] = finished.made
+    assert pool.kwargs["max_workers"] == 2
+    assert pool.kwargs["initargs"][1:3] == ("position", "numpy")
+    assert backend.config.tie_break != "position" or backend.config.backend != "numpy"
+
+
+def test_a_start_the_fit_has_read_is_not_kept(finished):
+    """The pool's results are read one at a time: a start read and let go is freed, and the ones
+    not yet read wait in their futures."""
+    runs = _pooled(4)
+    assert not isinstance(runs, list | tuple) and iter(runs) is runs
+    first = next(runs)
+    [pool] = finished.made
+    assert pool.refs[0]() is first
+    del first
+    assert pool.refs[0]() is None
+    assert all(ref() is not None for ref in pool.refs[1:])
+    next(runs)
+    assert pool.refs[1]() is None and all(ref() is not None for ref in pool.refs[2:])
+
+
+def test_the_pool_shuts_down_after_the_last_start_is_read(finished):
+    runs = _pooled(3)
+    assert len(list(runs)) == 3
+    [pool] = finished.made
+    assert len(pool.refs) == 3
+    assert pool.shut_down == [{"wait": True, "cancel_futures": True}]
+
+
+def test_the_pool_shuts_down_when_a_fit_stops_reading(finished):
+    runs = _pooled(3)
+    next(runs)
+    [pool] = finished.made
+    assert not pool.shut_down
+    runs.close()
+    assert pool.shut_down == [{"wait": True, "cancel_futures": True}]
+
+
+def test_the_pool_shuts_down_when_a_task_cannot_be_submitted(finished):
+    finished.fail_submit = True
+    runs = _pooled(3)
+    with pytest.raises(RuntimeError, match="cannot submit"):
+        next(runs)
+    [pool] = finished.made
+    assert pool.shut_down == [{"wait": True, "cancel_futures": True}]
 
 
 # --- the first-use warning ------------------------------------------------------------------------
@@ -574,6 +729,15 @@ def test_the_rpcmci_timers_fit_serially_and_use_the_pool_only_in_the_pooled_arm(
     assert serial(2) > 0 and not pools
     assert pooled(2) > 0 and len(pools) == 1
     assert work(4) == 4 * cal.RPCMCI_REGIMES * cal.RPCMCI_ROWS
+
+
+def test_the_rpcmci_timers_run_on_numpy_whatever_the_process_prefers(pools, monkeypatch):
+    """A process pinned to a device would run both arms in this process, and time nothing."""
+    monkeypatch.setattr(cal, "_time", _once)
+    _, pooled, _ = cal.rpcmci_timers(workers=2)
+    with andrey.config(backend="cuda"):
+        assert pooled(2) > 0
+    assert len(pools) == 1
 
 
 def test_the_rpcmci_calibrator_measures_in_starts_and_counts_work_as_the_gate_does(
