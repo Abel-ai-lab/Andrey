@@ -111,6 +111,11 @@ names its pull request.
   each from the table of single-edge moves, where it already sits. A fit's peak memory falls only
   where the scan sets it, as with many variables and few rows. Results are unchanged, bit for bit.
   ([#1370])
+- With more than one worker, the skeleton search of `pc`, `fci`, `fci_jci`, `gfci`, `cdnod`, and
+  `rsmax2` with `restrict="pc"` sends each worker the adjacency of a conditioning-size pass at one
+  bit per entry instead of one byte, and a worker rebuilds its neighbor lists from it a row at a
+  time, so a worker holds an eighth of the bytes it held for the pass. `pc` no longer copies its
+  adjacency for each pass. Results are unchanged, bit for bit. ([#1378])
 - With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
   searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
   targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
@@ -276,6 +281,13 @@ names its pull request.
   return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
   there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
   free cores. ([#1369])
+- For contributors, the `test-weakening` job of a pull request into a release or topic branch runs
+  `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
+  tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
+  a warning filter that lets a warning pass, a deleted test or `parametrize` case, and a re-recorded
+  baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it and flags a
+  change to the script or to its workflow job, it is a required check, `.github/` and the script
+  have code owners, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
 
 ### Fixed
 
@@ -3297,9 +3309,11 @@ First alpha release.
 [#1351]: https://github.com/Abel-ai-lab/Andrey/pull/1351
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
+[#1358]: https://github.com/Abel-ai-lab/Andrey/pull/1358
 [#1359]: https://github.com/Abel-ai-lab/Andrey/pull/1359
 [#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
 [#1366]: https://github.com/Abel-ai-lab/Andrey/pull/1366
 [#1369]: https://github.com/Abel-ai-lab/Andrey/pull/1369
 [#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371
+[#1378]: https://github.com/Abel-ai-lab/Andrey/pull/1378

@@ -8,7 +8,7 @@ comparisons with other packages and older Andrey builds live in `benchmarks/`.
 |---|---|
 | `quality_gate.py` | Pre-publish gate for the supported methods. |
 | `reference_parity.py` | Flag a published row where Andrey makes more errors than the reference package. |
-| `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`. |
+| `capture_baselines.py` | Record Andrey outputs in `tests/recovery/baselines/`; a recapture that changes a recorded value needs the `test-change-approved` label. |
 | `identity.py` | Hash every supported method's full output, to show a change returns the same bits. |
 | `profiler.py` | Time one method's fit and show where it spends its time. |
 | `column_order.py` | Count how often a column relabeling changes FCI's and GFCI's marks. |
@@ -390,7 +390,10 @@ median SHD over the draws is:
 
 `quality_baselines.json` holds the baselines, and in its `tolerances` block every tolerance with the
 reason for its size. A median better than the baseline by more than the tolerance also fails, so an
-intended change is recorded by a recapture. Every fit runs on the numpy backend with one worker and
+intended change is recorded by a recapture. A pull request whose recapture changes a recorded value
+or a tolerance is flagged by the weakened-test check until a maintainer sets the label
+`test-change-approved` (`DEVELOPMENT.md`, AI tools); a baseline for a new method is not flagged.
+Every fit runs on the numpy backend with one worker and
 one BLAS thread, so the host's accelerators and core count do not enter the result; the tolerances
 absorb rounding differences between CPUs. On every pull request,
 `tests/recovery/test_quality_gate.py` feeds each method the empty graph and a column-shifted true

@@ -426,7 +426,14 @@ def test_no_shared_file_outlives_a_task_error(files):
     pool = sk.SkeletonWorkerPool(test, 2)
     try:
         executor, _ = pool._ensure()
-        payload = ([(0, 1)], np.ones((20, 20), dtype=bool), 2, 0.05, True, "wrong token")
+        payload = (
+            [(0, 1)],
+            np.packbits(np.ones((20, 20), dtype=bool), axis=1),
+            2,
+            0.05,
+            True,
+            "wrong token",
+        )
         with pytest.raises(RuntimeError, match="reused across runs"):
             executor.submit(sk._scan_task, payload).result()
     finally:
