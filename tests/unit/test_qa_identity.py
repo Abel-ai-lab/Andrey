@@ -24,6 +24,7 @@ from andrey.constraint import blanket
 from andrey.core import ci, ci_missing, score_delta
 from andrey.core.ci import make_indep_test
 from andrey.core.score import BICScore
+from andrey.temporal import lpcmci_lattice
 from qa import identity
 from qa import quality_gate as qg
 
@@ -1720,3 +1721,34 @@ def test_the_full_graph_searches_are_refitted_on_workers_through_the_pool(
     assert findings == []
     assert {r["workers"] for r in rows} == {1, 2}
     assert started
+
+
+def test_lpcmci_is_fitted_on_a_series_whose_searches_reach_the_lattice(monkeypatch) -> None:
+    """Both draws of LPCMCI's path dataset build a lattice at the constants as shipped, and the
+    lattice's answers are counted and hashed as the inversion's are: the fit equals the batched
+    one in bits and in queries."""
+    (dataset,) = identity.PATH_DATASETS["LPCMCI"]
+    assert identity.datasets("LPCMCI")[-1] == dataset
+    builds: list[bool] = []
+    original = lpcmci_lattice.SubsetLattice.build
+
+    def build(*args: Any) -> Any:
+        builds.append(True)
+        return original(*args)
+
+    monkeypatch.setattr(lpcmci_lattice.SubsetLattice, "build", build)
+    fit = identity.FITS["LPCMCI"]
+    with andrey.config(backend="numpy", n_jobs=1):
+        x0, x1 = (np.ascontiguousarray(d.data) for d in identity.draws(dataset))
+        fit.call(x0)
+        assert builds  # draw 0 reaches the lattice
+        builds.clear()
+        with identity.counting(fit.alpha) as lattice_counts:
+            on_lattice = fit.call(x1)
+        assert builds  # draw 1 reaches it too
+        monkeypatch.setattr(lpcmci_lattice, "MIN_SUBSETS", 10**9)
+        with identity.counting(fit.alpha) as batched_counts:
+            batched = fit.call(x1)
+    assert identity.digest(on_lattice) == identity.digest(batched)
+    assert lattice_counts.summary() == batched_counts.summary()
+    assert lattice_counts.summary()["ci_queries"] > 0

@@ -945,16 +945,18 @@ _JOB: Job | None = None
 _BLAS: object = None  # a held threadpoolctl controller capping this worker's BLAS to one thread
 
 
-def _init_worker(job: Job) -> None:
-    """Pin a worker to one fit at a time on one BLAS thread, with the parent's settings.
+def _init_worker(job: Job, workers: int) -> None:
+    """Pin a worker of a pool of ``workers`` to one fit at a time on one BLAS thread.
 
-    Workers suppress default missing-value handling notices; :func:`bootstrap` logs once for all
-    workers in the calling process.
+    The worker takes the parent's settings and learns its pool's size
+    (:func:`~andrey.core.backend.join_pool`). Workers suppress default missing-value handling
+    notices; :func:`bootstrap` logs once for all workers in the calling process.
     """
     global _JOB, _BLAS
     from threadpoolctl import threadpool_limits
 
     _BLAS = threadpool_limits(limits=1)  # held for the worker's lifetime
+    _backend.join_pool(workers)
     mark_logged(MISSING_DEFAULT_NOTICE)
     _backend.config.n_jobs = 1
     _backend.config.backend = job.backend
@@ -1001,7 +1003,10 @@ def _fit_on_workers(
 ) -> list[Fitted]:
     """:func:`fit_resamples` on ``workers`` worker processes, appending to ``results``."""
     pool = ProcessPoolExecutor(
-        max_workers=workers, mp_context=pick_context(), initializer=_init_worker, initargs=(job,)
+        max_workers=workers,
+        mp_context=pick_context(),
+        initializer=_init_worker,
+        initargs=(job, workers),
     )
     try:
         futures = [pool.submit(_task, b) for b in range(n_resamples)]

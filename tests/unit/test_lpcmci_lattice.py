@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 import andrey
+from andrey.core import backend
 from andrey.core.ci import FisherZ, StudentT
 from andrey.data import sample_scm
 from andrey.temporal import lpcmci as engine
@@ -230,3 +231,35 @@ def test_a_fit_on_the_lattice_equals_the_batched_fit(monkeypatch, n, seed):
     first, second = fits
     assert same(first.metadata, second.metadata)
     assert same(first.structure, second.structure)
+
+
+def test_a_worker_of_a_pool_holds_its_share_of_the_bytes(monkeypatch):
+    """The cap is divided by the workers of the pool: a search that fits the cap alone does not
+    fit a quarter of it, and then answers as the batched path does."""
+    monkeypatch.setattr(lattice, "MIN_SUBSETS", 1)
+    data = mixed(500, 10, seed=5)
+    order = [(v, 0) for v in range(2, 10)]
+    need = lattice.live_bytes(len(order), 0, 4)
+    monkeypatch.setattr(lattice, "MAX_BYTES", 2 * need)
+    outcomes = []
+    for workers in (1, 2, 4):
+        monkeypatch.setattr(backend, "_pool_workers", workers)
+        search = engine.LPCMCISearch(design_of(data), 10, 0, 2.0, list(range(10)))
+        found = search.separating_subsets((0, 0), (1, 0), order, set(), 4)
+        outcomes.append((bool(search.lattices), found, search.imin, search.best, search.tested))
+    assert [kept for kept, *_ in outcomes] == [True, True, False]
+    assert outcomes[0][1:] == outcomes[1][1:] == outcomes[2][1:]
+
+
+@pytest.mark.parametrize("cap", [1000, 50_000, lattice.MAX_BYTES])
+def test_a_fit_gives_the_same_bits_whatever_the_cap(monkeypatch, cap):
+    """The cap only chooses between the lattice and the inversion for each search, so a fit under a
+    tiny, a middle, and the full cap returns the batched fit's result."""
+    data = sample_scm(functional="var", d=8, n=800, seed=0, density=2).data
+    monkeypatch.setattr(lattice, "MIN_SUBSETS", 1)
+    monkeypatch.setattr(lattice, "MAX_BYTES", cap)
+    capped = andrey.lpcmci(data, tau_max=2)
+    monkeypatch.setattr(lattice, "MIN_SUBSETS", 10**9)
+    batched = andrey.lpcmci(data, tau_max=2)
+    assert same(capped.metadata, batched.metadata)
+    assert same(capped.structure, batched.structure)

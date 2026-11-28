@@ -318,9 +318,10 @@ names its pull request.
   data: a search of subsets of four or more nodes reads each subset's partial correlation from the
   factors of its parent subset, kept between rounds, instead of inverting its correlation
   submatrix, and asks the test again for the subsets that decide what the search records, so the
-  output is the same bit for bit. A search whose factors would hold more than 1 GiB, or whose
-  correlation block is near singular, inverts as before. For contributors, `qa/identity.py` counts
-  the tests the lattice answers. ([#1360])
+  output is the same bit for bit. A search whose factors would hold more than 256 MiB, or whose
+  correlation block is near singular, inverts as before; in a bootstrap's worker processes the 256
+  MiB is shared by the workers. For contributors, `qa/identity.py` counts the tests the lattice
+  answers and fits LPCMCI on a series whose searches reach it. ([#1360])
 
 ### Fixed
 

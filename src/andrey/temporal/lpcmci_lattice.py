@@ -30,12 +30,18 @@ import numpy as np
 from andrey.core.ci import BOUND_MARGIN, ONE_MINUS_EPS, SINGULAR_RTOL, PartialCorrelationTest
 from andrey.temporal.pcmci import DesignTest
 
+#: ``MIN_SUBSETS`` and ``MAX_BYTES`` are fixed cutoffs of the algorithm, measured on one Linux CPU,
+#: not dispatch gates: they choose between two ways to compute the same values, so neither is read
+#: from the environment or recorded by ``andrey calibrate``.
+#:
 #: The fewest subsets of one size for which the lattice replaces the test. Below about 2,000 a
 #: level's fixed cost (about 0.7 ms) and the levels built beneath it exceed the inversions' time;
 #: from 4,096 on the lattice was faster in every case measured (candidates 12 to 16, 0 or 3 fixed).
 MIN_SUBSETS = 1 << 12
-#: The most bytes the factors of the live levels hold, in all the lattices of a search.
-MAX_BYTES = 1 << 30
+#: The most bytes the factors of the live levels hold, in all the lattices of a search, 256 MiB. A
+#: search that runs in one of a pool's workers holds its share of it,
+#: ``MAX_BYTES // backend.pool_workers()``, so the workers of a pool hold ``MAX_BYTES`` in all.
+MAX_BYTES = 1 << 28
 #: The subsets of a level answered in one call, after the doubling from :data:`FIRST_CHUNK`.
 CHUNK = 1 << 14
 FIRST_CHUNK = 16

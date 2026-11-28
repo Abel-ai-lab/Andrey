@@ -124,6 +124,13 @@ CD-NOD, and FCI-JCI, under `--workers`. SkewD and SkewD-MV run with the quality 
 budget; their larger fits, two draws each, took 362 s (`lsnm_pair_n1500`, 161 and 201 s) and 712 s
 (`anm_er_n1000_d6`, 644 and 68 s) on one AMD EPYC 7713 core, on top of their gate datasets' draws.
 
+LPCMCI has one more dataset, `lpcmci_var_d10_n1000`, on top of the gate's and its larger one: two
+series (seeds 0 and 7) of a vector autoregression of 10 variables and 1,000 steps, on which its
+separating-set searches reach subsets of four or more nodes in the thousands. Those searches read
+each subset's partial correlation from the subset lattice (`andrey.temporal.lpcmci_lattice`),
+which the gate's series do not reach, and the identity check counts the tests the lattice answers
+as it counts the others.
+
 ## Profile
 
 A speed change starts from where a fit spends its time. `profiler.py` fits one method on one draw

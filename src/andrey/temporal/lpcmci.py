@@ -658,9 +658,9 @@ class LPCMCISearch:
 
         The lattice keeps its level between rounds while the candidates in their order and the
         fixed columns repeat, and the lattices of a search hold at most
-        :data:`~andrey.temporal.lpcmci_lattice.MAX_BYTES`: the one used longest ago goes first. A
-        search that does not run on it takes the batches of :meth:`separating_subsets`, whatever
-        its neighbors do.
+        :data:`~andrey.temporal.lpcmci_lattice.MAX_BYTES`, or its share when the search runs in one
+        of a pool's workers: the one used longest ago goes first. A search that does not run on it
+        takes the batches of :meth:`separating_subsets`, whatever its neighbors do.
         """
         m = len(columns)
         if not isinstance(self.test, DesignTest) or math.comb(m, p) < lattice.MIN_SUBSETS:
@@ -674,11 +674,10 @@ class LPCMCISearch:
             if resumed
             else lattice.live_bytes(m, f, p)
         )
-        if need > lattice.MAX_BYTES:
+        cap = lattice.MAX_BYTES // backend.pool_workers()
+        if need > cap:
             return False, None
-        while self.lattices and need + sum(o.nbytes for o in self.lattices.values()) > (
-            lattice.MAX_BYTES
-        ):
+        while self.lattices and need + sum(o.nbytes for o in self.lattices.values()) > cap:
             del self.lattices[next(iter(self.lattices))]  # the one used longest ago
         if not resumed:
             if not lattice.rebuild_pays(m, p):

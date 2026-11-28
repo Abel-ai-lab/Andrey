@@ -12,7 +12,15 @@ import pytest
 import andrey
 from andrey import BootstrapOutput, bootstrap, resample
 from andrey.constraint.fci import fci_orient
-from andrey.core import ARROW, CIRCLE, TAIL, GraphStructure, StructureOutput, TemporalStructure
+from andrey.core import (
+    ARROW,
+    CIRCLE,
+    TAIL,
+    GraphStructure,
+    StructureOutput,
+    TemporalStructure,
+    backend,
+)
 from andrey.core._convert import _canonical_dag, _observed_ancestors_of, mag_of_pag
 from andrey.core.knowledge import Knowledge, resolve
 from andrey.core.orient import cpdag_of_pdag, dag2cpdag, pdag2dag
@@ -881,7 +889,8 @@ def test_the_workers_follow_the_configured_count_and_never_nest(
 ):
     """The fits run in this process at one job, else on ``min(n_jobs, n_resamples)`` worker
     processes, and each worker fits with one job on one BLAS thread whatever ``ANDREY_N_JOBS``
-    it inherits, so a method never starts workers of its own."""
+    it inherits, so a method never starts workers of its own. Each worker also learns the size of
+    its pool, so code that holds memory takes its share of a cap."""
     pools = []
 
     class Pool(resample.ProcessPoolExecutor):
@@ -899,10 +908,12 @@ def test_the_workers_follow_the_configured_count_and_never_nest(
     monkeypatch.setattr(resample, "_JOB", None)
     monkeypatch.setattr(resample, "_BLAS", None)
     monkeypatch.setenv("ANDREY_N_JOBS", "4")
+    monkeypatch.setattr(backend, "_pool_workers", 1)  # restored after the test
     assert andrey.config.n_jobs == 4
     pools[0]["initializer"](*pools[0]["initargs"])  # what each worker runs before its fits
     assert andrey.config.n_jobs == 1
     assert limits == [{"limits": 1}]
+    assert backend.pool_workers() == workers
 
 
 def test_knowledge_travels_to_the_workers():

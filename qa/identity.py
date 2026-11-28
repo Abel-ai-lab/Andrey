@@ -4,7 +4,8 @@ Every supported method of the quality gate (:mod:`qa.quality_gate`) is fitted on
 its gate datasets and of one larger dataset (:data:`LARGER`), and UT-IGSP and GnIES on the gate's
 smaller interventional dataset (:data:`UNKNOWN_TARGETS`), on the numpy backend with one worker and
 one BLAS thread. The options 0.19.0 added (:data:`OPTIONS`) have fits of their own on data where
-they change the answer. A fit's hash covers its whole output: the graph, the edge weights, the
+they change the answer, and LPCMCI is fitted on a series whose searches reach the subset lattice
+(:data:`PATH_DATASETS`). A fit's hash covers its whole output: the graph, the edge weights, the
 causal order, and every metadata value, such as a score, a p-value, or a list of nodes. Floats
 enter as their bytes, never as printed text, NaN as one bit pattern, and mappings in key order, so
 equal hashes mean equal bits. A second hash covers only the endpoint marks of the graphs, and each
@@ -384,12 +385,37 @@ def sparse_discrete_draws() -> tuple[qg.Draw, ...]:
     return tuple(qg.Draw(sample.data, sample.graph) for sample in out)
 
 
-#: The datasets of the option fits, which the gate does not draw.
+#: The seeds of the series of :func:`lattice_series_draws`, each with a link whose search of
+#: separating sets reaches subsets of four or more nodes in the thousands.
+LATTICE_SEEDS = (0, 7)
+
+
+def lattice_series_draws() -> tuple[qg.Draw, ...]:
+    """Return a draw per seed of :data:`LATTICE_SEEDS` of a vector autoregression of 10 variables
+    and 1,000 steps, with its lagged links as the truth.
+
+    LPCMCI's search on each reaches the subsets of four or more nodes that it reads from a
+    :class:`~andrey.temporal.lpcmci_lattice.SubsetLattice`, which the gate's series do not.
+    """
+    out = (
+        data.sample_scm(functional="var", d=10, n=1000, seed=seed, density=2)
+        for seed in LATTICE_SEEDS
+    )
+    return tuple(qg.Draw(sample.data, sample.graph) for sample in out)
+
+
+#: The datasets of the option fits and of the fits on a path the gate's datasets do not reach,
+#: which the gate does not draw.
 OPTION_DRAWS: dict[str, Callable[[], tuple[qg.Draw, ...]]] = {
     "cohorts_d14_n2000": functools.partial(cohort_draws, 2000),
     "gapped_series_d6_n600": functools.partial(gapped_series_draws, 6, 600),
     "discrete_sparse_d12_n250": sparse_discrete_draws,
+    "lpcmci_var_d10_n1000": lattice_series_draws,
 }
+#: The methods fitted on one more dataset, whose fit takes a path that their gate and larger
+#: datasets do not reach: LPCMCI's separating-set search of subsets of four or more nodes reads
+#: the partial correlations of each subset from a lattice (:mod:`andrey.temporal.lpcmci_lattice`).
+PATH_DATASETS: dict[str, tuple[str, ...]] = {"LPCMCI": ("lpcmci_var_d10_n1000",)}
 
 
 @dataclass(frozen=True)
@@ -660,7 +686,8 @@ UNKNOWN_TARGETS: dict[str, tuple[str, ...]] = dict.fromkeys(
 
 
 def datasets(method: str) -> tuple[str, ...]:
-    """Return the datasets ``method`` is fitted on: its gate datasets, then its larger dataset."""
+    """Return the datasets ``method`` is fitted on: its gate datasets, its larger dataset, then
+    the dataset of its path, when it has one."""
     if method in OPTIONS:
         return (OPTIONS[method].dataset,)
     if method in EM_FITS:
@@ -668,7 +695,7 @@ def datasets(method: str) -> tuple[str, ...]:
     method = TARGET_LISTS.get(method, method)
     if method in UNKNOWN_TARGETS:
         return UNKNOWN_TARGETS[method]
-    return (*qg.SUPPORTED[method].datasets, LARGER[method])
+    return (*qg.SUPPORTED[method].datasets, LARGER[method], *PATH_DATASETS.get(method, ()))
 
 
 @functools.cache

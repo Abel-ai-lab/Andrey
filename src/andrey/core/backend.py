@@ -602,6 +602,24 @@ def worker_count(n_jobs: int | None = None) -> int:
     return max(1, n)
 
 
+_pool_workers = 1
+
+
+def pool_workers() -> int:
+    """Return the worker processes of the pool this process belongs to, ``1`` outside a pool.
+
+    Code that holds memory in proportion to its work takes ``1 / pool_workers()`` of its cap, so a
+    pool of workers holds the cap in all.
+    """
+    return _pool_workers
+
+
+def join_pool(workers: int) -> None:
+    """Record, in a worker process, how many workers its pool has; a pool's initializer calls it."""
+    global _pool_workers
+    _pool_workers = max(1, workers)
+
+
 @lru_cache(maxsize=1)
 def _thread_pools(imported: frozenset[str]):
     """The thread pools of the libraries loaded when the modules named in ``imported`` were."""
