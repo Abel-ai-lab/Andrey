@@ -513,16 +513,17 @@ def _starts() -> rp.Starts:
         ("auto", None, True),
         ("auto", "mps", True),
         ("auto", "cuda", False),
-        ("cpu", None, False),
+        ("cpu", None, True),
+        ("cpu", "cuda", True),
         ("cuda", None, False),
         ("mps", None, False),
     ],
 )
-def test_a_fit_that_can_use_a_device_runs_its_starts_in_this_process(
+def test_a_fit_that_can_use_a_gpu_runs_its_starts_in_this_process(
     preference, live, pooled, monkeypatch
 ):
-    """``auto`` takes only CUDA, and only once its runtime is live, and a pinned PyTorch backend is
-    a device or PyTorch itself; a NumPy fit takes the pool whatever runtime is live."""
+    """``auto`` takes only CUDA, and only once its runtime is live, and ``cuda`` and ``mps`` are
+    pinned devices; a ``numpy`` or ``cpu`` fit takes the pool whatever runtime is live."""
     monkeypatch.setenv(VARIABLE, "0")
     monkeypatch.setattr(backend, "_is_live", lambda device: device == live)
     with andrey.config(n_jobs=4, backend=preference):
@@ -534,9 +535,10 @@ def test_a_fit_with_a_live_cuda_runtime_gives_the_result_of_a_fit_in_this_proces
     pools, monkeypatch
 ):
     monkeypatch.setenv(VARIABLE, "0")
-    serial = _outcome("two lags", 1)
-    monkeypatch.setattr(backend, "_is_live", lambda device: device == "cuda")
-    with_runtime = _outcome("two lags", 3)
+    with andrey.config(backend="auto"):
+        serial = _outcome("two lags", 1)
+        monkeypatch.setattr(backend, "_is_live", lambda device: device == "cuda")
+        with_runtime = _outcome("two lags", 3)
     assert not pools
     _same(with_runtime, serial)
 

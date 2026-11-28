@@ -2272,9 +2272,8 @@ def rpcmci(
     one BLAS thread. The best start, its weights, and the number of failed starts are the same at
     any worker count, whichever worker finishes first. A smaller fit runs in this process, because
     starting the workers costs more than it saves; ``andrey calibrate --method rpcmci`` measures the
-    value for a machine. A fit with the backend pinned to ``cpu``, ``cuda``, or ``mps`` (PyTorch),
-    or on ``auto`` once a CUDA runtime is live in the calling process, runs its starts in the
-    calling process.
+    value for a machine. A fit with the backend pinned to ``cuda`` or ``mps``, or on ``auto`` once a
+    CUDA runtime is live in the calling process, runs its starts in the calling process.
 
     The paper's threshold for joining a regime is ``0.5`` [1]_, the default. The paper's Eq. 11
     reads ``>=``, and Andrey follows the authors' code, which uses ``>``, so a step the linear

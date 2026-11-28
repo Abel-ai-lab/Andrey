@@ -58,8 +58,8 @@ requested backend uses `auto`, without a warning.
   that reads those sets, only when the data hold enough variables to repay them. `rpcmci` runs its
   starts on them, one per task, only when the fit holds enough starts and time steps to repay them,
   with the same result for any number of workers, whichever worker finishes first. A fit on a
-  pinned PyTorch backend, or on `auto` once a CUDA runtime is running in the calling process, runs its
-  starts in the calling process.
+  backend pinned to `cuda` or `mps`, or on `auto` once a CUDA runtime is running in the calling
+  process, runs its starts in the calling process.
   `andrey.bootstrap` fits one resample per worker, with the same result at any number. `1` (the
   default) and `0` run serially; `-1` uses every usable core. `pnl` runs on one BLAS thread with
   any number of workers, so its p-values and statistics do not depend on the worker count or on
