@@ -424,6 +424,7 @@ def test_lean_trees_and_predictions_equal_the_staged_fit(depth):
     prediction = np.full((len(target), 1), lean.init)
     for i, staged in enumerate(fit.staged_predict(features)):
         tree = lean.grow().tree_
+        assert lean.trees[i, 0].criterion == fit.estimators_[i, 0].criterion
         expected = fit.estimators_[i, 0].tree_
         for name in ("feature", "threshold", "value"):
             assert getattr(tree, name).tobytes() == getattr(expected, name).tobytes()

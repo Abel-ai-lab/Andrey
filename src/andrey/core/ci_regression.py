@@ -146,7 +146,9 @@ class _Boosted:
 
     def grow(self) -> DecisionTreeRegressor:
         """Fit the next round's tree, add its prediction, and return it."""
-        tree = DecisionTreeRegressor(max_depth=self.depth, random_state=self._random_state)
+        tree = DecisionTreeRegressor(
+            criterion="squared_error", max_depth=self.depth, random_state=self._random_state
+        )
         tree.fit(self.features, -(self.raw[:, 0] - self.target), check_input=False)
         self.raw[:, 0] += self.rate * tree.predict(self.features, check_input=False)
         self.trees[self.grown, 0] = tree
