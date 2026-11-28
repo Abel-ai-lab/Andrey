@@ -275,8 +275,9 @@ names its pull request.
   took each row's nearest rows in the conditioning set in the order `np.argpartition` returned
   them, which differs between NumPy versions and CPUs, so a p-value with a non-empty conditioning
   set differed with it. The rows now go in the order of their distance, then their random tie
-  key, then their index. `ica_lingam` zeroes weights of equal magnitude in row-major order; it took
-  them in the order of NumPy's default sort. ([#1366])
+  key, then their index, which is the order NumPy 2 returned at the default `k_perm` on the CPUs
+  tried, so those p-values do not change. `ica_lingam` zeroes weights of equal magnitude in
+  row-major order; it took them in the order of NumPy's default sort. ([#1366])
 
 ## [0.19.0] - 2026-11-24
 
