@@ -985,10 +985,18 @@ def test_ges_records_only_the_moves_the_knowledge_admits(monkeypatch) -> None:
     data = np.ascontiguousarray(identity.draws("linear_gauss_er_d20")[0].data)
     with identity.checkpointing(True) as recorder:
         andrey.ges(data, knowledge=andrey.Knowledge(forbidden=[(0, 1)]))
-    stages = [r.stage for r in recorder.records]
+    stages = [r.stage for r in recorder.records if r.stage != "ges.total"]
     assert not all(verdicts) and any(verdicts)
     assert len(stages) == sum(verdicts)
     assert {"ges.forward", "ges.backward"} <= set(stages)
+
+
+def test_ges_records_its_recomputed_total_once_after_the_search(x: np.ndarray) -> None:
+    with identity.checkpointing(True) as recorder:
+        out = andrey.ges(x)
+    stages = [r.stage for r in recorder.records]
+    assert stages.count("ges.total") == 1 and stages[-1] == "ges.total"
+    assert float(recorder.records[-1].pieces[0].array[0]) == out.metadata["score"]
 
 
 @pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
@@ -1453,6 +1461,37 @@ def test_compare_says_when_a_sidecar_is_not_its_manifests_and_still_compares_the
     assert "checkpoints not compared: the sidecar's checkpoints of the fit" in out
     assert "first checkpoint difference" not in out
     assert "0 with a different graph, 0 with only different bits" in out
+
+
+@pytest.mark.parametrize("damage", ["garbage", "truncated"])
+def test_compare_goes_on_without_checkpoints_when_a_sidecar_cannot_be_read(
+    tmp_path, monkeypatch, capsys, damage: str
+) -> None:
+    base, head, _ = _checkpointed_pc_manifests(tmp_path, monkeypatch)
+    sidecar = tmp_path / identity.sidecar_name(head)
+    sidecar.write_bytes(
+        b"not an archive"
+        if damage == "garbage"
+        else sidecar.read_bytes()[: sidecar.stat().st_size // 2]
+    )
+    capsys.readouterr()
+    assert identity.main(["--compare", str(base), str(head)]) == 0
+    out = capsys.readouterr().out
+    assert "checkpoints not compared:" in out and "first checkpoint difference" not in out
+    assert "0 with a different graph, 0 with only different bits" in out
+
+
+def test_a_piece_that_changes_dtype_differs_at_its_first_element() -> None:
+    def fit(value: np.ndarray) -> list:
+        return _fit_record([("a", None, {"total": value})])
+
+    before, after = fit(np.array([1], dtype=np.int64)), fit(np.array([1.0]))
+    found = identity.first_difference(identity.stages_of(before), identity.stages_of(after))
+    assert found is not None and (found.stage, found.piece, found.index) == ("a", "total", 0)
+
+
+def test_the_structural_em_fit_runs_again_on_workers() -> None:
+    assert "GES-em" in identity.WORKER_METHODS
 
 
 def test_the_checkpoint_mode_needs_a_manifest_and_a_package_that_has_the_sink(

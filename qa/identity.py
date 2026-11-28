@@ -60,6 +60,7 @@ import platform
 import struct
 import subprocess
 import sys
+import zipfile
 from collections import Counter, defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from contextlib import contextmanager
@@ -512,11 +513,12 @@ def _with_missing(
 
 FITS |= {name: Fit(_with_missing(search), shuffled=False) for name, search in EM_FITS.items()}
 
-#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GFCI's GES phase, the skeleton
-#: searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2's PC phase, and the possible-d-sep
-#: searches of FCI, FCI-JCI, and GFCI in worker processes, PNL's two directions on threads, and the
-#: lists of targets of :data:`TARGET_LISTS`, and the option fits of those methods.
-_WORKERS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "PNL")
+#: The methods that run on ``andrey.config(n_jobs=...)``: GES, GES in each structural-EM round of
+#: ``GES-em``, GFCI's GES phase, the skeleton searches of PC, FCI, FCI-JCI, GFCI, CD-NOD, and
+#: RSMAX2's PC phase, and the possible-d-sep searches of FCI, FCI-JCI, and GFCI in worker processes,
+#: PNL's two directions on threads, and the lists of targets of :data:`TARGET_LISTS`, and the option
+#: fits of those methods.
+_WORKERS = ("PC", "FCI", "FCI-JCI", "GFCI", "CDNOD", "RSMAX2", "GES", "GES-em", "PNL")
 WORKER_METHODS = (
     *_WORKERS,
     *TARGET_LISTS,
@@ -1860,8 +1862,8 @@ def _bytes_differ(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     NaN as one bit pattern."""
     n = min(x.size, y.size)
     x, y = x[:n], y[:n]
-    if x.dtype != y.dtype:
-        return x.astype(np.float64) != y.astype(np.float64)
+    if x.dtype != y.dtype:  # a changed dtype is a changed representation from the first element
+        return np.ones(n, dtype=bool)
     if x.dtype.kind == "f":
         x, y = (np.where(np.isnan(a), np.nan, a).view(np.uint64) for a in (x, y))
     return x != y
@@ -2010,7 +2012,7 @@ def _sidecar_stages(
         before, after = (
             read_stages(s, m["rows"]) for s, m in zip(sidecars, manifests, strict=True)
         )
-    except ValueError as error:
+    except (ValueError, OSError, EOFError, zipfile.BadZipFile) as error:
         print(f"checkpoints not compared: {error}")
         return None
     return before, after
