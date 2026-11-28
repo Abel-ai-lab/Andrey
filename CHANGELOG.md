@@ -252,7 +252,8 @@ names its pull request.
   `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
   tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
   a deleted test or `parametrize` case, and a re-recorded baseline file in `tests/` and `qa/`. The
-  job fails until a maintainer sets the label `test-change-approved`. ([#1358])
+  job runs the script as the base branch has it and flags a change to the script or to its workflow
+  step, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
 
 ### Fixed
 

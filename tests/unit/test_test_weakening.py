@@ -793,6 +793,263 @@ FLAGGED = {
         """,
         "does not parse",
     ),
+    "delta replaces the default places": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=1)
+        """,
+        "places loosened from 7 to delta=1",
+    ),
+    "delta replaces explicit places": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, places=3)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=0.01)
+        """,
+        "places loosened from 3 to delta=0.01",
+    ),
+    "delta enlarged": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=0.01)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=1)
+        """,
+        "places loosened from delta=0.01 to delta=1",
+    ),
+    "test deleted from a TestCase through a base class": (
+        """
+        class Base(unittest.TestCase):
+            pass
+
+        class Fits(Base):
+            def test_a(self):
+                assert a()
+
+            def test_b(self):
+                assert b()
+        """,
+        """
+        class Base(unittest.TestCase):
+            pass
+
+        class Fits(Base):
+            def test_a(self):
+                assert a()
+        """,
+        "test deleted",
+    ),
+    "test deleted from a TestCase imported under another name": (
+        """
+        from unittest import TestCase as Case
+
+        class Fits(Case):
+            def test_a(self):
+                assert a()
+
+            def test_b(self):
+                assert b()
+        """,
+        """
+        from unittest import TestCase as Case
+
+        class Fits(Case):
+            def test_a(self):
+                assert a()
+        """,
+        "test deleted",
+    ),
+    "test deleted from a class with a base imported from another module": (
+        """
+        from helpers import Base
+
+        class Fits(Base):
+            def test_a(self):
+                assert a()
+
+            def test_b(self):
+                assert b()
+        """,
+        """
+        from helpers import Base
+
+        class Fits(Base):
+            def test_a(self):
+                assert a()
+        """,
+        "test deleted",
+    ),
+    "skip called by an imported name": (
+        """
+        from pytest import skip
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from pytest import skip
+
+        def test_fit():
+            skip("disabled")
+            assert fit()
+        """,
+        "pytest.skip() added",
+    ),
+    "skip called through an alias of pytest": (
+        """
+        import pytest as pt
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        import pytest as pt
+
+        def test_fit():
+            pt.skip("disabled")
+            assert fit()
+        """,
+        "pytest.skip() added",
+    ),
+    "skip marker through an alias of mark": (
+        """
+        from pytest import mark as m
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from pytest import mark as m
+
+        @m.skip
+        def test_fit():
+            assert fit()
+        """,
+        "pytest.mark.skip added",
+    ),
+    "pytest.fail removed through an imported name": (
+        """
+        from pytest import fail
+
+        def test_fit():
+            if not fit():
+                fail("no fit")
+        """,
+        """
+        from pytest import fail
+
+        def test_fit():
+            fit()
+        """,
+        "assertion removed",
+    ),
+    "raises match turned into the empty string": (
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match="specific"):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match=""):
+                fit(None)
+        """,
+        "pytest.raises lost its match",
+    ),
+    "raises match turned into a pattern that matches everything": (
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match="specific"):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match=".*"):
+                fit(None)
+        """,
+        "pytest.raises lost its match",
+    ),
+    "raises tuple member replaced by Exception": (
+        """
+        def test_fit():
+            with pytest.raises((ValueError, TypeError)):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises((ValueError, Exception)):
+                fit(None)
+        """,
+        "pytest.raises widened to Exception",
+    ),
+    "xfail made non-strict": (
+        """
+        @pytest.mark.xfail(strict=True)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(strict=False)
+        def test_fit():
+            assert fit()
+        """,
+        "xfail made non-strict",
+    ),
+    "xfail without its strict": (
+        """
+        @pytest.mark.xfail(reason="slow", strict=True)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+        "xfail made non-strict",
+    ),
+    "xfail without its raises": (
+        """
+        @pytest.mark.xfail(raises=ValueError)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail
+        def test_fit():
+            assert fit()
+        """,
+        "xfail lost its raises",
+    ),
+    "self.fail removed": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                if fit() is None:
+                    self.fail("unexpected path")
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                fit()
+        """,
+        "assertion removed",
+    ),
 }
 
 
@@ -1233,6 +1490,179 @@ NOT_FLAGGED = {
             assert fit()
         """,
     ),
+    "delta tightened": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=1)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=0.01)
+        """,
+    ),
+    "delta tighter than the places it replaces": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, places=2)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=0.001)
+        """,
+    ),
+    "delta of None is no delta": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b)
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                self.assertAlmostEqual(a, b, delta=None)
+        """,
+    ),
+    "method named test of a class that derives from a plain class": (
+        """
+        class Base:
+            pass
+
+        class Helper(Base):
+            def test_value(self):
+                return 1
+
+            def other(self):
+                return 2
+        """,
+        """
+        class Base:
+            pass
+
+        class Helper(Base):
+            def other(self):
+                return 2
+        """,
+    ),
+    "skip of a local function named skip": (
+        """
+        def skip(reason):
+            return reason
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        def skip(reason):
+            return reason
+
+        def test_fit():
+            skip("not pytest's")
+            assert fit()
+        """,
+    ),
+    "skip imported from another module": (
+        """
+        from helpers import skip
+
+        def test_fit():
+            assert fit()
+        """,
+        """
+        from helpers import skip
+
+        def test_fit():
+            skip("not pytest's")
+            assert fit()
+        """,
+    ),
+    "raises match changed to another pattern": (
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match="a|b"):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises(ValueError, match="a|c"):
+                fit(None)
+        """,
+    ),
+    "raises tuple member replaced by another exception": (
+        """
+        def test_fit():
+            with pytest.raises((ValueError, TypeError)):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises((ValueError, KeyError)):
+                fit(None)
+        """,
+    ),
+    "raises tuple that was broad already": (
+        """
+        def test_fit():
+            with pytest.raises((ValueError, Exception)):
+                fit(None)
+        """,
+        """
+        def test_fit():
+            with pytest.raises((TypeError, Exception)):
+                fit(None)
+        """,
+    ),
+    "xfail made strict": (
+        """
+        @pytest.mark.xfail(strict=False)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(strict=True)
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "xfail that stays strict": (
+        """
+        @pytest.mark.xfail(strict=True, raises=ValueError)
+        def test_fit():
+            assert fit()
+        """,
+        """
+        @pytest.mark.xfail(strict=True, raises=ValueError, reason="slow")
+        def test_fit():
+            assert fit()
+        """,
+    ),
+    "self.fail added": (
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                fit()
+        """,
+        """
+        class TestFit(unittest.TestCase):
+            def test_fit(self):
+                if fit() is None:
+                    self.fail("unexpected path")
+        """,
+    ),
+    "fail of an object that is not the test": (
+        """
+        def test_fit():
+            report.fail("a")
+            assert fit()
+        """,
+        """
+        def test_fit():
+            assert fit()
+        """,
+    ),
 }
 
 
@@ -1399,6 +1829,38 @@ def test_a_parametrized_fixture_that_moved_with_its_cases_is_not_flagged(check):
     assert check.analyze(moved) == []
 
 
+FIT_ONCE = "def test_fit():\n    assert fit('a')\n"
+
+
+def test_a_function_of_the_same_name_does_not_hide_a_deleted_fixture(check):
+    fixture = textwrap.dedent("""
+    @pytest.fixture(params=["a", "b", "c"])
+    def kind(request):
+        return request.param
+    """)
+    a, helpers = "tests/unit/test_a.py", "tests/unit/test_helpers.py"
+    changes = [
+        check.Change(a, a, fixture + "def test_fit(kind):\n    assert fit(kind)\n", FIT_ONCE),
+        check.Change(helpers, helpers, "x = 1\n", "def kind():\n    return 1\n"),
+    ]
+    assert [f.reason for f in check.analyze(changes)] == ["parametrized fixture deleted"]
+
+
+def test_a_fixture_that_moved_without_its_params_is_flagged(check):
+    fixture = textwrap.dedent("""
+    @pytest.fixture(params=["a", "b", "c"])
+    def kind(request):
+        return request.param
+    """)
+    plain = "@pytest.fixture\ndef kind(request):\n    return 'a'\n"
+    a, conftest = "tests/unit/test_a.py", "tests/unit/conftest.py"
+    changes = [
+        check.Change(a, a, fixture + "def test_fit(kind):\n    assert fit(kind)\n", FIT_ONCE),
+        check.Change(conftest, conftest, None, plain),
+    ]
+    assert [f.reason for f in check.analyze(changes)] == ["parametrized fixture deleted"]
+
+
 def test_a_flag_names_the_file_the_test_and_the_code(check):
     old = """
     def test_fit():
@@ -1560,6 +2022,18 @@ def test_a_renamed_file_is_compared_with_its_old_content(check, repo):
     assert baselines == []
 
 
+def test_a_python_file_renamed_to_another_kind_of_file_loses_its_tests(check, repo):
+    git(repo, "mv", "tests/unit/test_c.py", "tests/unit/test_c.txt")
+    commit(repo)
+    changes, baselines = check.load("main", "HEAD", str(repo))
+    found = check.analyze(changes)
+    reason = "test no longer collected: the file was renamed to tests/unit/test_c.txt"
+    assert [(f.path, f.unit, f.reason) for f in found] == [
+        ("tests/unit/test_c.py", "test_c", reason)
+    ]
+    assert baselines == []
+
+
 def test_a_baseline_moved_out_of_its_folder_is_a_deletion(check, repo):
     (repo / "tests/recovery/data").mkdir()
     git(repo, "mv", "tests/recovery/baselines/PC/gauss.json", "tests/recovery/data/gauss.json")
@@ -1598,6 +2072,113 @@ def test_a_change_outside_tests_and_qa_is_not_read(check, repo):
     write(repo, {"src/andrey/__init__.py": "x = 3\n", "tests/unit/data.json": '{"x": 9}'})
     commit(repo)
     assert check.main(["--base", "main"]) == 0
+
+
+# The check and the workflow step that runs it are guarded: a pull request cannot weaken the check
+# it is judged by without a maintainer reading the change.
+
+WORKFLOW = textwrap.dedent("""
+    name: CI
+    jobs:
+      lint:
+        steps:
+          - uses: actions/checkout@v7
+          - name: Weakened tests need a maintainer's approval
+            # Judges the pull request's tests.
+            run: |
+              git show HEAD^1:scripts/test_weakening.py > "$RUNNER_TEMP/test_weakening.py"
+              python -I "$RUNNER_TEMP/test_weakening.py" --base HEAD^1
+          - name: ty
+            run: ty check
+      other:
+        steps:
+          - run: echo hi
+    """)
+CHECK = "print('the check')\n"
+WORKFLOW_FILE = ".github/workflows/ci.yml"
+CHECK_FILE = "scripts/test_weakening.py"
+
+
+@pytest.fixture
+def guarded(repo):
+    """The repository whose base branch already has the check and the step that runs it."""
+    git(repo, "checkout", "-q", "main")
+    write(repo, {CHECK_FILE: CHECK, WORKFLOW_FILE: WORKFLOW})
+    commit(repo)
+    git(repo, "checkout", "-q", "feature")
+    git(repo, "reset", "-q", "--hard", "main")
+    return repo
+
+
+GUARDED = {
+    "the check edited": {CHECK_FILE: "import sys\nsys.exit(0)\n"},
+    "the step edited": {WORKFLOW_FILE: WORKFLOW.replace("--base HEAD^1", "--base HEAD")},
+    "the step renamed": {WORKFLOW_FILE: WORKFLOW.replace("Weakened tests", "Tests")},
+    "the step pointed at the pull request's copy": {
+        WORKFLOW_FILE: WORKFLOW.replace('"$RUNNER_TEMP/test_weakening.py"', CHECK_FILE)
+    },
+    "the step removed": {WORKFLOW_FILE: WORKFLOW.replace("test_weakening", "other")},
+}
+NOT_GUARDED = {
+    "an unrelated edit of the workflow": {
+        WORKFLOW_FILE: WORKFLOW.replace("ty check", "ty check .")
+    },
+    "a reworded comment of the step": {
+        WORKFLOW_FILE: WORKFLOW.replace("Judges the pull request's tests.", "Judges tests.")
+    },
+    "a job added": {WORKFLOW_FILE: WORKFLOW + "  extra:\n    steps:\n      - run: echo x\n"},
+}
+
+
+@pytest.mark.parametrize("name", GUARDED)
+def test_a_change_to_the_check_or_its_step_needs_approval(check, guarded, capsys, name):
+    write(guarded, GUARDED[name])
+    commit(guarded)
+    assert check.main(["--base", "main"]) == 1
+    output = capsys.readouterr().out
+    assert "1 flagged change(s)" in output
+    assert "weakened-test check" in output
+    assert "title=Weakened test::" in output
+
+
+def test_deleting_the_check_needs_approval(check, guarded, capsys):
+    (guarded / CHECK_FILE).unlink()
+    commit(guarded)
+    assert check.main(["--base", "main"]) == 1
+    assert f"{CHECK_FILE}: the weakened-test check was deleted" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name", NOT_GUARDED)
+def test_other_changes_to_the_workflow_need_no_approval(check, guarded, name):
+    write(guarded, NOT_GUARDED[name])
+    commit(guarded)
+    assert check.main(["--base", "main"]) == 0
+
+
+def test_a_change_to_the_check_passes_with_a_label_set_after_the_head_changed(
+    check, guarded, monkeypatch
+):
+    write(guarded, GUARDED["the check edited"])
+    commit(guarded)
+    argv = ["--base", "main", "--pr", "7", "--since", "2026-11-20T12:00:00Z", "--repo", "o/r"]
+    monkeypatch.setattr(check, "label_applied", lambda *args: when("2026-11-20T12:30:00Z"))
+    assert check.main(argv) == 0
+    monkeypatch.setattr(check, "label_applied", lambda *args: when("2026-11-20T11:00:00Z"))
+    assert check.main(argv) == 1
+
+
+def test_a_pull_request_that_adds_the_check_and_its_step_is_not_flagged(check, repo):
+    write(repo, {CHECK_FILE: CHECK, WORKFLOW_FILE: WORKFLOW})
+    commit(repo)
+    assert check.main(["--base", "main"]) == 0
+
+
+def test_the_step_of_this_repository_runs_the_check_of_the_base_branch(check):
+    text = (ROOT / WORKFLOW_FILE).read_text()
+    [(_, step)] = check.workflow_steps(text)
+    assert 'git show HEAD^1:scripts/test_weakening.py > "$detector"' in step
+    assert 'python -I "$detector"' in step
+    assert "python scripts/test_weakening.py" not in step
 
 
 SINCE = "2026-11-20T12:00:00Z"

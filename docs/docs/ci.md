@@ -28,10 +28,13 @@ assertion or `pytest.raises` check, a larger tolerance or a looser bound, a `ski
 that pytest no longer collects it) or `parametrize` case, and a re-recorded baseline file. It prints
 each flagged change with its reason and fails until a maintainer, who has read the flags, sets the
 label `test-change-approved`; re-run the job after the label is set. A push withdraws the approval:
-the maintainer removes the label and sets it again after reading the new flags. An added test, a
-tighter tolerance, and a test that only moved or was renamed are not flagged. The check cannot see
-an assertion rewritten to a weaker one or a tolerance passed through a variable, so it does not
-replace review. To see the flags before you push, run
+the maintainer removes the label and sets it again after reading the new flags. The job runs the
+copy of the script that the base branch has, never the pull request's own, and flags a change to the
+script or to the workflow step that runs it, so a pull request cannot weaken the check it is judged
+by; a pull request that deletes the step from the workflow is for a reviewer to catch. An added
+test, a tighter tolerance, and a test that only moved or was renamed are not flagged. The check
+cannot see an assertion rewritten to a weaker one or a tolerance passed through a variable, so it
+does not replace review. To see the flags before you push, run
 `uv run python scripts/test_weakening.py --base origin/<release branch>`.
 
 Each release's pull request into `main` runs every test, the `release`-marked checks included, and

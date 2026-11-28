@@ -46,7 +46,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: read   # paths-filter reads the PR file list; the weakened-test check, its labels
+      pull-requests: read   # paths-filter reads the PR file list; the weakened-test check, labels
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
@@ -83,26 +83,39 @@ jobs:
         run: |
           uvx ruff check .
           uvx ruff format --check .
-      - name: Sync the dev group
-        run: uv sync --group dev
-      - name: ty (type check)
-        run: uv run --no-sync ty check src/andrey tests/recovery/helpers qa/capture_baselines.py
       - name: Weakened tests need a maintainer's approval
         # Reads the pull request's changes to tests/ and qa/ against its base (the merge commit's
         # first parent) and fails on a removed assertion, a looser tolerance, a new skip, a deleted
         # test, or a re-recorded baseline, unless a maintainer set the label test-change-approved.
-        # It reads the label's events when it runs, so a re-run of this job sees a label set after a
-        # failure; a label set before the event's updated_at (the last push) is stale and does not
-        # count. The release pull request into main is not read: each of its changes passed this
-        # check in its own pull request. DEVELOPMENT.md, AI tools; docs/docs/ci.md.
+        # It runs the copy of scripts/test_weakening.py that the base branch has, never the pull
+        # request's own, and the script flags a change to itself or to this step; the base has no
+        # copy only for the pull request that adds it. It reads the label's events when it runs, so
+        # a re-run of this job sees a label set after a failure; a label set before the event's
+        # updated_at (the last push) is stale and does not count. The release pull request into main
+        # is not read: each of its changes passed this check in its own pull request. It runs before
+        # the pull request's code is installed. DEVELOPMENT.md, AI tools; docs/docs/ci.md.
         if: github.event_name == 'pull_request' && github.base_ref != 'main'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
-        run: >-
-          uv run --no-project python scripts/test_weakening.py
-          --base HEAD^1 --pr "$PR_NUMBER" --since "$PR_UPDATED_AT"
+        run: |
+          git rev-parse --verify --quiet 'HEAD^1^{commit}' > /dev/null \
+            || { echo "::error::The base commit is missing from the checkout."; exit 1; }
+          detector="$RUNNER_TEMP/test_weakening.py"
+          if git cat-file -e HEAD^1:scripts/test_weakening.py 2> /dev/null; then
+            git show HEAD^1:scripts/test_weakening.py > "$detector"
+          else
+            echo "::notice::The base has no weakened-test check; this pull request's copy runs."
+            cp scripts/test_weakening.py "$detector"
+          fi
+          test -s "$detector" || { echo "::error::The weakened-test check is empty."; exit 1; }
+          uv run --no-project python -I "$detector" \
+            --base HEAD^1 --pr "$PR_NUMBER" --since "$PR_UPDATED_AT"
+      - name: Sync the dev group
+        run: uv sync --group dev
+      - name: ty (type check)
+        run: uv run --no-sync ty check src/andrey tests/recovery/helpers qa/capture_baselines.py
 
   checks:
     needs: lint

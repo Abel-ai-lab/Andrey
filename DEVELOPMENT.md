@@ -524,10 +524,13 @@ contributors:
   and fails until the pull request carries the label `test-change-approved`, which a maintainer sets
   after reading the flags; the job reads the label when it runs, so re-run it after the label is
   set. The label approves the head it was set after: a push withdraws it, and a maintainer removes
-  it and sets it again after reading the new flags. An added test, a tightened tolerance, and a test
-  that only moved or was renamed are not flagged, and the release pull request into `main` is not
-  read, since each of its changes passed the check in its own pull request. A person's approval is
-  what the label records, so an agent never sets it. Run
+  it and sets it again after reading the new flags. The job runs the copy of the script that the
+  base branch has, not the pull request's, and a change to the script or to the workflow step that
+  runs it is flagged too, so a pull request cannot weaken the check it is judged by; a workflow
+  change that deletes the step is for the reviewer to catch. An added test, a tightened tolerance,
+  and a test that only moved or was renamed are not flagged, and the release pull request into
+  `main` is not read, since each of its changes passed the check in its own pull request. A person's
+  approval is what the label records, so an agent never sets it. Run
   `uv run python scripts/test_weakening.py --base origin/release/<x.y.z>` before opening the pull
   request to see the flags. A pass is necessary and not sufficient: the check cannot see an
   assertion rewritten to a weaker one, a tolerance passed through a variable, or a check that moved

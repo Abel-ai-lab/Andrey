@@ -5,20 +5,23 @@ record the new output as the baseline, and each of these passes the check withou
 right. This script compares the base and the head of ``tests/`` and ``qa/`` by their syntax trees,
 function by function, and flags:
 
-- a removed ``assert`` statement, ``assert_*`` or ``pytest.fail`` call, ``pytest.raises`` check, or
-  ``pytest.approx`` assertion, and a ``pytest.raises`` that lost its ``match``, widened to
-  ``Exception``, or lists more exceptions;
-- a looser tolerance or bound: a larger ``rtol``, ``atol``, ``abs``, ``rel``, ``tol``, or ``delta``,
-  a smaller ``decimal`` or ``places``, a looser bound in a comparison, an exact comparison turned
-  into ``pytest.approx``, in a call, a default, a module constant, or a tolerance table;
+- a removed ``assert`` statement, ``assert_*``, ``pytest.fail`` or ``self.fail`` call,
+  ``pytest.raises`` check, or ``pytest.approx`` assertion, and a ``pytest.raises`` that lost its
+  ``match`` (or matches every message), widened to ``Exception``, or lists more exceptions;
+- a looser tolerance or bound: a larger ``rtol``, ``atol``, ``abs``, ``rel``, ``tol``, or ``delta``
+  (a ``delta`` of ``assertAlmostEqual`` replaces its ``places``), a smaller ``decimal`` or
+  ``places``, a looser bound in a comparison, an exact comparison turned into ``pytest.approx``, in
+  a call, a default, a module constant, or a tolerance table;
 - a new ``skip``, ``skipif``, or ``xfail`` marker or call, or a new ``release`` marker (a pull
-  request into a release branch skips those tests), on a test that existed in the base, written out
-  or through a module name bound to one;
+  request into a release branch skips those tests), on a test that existed in the base, written out,
+  through a module name bound to one, or through an alias of ``pytest``; a ``skipif`` made always
+  true, and an ``xfail`` made non-strict or without its ``raises``;
 - a deleted test function or parametrized fixture, a test file renamed out of the names pytest
-  collects, or a removed ``parametrize`` case (a literal list, tuple, set, or ``range``; a case
-  that another replaced counts as removed);
+  collects (or into another kind of file), or a removed ``parametrize`` case (a literal list,
+  tuple, set, or ``range``; a case that another replaced counts as removed);
 - a re-recorded baseline file: a changed or deleted file of ``baselines/`` or named for one, and a
-  JSON baseline whose recorded values changed.
+  JSON baseline whose recorded values changed;
+- a change to this script or to the workflow step that runs it (see below).
 
 An added test, a tightened tolerance, and a test that only moved or was renamed are not flagged. It
 cannot see an assertion rewritten to a weaker one, a tolerance passed through a variable, or a
@@ -33,6 +36,11 @@ parent ``HEAD^1``. ``--pr`` reads the label's events from GitHub with ``gh`` (``
 maintainer removes the label and sets it again after reading the new flags. It exits 2 when it
 cannot decide.
 
+CI runs the copy of this script that the base branch has, never the pull request's own, so a pull
+request cannot weaken the check it is judged by: it flags a change to this file, and to the
+workflow step that runs it, like any other weakening. The workflow file itself is the pull
+request's, so a pull request that deletes the step is for a reviewer to catch.
+
     python3 scripts/test_weakening.py --base HEAD^1 --pr 123 --since 2026-11-20T12:00:00Z
 """
 
@@ -43,6 +51,7 @@ import ast
 import copy
 import fnmatch
 import json
+import math
 import operator
 import os
 import re
@@ -55,6 +64,9 @@ from typing import Any, NamedTuple
 
 LABEL = "test-change-approved"
 ROOTS = ("tests", "qa")
+# This script and the workflow that runs it: a change to either needs the label too.
+DETECTOR = "scripts/test_weakening.py"
+WORKFLOW = ".github/workflows/ci.yml"
 
 LARGER_IS_LOOSER = frozenset(
     {"rtol", "atol", "rel_tol", "abs_tol", "rel", "abs", "tol", "tolerance", "eps", "epsilon"}
@@ -79,7 +91,7 @@ POSITIONAL = {
     "assert_approx_equal": {2: "significant"},
     "assert_array_almost_equal_nulp": {2: "nulp"},
     "assert_array_max_ulp": {2: "maxulp"},
-    "assertAlmostEqual": {2: "places"},
+    "assertAlmostEqual": {2: "places", 4: "delta"},
 }
 DEFAULTS = {
     "assert_allclose": {"rtol": 1e-7, "atol": 0.0},
@@ -145,6 +157,7 @@ class Unit(NamedTuple):
     constants: dict[str, ast.AST]
     aliases: dict[str, str] = {}
     collected: bool = True
+    imports: dict[str, str] = {}
 
     @property
     def is_function(self) -> bool:
@@ -174,6 +187,7 @@ class Knob(NamedTuple):
     value: float
     larger_is_looser: bool
     strict: bool = False
+    shown: str = ""  # how a report writes the value when it is not the number itself
 
 
 def _callee(node: ast.AST) -> str:
@@ -184,7 +198,7 @@ def _callee(node: ast.AST) -> str:
 
 
 def _tolerance_callee(call: ast.Call) -> str:
-    """Return the callee a call's tolerance knobs are read for: ``math.isclose`` apart from NumPy's."""
+    """Return the callee whose tolerance knobs a call has: ``math.isclose`` apart from NumPy's."""
     func = call.func
     if (
         isinstance(func, ast.Attribute)
@@ -285,7 +299,34 @@ def _scope_nodes(root: ast.AST, definitions: list[ast.AST]) -> Iterator[ast.AST]
         stack.extend(ast.iter_child_nodes(node))
 
 
-def _marker_kind(node: ast.AST) -> str:
+def _imports(tree: ast.AST) -> dict[str, str]:
+    """Return what each imported name stands for: ``{"pt": "pytest", "sk": "pytest.skip"}``."""
+    found = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                found[alias.asname or alias.name.split(".")[0]] = (
+                    alias.name if alias.asname else alias.name.split(".")[0]
+                )
+        elif isinstance(node, ast.ImportFrom):
+            module = "." * node.level + (node.module or "")
+            for alias in node.names:
+                found[alias.asname or alias.name] = f"{module}.{alias.name}"
+    return found
+
+
+def _dotted(node: ast.AST, imports: dict[str, str]) -> str:
+    """Return the dotted name of a name or attribute chain, its first name read through imports."""
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return ""
+    return ".".join([imports.get(node.id, node.id), *reversed(parts)])
+
+
+def _marker_kind(node: ast.AST, imports: dict[str, str] | None = None) -> str:
     """Return ``pytest.mark.skip`` and the like for ``pytest.mark.skip`` or ``mark.skip``."""
     if (
         isinstance(node, ast.Attribute)
@@ -296,13 +337,41 @@ def _marker_kind(node: ast.AST) -> str:
         )
     ):
         return f"pytest.mark.{node.attr}"
+    dotted = _dotted(node, imports or {}).split(".")
+    if len(dotted) == 3 and dotted[:2] == ["pytest", "mark"] and dotted[2] in MARKERS:
+        return ".".join(dotted)
     return ""
 
 
-def _collected_class(node: ast.ClassDef) -> bool:
-    """Whether pytest collects the methods of a class: named ``Test...`` or a ``TestCase``."""
-    bases = {_callee(base) for base in node.bases}
-    return node.name.startswith("Test") or "TestCase" in bases
+def _collected_class(
+    node: ast.ClassDef,
+    classes: dict[str, ast.ClassDef],
+    imports: dict[str, str],
+    seen: frozenset[str] = frozenset(),
+) -> bool:
+    """Whether pytest collects the methods of a class.
+
+    A class named ``Test...`` is collected, and so is one that derives from a ``TestCase``, directly
+    or through classes of the file. A base imported from another module cannot be read, so it counts
+    as one that may derive from a ``TestCase``.
+    """
+    seen = seen | {node.name}
+    if node.name.startswith("Test"):
+        return True
+    for base in node.bases:
+        if _dotted(base, imports).endswith("TestCase"):
+            return True
+        root = base
+        while isinstance(root, ast.Attribute):
+            root = root.value
+        if not isinstance(root, ast.Name):
+            continue
+        if isinstance(base, ast.Name) and base.id in classes:
+            if base.id not in seen and _collected_class(classes[base.id], classes, imports, seen):
+                return True
+        elif root.id in imports:
+            return True
+    return False
 
 
 def collect(path: str, source: str) -> dict[str, Unit]:
@@ -318,10 +387,12 @@ def collect(path: str, source: str) -> dict[str, Unit]:
             continue
         if isinstance(target, ast.Name):
             constants[target.id] = value
+    imports = _imports(tree)
+    classes = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)}
     # A module name bound to a marker, such as ``SKIP = pytest.mark.skip(reason="slow")``.
     aliases = {}
     for name, value in constants.items():
-        kind = _marker_kind(value.func if isinstance(value, ast.Call) else value)
+        kind = _marker_kind(value.func if isinstance(value, ast.Call) else value, imports)
         if kind:
             aliases[name] = kind
     units: dict[str, Unit] = {}
@@ -332,10 +403,14 @@ def collect(path: str, source: str) -> dict[str, Unit]:
             nodes = list(_scope_nodes(root, definitions))
         else:
             nodes = list(ast.walk(root))
-        units[qualname] = Unit(path, qualname, root, nodes, source, constants, aliases, collected)
+        units[qualname] = Unit(
+            path, qualname, root, nodes, source, constants, aliases, collected, imports
+        )
         for child in definitions:
             name = getattr(child, "name", "")
-            inside = isinstance(child, ast.ClassDef) and not _collected_class(child)
+            inside = isinstance(child, ast.ClassDef) and not _collected_class(
+                child, classes, imports
+            )
             add(
                 child,
                 name if qualname == "<module>" else f"{qualname}.{name}",
@@ -346,12 +421,31 @@ def collect(path: str, source: str) -> dict[str, Unit]:
     return units
 
 
-def _pytest_call(node: ast.AST) -> str:
-    """Return ``fail`` for the call ``pytest.fail(...)`` and so on, else an empty string."""
+def _pytest_call(node: ast.AST, imports: dict[str, str]) -> str:
+    """Return ``fail`` for the call ``pytest.fail(...)`` and so on, else an empty string.
+
+    The call may be written through an alias (``pt.fail``) or imported by name (``fail``).
+    """
     func = node.func if isinstance(node, ast.Call) else None
+    if func is None:
+        return ""
+    dotted = _dotted(func, imports).split(".")
+    if len(dotted) == 2 and dotted[0] == "pytest":
+        return dotted[1]
     if isinstance(func, ast.Attribute) and _callee(func.value) == "pytest":
         return func.attr
     return ""
+
+
+def _self_fail(node: ast.AST) -> bool:
+    """Whether a node is the call ``self.fail(...)`` of a ``unittest.TestCase``."""
+    func = node.func if isinstance(node, ast.Call) else None
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "fail"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "self"
+    )
 
 
 def _checks(unit: Unit) -> list[Check]:
@@ -361,7 +455,8 @@ def _checks(unit: Unit) -> list[Check]:
         if (
             isinstance(node, ast.Assert)
             or name.startswith("assert")
-            or _pytest_call(node) == "fail"
+            or _pytest_call(node, unit.imports) == "fail"
+            or _self_fail(node)
         ):
             checks.append(Check("assert", node, _key(node)))
         elif name in RAISES:
@@ -379,7 +474,11 @@ def _call_knobs(call: ast.Call) -> list[Knob]:
     opaque: set[str] = set()
     positional = POSITIONAL.get(name, {})
     named = [(positional[i], arg) for i, arg in enumerate(call.args) if i in positional]
-    named += [(kw.arg, kw.value) for kw in call.keywords if kw.arg in TOLERANCES]
+    named += [
+        (kw.arg, kw.value)
+        for kw in call.keywords
+        if kw.arg in TOLERANCES and not (kw.arg == "delta" and _is_none(kw.value))
+    ]
     for tolerance, value in named:
         number = _number(value)
         if number is None:
@@ -394,6 +493,13 @@ def _call_knobs(call: ast.Call) -> list[Knob]:
         if relative is None:
             relative = 0.0 if absolute is not None else APPROX_DEFAULT_REL
         given = {"rel": relative, "abs": APPROX_DEFAULT_ABS if absolute is None else absolute}
+    elif name == "assertAlmostEqual" and ("delta" in given or "delta" in opaque):
+        # A delta replaces the places: read it as the places that allow the same difference.
+        if "delta" in opaque:
+            return []
+        delta = given["delta"]
+        places = -math.log10(2 * delta) if delta > 0 else math.inf
+        return [Knob(("call", name, "places"), "places", places, False, shown=f"delta={delta:g}")]
     else:
         given = {**{k: v for k, v in DEFAULTS.get(name, {}).items() if k not in opaque}, **given}
     return [
@@ -479,6 +585,10 @@ def _own_knobs(unit: Unit) -> list[Knob]:
     return knobs
 
 
+def _shown(knob: Knob) -> str:
+    return knob.shown or f"{knob.value:g}"
+
+
 def _looser(before: list[Knob], after: list[Knob]) -> list[str]:
     """Return why a tolerance or bound of ``after`` is looser than its match in ``before``."""
     by_context: dict[tuple, list[Knob]] = defaultdict(list)
@@ -494,14 +604,21 @@ def _looser(before: list[Knob], after: list[Knob]) -> list[str]:
         old = by_context[knob.context][index]
         looser = knob.value > old.value if knob.larger_is_looser else knob.value < old.value
         if looser:
-            reasons.append(f"{knob.label} loosened from {old.value:g} to {knob.value:g}")
+            reasons.append(f"{knob.label} loosened from {_shown(old)} to {_shown(knob)}")
         elif knob.value == old.value and old.strict and not knob.strict:
             reasons.append(f"{knob.label} loosened from strict to non-strict at {knob.value:g}")
     return reasons
 
 
-def _first_name(call: ast.Call) -> str:
-    return _callee(call.args[0]) if call.args else ""
+def _is_none(node: ast.AST | None) -> bool:
+    return isinstance(node, ast.Constant) and node.value is None
+
+
+def _listed(call: ast.Call) -> frozenset[str]:
+    """Return the names of the exceptions a ``pytest.raises`` lists that the source writes out."""
+    first = call.args[0] if call.args else None
+    elements = first.elts if isinstance(first, ast.Tuple | ast.List) else [first]
+    return frozenset(name for e in elements if e is not None and (name := _callee(e)))
 
 
 def _accepted(call: ast.Call) -> frozenset[str] | None:
@@ -513,20 +630,34 @@ def _accepted(call: ast.Call) -> frozenset[str] | None:
     return frozenset(names) if first is not None and all(names) else None
 
 
+# Messages a pattern is tested on: one that matches all of them limits nothing (``""``, ``.*``).
+PROBES = ("", "x", "Error: 1 2")
+
+
+def _limits_message(value: ast.expr) -> bool:
+    """Whether a ``match`` of ``pytest.raises`` limits the message: not ``None``, not match-all."""
+    if _is_none(value):
+        return False
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+        try:
+            return not all(re.search(value.value, probe) for probe in PROBES)
+        except re.error:
+            return True
+    return True
+
+
 def _matches(call: ast.Call) -> bool:
-    """Whether a ``pytest.raises`` checks the message: it has a ``match`` that is not ``None``."""
-    return any(
-        k.arg == "match" and not (isinstance(k.value, ast.Constant) and k.value.value is None)
-        for k in call.keywords
-    )
+    """Whether a ``pytest.raises`` checks the message: it has a ``match`` that limits it."""
+    return any(k.arg == "match" and _limits_message(k.value) for k in call.keywords)
 
 
 def _raises_reasons(before: ast.Call, after: ast.Call) -> list[str]:
     reasons = []
     if _matches(before) and not _matches(after):
         reasons.append("pytest.raises lost its match")
-    if _first_name(after) in BROAD and _first_name(before) not in BROAD:
-        reasons.append(f"pytest.raises widened to {_first_name(after)}")
+    broad = _listed(after) & BROAD
+    if broad and not _listed(before) & BROAD:
+        reasons.append(f"pytest.raises widened to {', '.join(sorted(broad))}")
     old, new = _accepted(before), _accepted(after)
     if old is not None and new is not None and old < new:
         reasons.append(f"pytest.raises accepts {', '.join(sorted(new - old))} as well")
@@ -556,7 +687,7 @@ def _markers(unit: Unit, exempt: frozenset[str] = frozenset()) -> dict[str, list
     for node in sorted(unit.nodes, key=_position):
         if id(node) in skipped:
             continue
-        if kind := _marker_kind(node):
+        if kind := _marker_kind(node, unit.imports):
             found[kind].append(node)
         elif (
             isinstance(node, ast.Name)
@@ -564,7 +695,7 @@ def _markers(unit: Unit, exempt: frozenset[str] = frozenset()) -> dict[str, list
             and node.id in unit.aliases
         ):
             found[unit.aliases[node.id]].append(node)
-        elif (call := _pytest_call(node)) in SKIP_CALLS:
+        elif (call := _pytest_call(node, unit.imports)) in SKIP_CALLS:
             found[f"pytest.{call}()"].append(node)
     return found
 
@@ -685,25 +816,73 @@ def _check_findings(old: Unit, new: Unit, flag: Flag) -> None:
         flag(None, reason)
 
 
+def _marker_uses(unit: Unit, kind: str) -> list[ast.expr]:
+    """List the uses of one marker in a unit in order: ``pytest.mark.xfail(...)`` or a bare one."""
+    nodes = sorted(unit.nodes, key=_position)
+    called = {id(node.func) for node in nodes if isinstance(node, ast.Call)}
+    return [
+        node
+        for node in nodes
+        if isinstance(node, ast.expr)
+        and (
+            (isinstance(node, ast.Call) and _marker_kind(node.func, unit.imports) == kind)
+            or (id(node) not in called and _marker_kind(node, unit.imports) == kind)
+        )
+    ]
+
+
+def _keywords(use: ast.expr) -> dict[str, ast.expr]:
+    return {k.arg: k.value for k in use.keywords if k.arg} if isinstance(use, ast.Call) else {}
+
+
 def _skipifs(unit: Unit) -> list[tuple[ast.Call, bool]]:
-    """List the ``skipif`` markers of a unit in order, with whether the condition is a literal true."""
+    """List a unit's ``skipif`` markers in order, with whether the condition is a literal true."""
     found = []
-    for node in sorted(unit.nodes, key=_position):
-        if isinstance(node, ast.Call) and _marker_kind(node.func) == "pytest.mark.skipif":
-            keywords = {k.arg: k.value for k in node.keywords}
-            condition = node.args[0] if node.args else keywords.get("condition")
+    for node in _marker_uses(unit, "pytest.mark.skipif"):
+        if isinstance(node, ast.Call):
+            condition = node.args[0] if node.args else _keywords(node).get("condition")
             found.append((node, isinstance(condition, ast.Constant) and bool(condition.value)))
     return found
+
+
+def _strict(use: ast.expr) -> bool | None:
+    """Whether an ``xfail`` marker fails a test that passes: None if ``strict`` is not literal.
+
+    A marker that does not say is not strict: ``pyproject.toml`` leaves ``xfail_strict`` unset.
+    """
+    value = _keywords(use).get("strict")
+    if value is None:
+        return False
+    return bool(value.value) if isinstance(value, ast.Constant) else None
+
+
+def _xfail_reasons(before: ast.expr, after: ast.expr) -> list[str]:
+    reasons = []
+    if _strict(before) is True and _strict(after) is False:
+        reasons.append("xfail made non-strict")
+    if "raises" in _keywords(before) and "raises" not in _keywords(after):
+        reasons.append("xfail lost its raises")
+    return reasons
 
 
 def _marker_findings(old: Unit, new: Unit, flag: Flag, exempt: frozenset[str]) -> None:
     """Flag the skip, xfail, and release markers a unit gained, but not in an exempt constant.
 
-    A ``skipif`` that stays and whose condition becomes a literal true also skips the test.
+    A ``skipif`` that stays and whose condition becomes a literal true also skips the test, and an
+    ``xfail`` that stays and turns non-strict or loses its ``raises`` also lets a failure pass.
     """
     for (_, was), (call, now) in zip(_skipifs(old), _skipifs(new)):
         if now and not was:
             flag(call, "skipif condition made always true", [], [_clip(_text(new, call))])
+    xfail = "pytest.mark.xfail"
+    for before_use, after_use in zip(_marker_uses(old, xfail), _marker_uses(new, xfail)):
+        if reasons := _xfail_reasons(before_use, after_use):
+            flag(
+                after_use,
+                "; ".join(reasons),
+                [_clip(_text(old, before_use))],
+                [_clip(_text(new, after_use))],
+            )
     before = _markers(old, exempt)
     for name, nodes in _markers(new, exempt).items():
         extra = len(nodes) - len(before.get(name, []))
@@ -768,7 +947,7 @@ def _body_key(unit: Unit) -> str:
 
 
 def _collected(path: str) -> bool:
-    """Whether pytest collects tests from a file: under its test folders, with a name it collects."""
+    """Whether pytest collects tests from a file: in its test folders, under a name it collects."""
     name = path.rsplit("/", 1)[-1]
     return any(path.startswith(f"{root}/") for root in TESTPATHS) and any(
         fnmatch.fnmatch(name, pattern) for pattern in COLLECTED
@@ -802,9 +981,6 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
     fixtures: list[Unit] = []
     added: list[Unit] = []
     added_fixtures: list[Unit] = []
-    names: set[str] = (
-        set()
-    )  # every function of the new files, to tell a moved fixture from a gone one
     for change in changes:
         if change.old is None:
             # A new file has nothing to compare with, but a test moved into it is not a deletion.
@@ -814,7 +990,6 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
                 continue
             added += [u for u in new_file.values() if u.is_test]
             added_fixtures += [u for u in new_file.values() if _is_fixture(u)]
-            names.update(u.qualname.rsplit(".", 1)[-1] for u in new_file.values() if u.is_function)
             continue
         try:
             old_units = collect(change.old_path, change.old)
@@ -831,7 +1006,6 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
             # Renamed out of the names pytest collects: the tests are gone, not moved.
             reason = f"test no longer collected: the file was renamed to {change.path}"
             new_units = {}
-        names.update(u.qualname.rsplit(".", 1)[-1] for u in new_units.values() if u.is_function)
         exempt = _only_added_tests(old_units, new_units)
         for name, unit in old_units.items():
             if name in new_units:
@@ -846,14 +1020,17 @@ def analyze(changes: Sequence[Change]) -> list[Finding]:
         added_fixtures += [u for n, u in new_units.items() if n not in old_units and _is_fixture(u)]
     for unit in fixtures:
         name = unit.qualname.rsplit(".", 1)[-1]
-        if name not in names:
+        # A fixture that moved is an added parametrized fixture of the same name; a function of that
+        # name that is not one is no move.
+        same = [a for a in added_fixtures if a.qualname.rsplit(".", 1)[-1] == name]
+        if len(same) == 1:
+            findings += compare(unit, same[0])
+        else:
             line = _position(unit.node)[0]
             reason = "parametrized fixture deleted"
             findings.append(
                 Finding(unit.path, line, unit.qualname, reason, _clip(_text(unit, unit.node)))
             )
-        elif len(same := [a for a in added_fixtures if a.qualname.rsplit(".", 1)[-1] == name]) == 1:
-            findings += compare(unit, same[0])
     for unit, reason in deleted:
         key = _body_key(unit)
         name = unit.qualname.rsplit(".", 1)[-1]
@@ -958,9 +1135,76 @@ def load(base: str, head: str, root: str) -> tuple[list[Change], list[Finding]]:
             findings += baseline_findings(old_path, old, None)  # renamed out of the baselines
         elif path.endswith(".py") and path.split("/")[0] in ROOTS:
             changes.append(Change(path, old_path, _text_of(old), _text_of(new)))
+        elif old is not None and old_path.endswith(".py") and old_path.split("/")[0] in ROOTS:
+            # A Python file renamed to another kind of file: its tests are gone.
+            changes.append(Change(path, old_path, _text_of(old), None))
         elif _is_baseline(path):
             findings += baseline_findings(path, old, new)
     return changes, findings
+
+
+def _exists(root: str, revision: str, path: str) -> bool:
+    return bool(_git("ls-tree", "--name-only", revision, "--", path, root=root).strip())
+
+
+def workflow_steps(workflow: str) -> list[tuple[int, str]]:
+    """Return the steps of a workflow file that run this script, found by content: (line, text).
+
+    A step is the list item around a line that names the script, up to the next line at or left of
+    its dash. Its text leaves out blank lines and comments, so a reworded comment is not a change.
+    """
+    lines = workflow.splitlines()
+    starts = set()
+    for index, line in enumerate(lines):
+        if DETECTOR.rsplit("/", 1)[-1][:-3] not in line or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        for i in range(index, -1, -1):
+            dash = len(lines[i]) - len(lines[i].lstrip())
+            if lines[i].lstrip().startswith("- ") and (i == index or dash < indent):
+                starts.add(i)
+                break
+    steps = []
+    for start in sorted(starts):
+        dash = len(lines[start]) - len(lines[start].lstrip())
+        end = len(lines)
+        for i in range(start + 1, len(lines)):
+            text = lines[i].lstrip()
+            if text and not text.startswith("#") and len(lines[i]) - len(text) <= dash:
+                end = i
+                break
+        body = [ln.rstrip() for ln in lines[start:end] if ln.strip()]
+        steps.append((start + 1, "\n".join(ln for ln in body if not ln.lstrip().startswith("#"))))
+    return steps
+
+
+def guard_findings(base: str, head: str, root: str) -> list[Finding]:
+    """Flag a change to this script or to the workflow step that runs it.
+
+    CI runs the copy of this script on the base branch, so a pull request cannot weaken the check
+    it is judged by without a maintainer reading the change. A file the base does not have yet is
+    not a change.
+    """
+    merge_base = _git("merge-base", base, head, root=root).decode().strip()
+    findings = []
+    if _exists(root, merge_base, DETECTOR):
+        if not _exists(root, head, DETECTOR):
+            findings.append(Finding(DETECTOR, 0, "", "the weakened-test check was deleted"))
+        elif _show(root, head, DETECTOR) != _show(root, merge_base, DETECTOR):
+            findings.append(Finding(DETECTOR, 0, "", "the weakened-test check changed"))
+    if _exists(root, merge_base, WORKFLOW):
+        before = workflow_steps(_show(root, merge_base, WORKFLOW).decode("utf-8", "replace"))
+        text = (
+            _show(root, head, WORKFLOW).decode("utf-8", "replace")
+            if _exists(root, head, WORKFLOW)
+            else ""
+        )
+        after = workflow_steps(text)
+        if before and [step for _, step in before] != [step for _, step in after]:
+            line = after[0][0] if after else 0
+            reason = "the workflow step that runs the weakened-test check changed or was removed"
+            findings.append(Finding(WORKFLOW, line, "", reason))
+    return findings
 
 
 def report(findings: Sequence[Finding]) -> str:
@@ -1018,7 +1262,7 @@ def main(argv: Sequence[str] = ()) -> int:
     try:
         root = _git("rev-parse", "--show-toplevel").decode().strip()
         changes, findings = load(args.base, args.head, root)
-        findings = [*analyze(changes), *findings]
+        findings = [*analyze(changes), *findings, *guard_findings(args.base, args.head, root)]
         if not findings:
             print(f"No weakened test between {args.base} and {args.head}.")
             return 0
