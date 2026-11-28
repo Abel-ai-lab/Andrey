@@ -28,7 +28,7 @@ env:
   # run, and a call from deploy-prod.yml run every test (an empty `-m` selects them all).
   TEST_MARKS: ${{ github.event_name == 'pull_request' && github.base_ref != 'main' && 'not release' || '' }}
 
-# Jobs that need more (lint's PR file list) say so themselves.
+# Jobs that need more (lint's PR file list, the label of test-weakening) say so themselves.
 permissions:
   contents: read
 
@@ -84,6 +84,59 @@ jobs:
         run: uv sync --group dev
       - name: ty (type check)
         run: uv run --no-sync ty check src/andrey tests/recovery/helpers qa/capture_baselines.py
+
+  # A required check, by its stable name: a pull request into a release or topic branch whose
+  # changes to tests/ and qa/ weaken a test fails here until a maintainer sets the label
+  # test-change-approved. It is a job of its own so that its name can be required; it runs on every
+  # pull request that runs CI, so that the context always reports, and reads only one into a
+  # branch other than main (the release pull request into main is not read: each of its changes
+  # passed this check in its own pull request). DEVELOPMENT.md, AI tools; docs/docs/ci.md.
+  test-weakening:
+    if: >-
+      github.repository_owner == 'Abel-ai-lab'
+      && github.event_name == 'pull_request'
+      && !github.event.pull_request.draft
+      && (github.event.pull_request.head.repo.full_name == github.repository || !vars.CI_RUNNER)
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read   # the label's events
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # A pull request's merge commit and its two parents.
+          fetch-depth: 2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Weakened tests need a maintainer's approval
+        # Reads the pull request's changes to tests/ and qa/ against its base (the merge commit's
+        # first parent) and fails on a removed assertion, a looser tolerance, a new skip, a deleted
+        # test, or a re-recorded baseline, unless a maintainer set the label test-change-approved.
+        # It runs the copy of scripts/test_weakening.py that the base branch has, never the pull
+        # request's own, and the script flags a change to itself or to this job; the base has no
+        # copy only for the pull request that adds it. It reads the label's events when it runs, so
+        # a re-run of this job sees a label set after a failure; a label set before the event's
+        # updated_at (the last push) is stale and does not count.
+        if: github.base_ref != 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
+        run: |
+          git rev-parse --verify --quiet 'HEAD^1^{commit}' > /dev/null \
+            || { echo "::error::The base commit is missing from the checkout."; exit 1; }
+          detector="$RUNNER_TEMP/test_weakening.py"
+          if git cat-file -e HEAD^1:scripts/test_weakening.py 2> /dev/null; then
+            git show HEAD^1:scripts/test_weakening.py > "$detector"
+          else
+            echo "::notice::The base has no weakened-test check; this pull request's copy runs."
+            cp scripts/test_weakening.py "$detector"
+          fi
+          test -s "$detector" || { echo "::error::The weakened-test check is empty."; exit 1; }
+          uv run --no-project python -I "$detector" \
+            --base HEAD^1 --pr "$PR_NUMBER" --since "$PR_UPDATED_AT"
 
   checks:
     needs: lint
@@ -173,7 +226,7 @@ jobs:
   # one pending forever. This job runs on every non-draft event and turns "passed or skipped" into
   # one green context.
   ci-gate:
-    needs: [lint, checks, build-install, extras]
+    needs: [lint, test-weakening, checks, build-install, extras]
     if: always() && !github.event.pull_request.draft
     runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-24.04"') }}
     timeout-minutes: 5
@@ -181,6 +234,7 @@ jobs:
       - name: Every gated job passed or was skipped
         run: |
           for r in '${{ needs.lint.result }}' \
+                   '${{ needs.test-weakening.result }}' \
                    '${{ needs.checks.result }}' \
                    '${{ needs.build-install.result }}' \
                    '${{ needs.extras.result }}'; do
