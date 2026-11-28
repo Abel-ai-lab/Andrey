@@ -111,6 +111,11 @@ names its pull request.
   each from the table of single-edge moves, where it already sits. A fit's peak memory falls only
   where the scan sets it, as with many variables and few rows. Results are unchanged, bit for bit.
   ([#1370])
+- With more than one worker, the skeleton search of `pc`, `fci`, `fci_jci`, `gfci`, `cdnod`, and
+  `rsmax2` with `restrict="pc"` sends each worker the adjacency of a conditioning-size pass at one
+  bit per entry instead of one byte, and a worker rebuilds its neighbor lists from it a row at a
+  time, so a worker holds an eighth of the bytes it held for the pass. `pc` no longer copies its
+  adjacency for each pass. Results are unchanged, bit for bit. ([#1378])
 - With more than one worker on Linux, the workers of GES, of the skeleton and possible-d-separation
   searches (PC, FCI, FCI-JCI, GFCI, CD-NOD, and RSMAX2 with `restrict="pc"`), and of a list of
   targets (IAMB, Inter-IAMB, and MMPC) read one shared copy of the covariance or correlation matrix
@@ -3311,3 +3316,4 @@ First alpha release.
 [#1369]: https://github.com/Abel-ai-lab/Andrey/pull/1369
 [#1370]: https://github.com/Abel-ai-lab/Andrey/pull/1370
 [#1371]: https://github.com/Abel-ai-lab/Andrey/pull/1371
+[#1378]: https://github.com/Abel-ai-lab/Andrey/pull/1378
