@@ -434,7 +434,7 @@ median SHD over the draws is:
 `quality_baselines.json` holds the baselines, and in its `tolerances` block every tolerance with the
 reason for its size. A median better than the baseline by more than the tolerance also fails, so an
 intended change is recorded by a recapture. A pull request whose recapture changes a recorded value
-or a tolerance is flagged by the weakened-test check until a maintainer sets the label
+or a tolerance is flagged by the check of changes to tests until a maintainer sets the label
 `test-change-approved` (`DEVELOPMENT.md`, AI tools); a baseline for a new method is not flagged.
 Every fit runs on the numpy backend with one worker and
 one BLAS thread, so the host's accelerators and core count do not enter the result; the tolerances

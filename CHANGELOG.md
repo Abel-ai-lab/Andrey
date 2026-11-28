@@ -281,13 +281,14 @@ names its pull request.
   return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
   there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
   free cores. ([#1369])
-- For contributors, the `test-weakening` job of a pull request into a release or topic branch runs
-  `scripts/test_weakening.py`, which flags a removed assertion or `pytest.raises` check, a looser
-  tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that existed,
-  a warning filter that lets a warning pass, a deleted test or `parametrize` case, and a re-recorded
-  baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it and flags a
-  change to the script or to its workflow job, it is a required check, `.github/` and the script
-  have code owners, and it fails until a maintainer sets the label `test-change-approved`. ([#1358])
+- For contributors, the `check-test-changes` job of a pull request into a release or topic branch
+  runs `scripts/check_test_changes.py`, which flags a removed assertion or `pytest.raises` check, a
+  looser tolerance or bound, a `skip`, `skipif`, `xfail`, or `release` marker added to a test that
+  existed, a warning filter that lets a warning pass, a deleted test or `parametrize` case, and a
+  re-recorded baseline file in `tests/` and `qa/`. The job runs the script as the base branch has it
+  and flags a change to the script or to its workflow job, it is a required check, `.github/` and
+  the script have code owners, and it fails until a maintainer sets the label
+  `test-change-approved`. ([#1358])
 - The `gcm` and `wgcm` tests, and the `pcm` test with `regression="boosting"`, grow the boosted
   trees of their cross-validation folds in a lean loop over scikit-learn's decision trees, not in a
   gradient-boosting fit per fold, so the methods that take them as `indep_test` run faster, with the
@@ -307,6 +308,12 @@ names its pull request.
   them only after a check at import that they return the bytes of `linprog` on small programs of the
   same form, and `linprog` solves the program with SciPy before 1.15 and wherever the check fails.
   ([#1383])
+- For contributors, the `check-test-changes` job also flags a `conftest.py` that sets
+  `collect_ignore` or `collect_ignore_glob`, a `__test__ = False` added to a module or a function, a
+  string `skipif` or `xfail` condition made `True`, a `pytest.raises` widened from `Exception` to
+  `BaseException`, a `test_*` function that becomes a fixture, a `parametrize` with no case added,
+  an `xfail` that gains `run=False`, a new `setup_module`, `setup_class`, `setup_method`, or
+  `setup_function` that skips, and a function of `qa/` that is deleted or emptied. ([#1381])
 
 ### Fixed
 
@@ -3339,3 +3346,4 @@ First alpha release.
 [#1378]: https://github.com/Abel-ai-lab/Andrey/pull/1378
 [#1373]: https://github.com/Abel-ai-lab/Andrey/pull/1373
 [#1383]: https://github.com/Abel-ai-lab/Andrey/pull/1383
+[#1381]: https://github.com/Abel-ai-lab/Andrey/pull/1381
