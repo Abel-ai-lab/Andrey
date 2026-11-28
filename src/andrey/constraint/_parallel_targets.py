@@ -56,8 +56,8 @@ T = TypeVar("T")
 #: Intel Xeon Gold 6542Y server with 2, 4, and 8 workers, a fit on the first pool of its process,
 #: the start included, beat the serial fit of each learner from about 120,000 pairs (Inter-IAMB) to
 #: about 280,000 (MMPC on 2 workers), and at 359,400 pairs, 600 variables, every case took 0.26 to
-#: 0.84 of the serial time. The first pool of a process starts in about 1.4 s, a later one in about 0.05 s.
-#: The default stays above the crossovers.
+#: 0.84 of the serial time. The first pool of a process starts in about 1.4 s, a later one in about
+#: 0.05 s. The default stays above the crossovers.
 MIN_POOL_BLANKET_WORK: int = 350_000
 
 #: Chunks per worker: smaller chunks balance unequal target costs; workers keep searches across
