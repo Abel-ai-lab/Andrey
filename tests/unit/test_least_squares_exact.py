@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from scipy.linalg import lstsq
 from sklearn.linear_model import LinearRegression
 
 from andrey.core.units import _RANK_CUTOFF, least_squares, unit_factors
@@ -69,27 +68,32 @@ def test_columns_on_different_scales(seed: int) -> None:
     assert_same(X[:, :5] * scales[:5], X[:, 5:] * scales[5:])
 
 
+def near_copy(gap: float) -> np.ndarray:
+    """Columns 0 to 2 where column 2 is column 0 plus ``gap`` times an independent column 5."""
+    X = data(400, 6, seed=11)
+    X[:, 2] = X[:, 0] + gap * X[:, 5]
+    return X
+
+
 @pytest.mark.parametrize("gap", [1e-3, 1e-5, 1e-7, 1e-9, 1e-12, 0.0])
-def test_a_design_below_the_rank_cutoff(gap: float) -> None:
-    """A near-copy column, the singular-value ratio from above to far below ``tol``, drops alike."""
-    X = data(400, 5, seed=11)
-    X[:, 2] = X[:, 0] + gap * X[:, 1]
+def test_a_near_copy_column(gap: float) -> None:
+    """The smallest singular value runs from above ``tol`` to far below it, to an exact copy."""
+    X = near_copy(gap)
     assert_same(X[:, :3], X[:, 3])
     assert_same(X[:, :3], X[:, 3:5])
 
 
-def test_the_near_copy_case_exercises_the_cutoff() -> None:
-    """Its smallest singular value lies below ``tol`` and ``cond=None`` would solve differently."""
-    X = data(400, 5, seed=11)
-    X[:, 2] = X[:, 0] + 1e-9 * X[:, 1]
-    x, y = X[:, :3] * unit_factors(X[:, :3]), X[:, 3]
-    centered = x - x.mean(axis=0)
-    singular = np.linalg.svd(centered, compute_uv=False)
-    assert singular[-1] / singular[0] < _RANK_CUTOFF
-    dropped = lstsq(centered, y - y.mean(), cond=_RANK_CUTOFF)[0]
-    kept = lstsq(centered, y - y.mean(), cond=None)[0]
-    assert not np.array_equal(dropped, kept)
-    assert_same(X[:, :3], X[:, 3])
+@pytest.mark.parametrize(
+    ("gap", "below"), [(1e-3, False), (1e-5, False), (1e-7, True), (1e-9, True)]
+)
+def test_the_near_copies_lie_on_both_sides_of_the_cutoff(gap: float, below: bool) -> None:
+    """The cases above straddle ``tol`` with their smallest relative singular value far from it."""
+    x = near_copy(gap)[:, :3]
+    x = x * unit_factors(x)
+    singular = np.linalg.svd(x - x.mean(axis=0), compute_uv=False)
+    ratio = singular[-1] / singular[0]
+    assert (ratio < _RANK_CUTOFF) == below
+    assert abs(np.log10(ratio / _RANK_CUTOFF)) > 0.5
 
 
 def test_integer_input() -> None:
