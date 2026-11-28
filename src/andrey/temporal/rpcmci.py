@@ -40,6 +40,8 @@ https://doi.org/10.1063/5.0020538
 from __future__ import annotations
 
 import importlib
+from collections.abc import Iterable
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from types import ModuleType
@@ -52,6 +54,7 @@ from andrey.core import backend
 from andrey.core.seeding import start_generator
 from andrey.core.ties import KEY_DP, stable_key, tie_ranks
 
+from ._parallel_rpcmci import pooled_starts
 from .pcmci import PCMCIResult, lagged_design, pcmci
 
 #: The iteration enabling early stopping on small ``Gamma`` changes, and the small-change share of
@@ -421,6 +424,64 @@ def _start(
     )
 
 
+@dataclass(frozen=True)
+class Starts:
+    """What every start of one fit shares: the series, its variables' ``ranks``, the ``seed`` of the
+    starts' first weights, and the settings :func:`_start` takes.
+
+    A worker process rebuilds the fit's starts from one, so a start runs the same in any process.
+    """
+
+    data: np.ndarray
+    ranks: np.ndarray
+    seed: int
+    n_regimes: int
+    max_transitions: int
+    switch_threshold: float
+    max_iter: int
+    tau_max: int
+    pcmci_args: dict
+
+
+def run_start(starts: Starts, a: int) -> RPCMCIResult | None:
+    """Start ``a`` of a fit: its first weights from :func:`~andrey.core.seeding.start_generator`,
+    uniform in ``[0, 1)``, run by :func:`_start`; ``None`` when it fails."""
+    weights = start_generator(starts.seed, a).uniform(
+        0, 1, size=(starts.n_regimes, starts.data.shape[0])
+    )
+    return _start(
+        starts.data,
+        weights,
+        max_transitions=starts.max_transitions,
+        switch_threshold=starts.switch_threshold,
+        max_iter=starts.max_iter,
+        tau_max=starts.tau_max,
+        pcmci_args=starts.pcmci_args,
+        ranks=starts.ranks,
+    )
+
+
+def best_start(
+    runs: Iterable[RPCMCIResult | None], n_steps: int
+) -> tuple[RPCMCIResult | None, int]:
+    """The best of the starts ``runs``, given in start order, and the number that failed.
+
+    The best has the lowest objective, per step to :data:`~andrey.core.ties.KEY_DP` decimals, the
+    first start of objectives that tie, and holds its index as ``start``; ``None`` when every start
+    failed. ``runs`` are read once, in order, so they come from this process or from workers alike.
+    """
+    best: RPCMCIResult | None = None
+    n_failed = 0
+    for a, run in enumerate(runs):
+        if run is None:
+            n_failed += 1
+        elif best is None or stable_key(run.objective, n_steps) < stable_key(
+            best.objective, n_steps
+        ):
+            best = replace(run, start=a)
+    return best, n_failed
+
+
 def rpcmci(
     data: np.ndarray,
     *,
@@ -441,37 +502,36 @@ def rpcmci(
     Start ``a`` draws its first ``Gamma`` from :func:`~andrey.core.seeding.start_generator`,
     uniform in ``[0, 1)``. ``pc_alpha``, ``alpha_level``, ``fdr_method``, and ``indep_test`` reach
     each regime's PCMCI. Raises :class:`RegimeFitError` when every start fails.
+
+    With more than one worker (``andrey.config.n_jobs``) and enough work, the starts run on worker
+    processes (:func:`~andrey.temporal._parallel_rpcmci.pooled_starts`) and come back in start
+    order, so the result is the one of a fit in this process.
     """
     data = np.asarray(data, dtype=np.float64)
-    ranks = tie_ranks(data)
-    pcmci_args = {
-        "pc_alpha": pc_alpha,
-        "alpha_level": alpha_level,
-        "fdr_method": fdr_method,
-        "indep_test": indep_test,
-    }
-    best: RPCMCIResult | None = None
-    n_failed = 0
-    n_steps = data.shape[0]
-    with backend.one_blas_thread():  # the regression costs then give the same bits on any host
-        for a in range(n_starts):
-            weights = start_generator(seed, a).uniform(0, 1, size=(n_regimes, n_steps))
-            run = _start(
-                data,
-                weights,
-                max_transitions=max_transitions,
-                switch_threshold=switch_threshold,
-                max_iter=max_iter,
-                tau_max=tau_max,
-                pcmci_args=pcmci_args,
-                ranks=ranks,
-            )
-            if run is None:
-                n_failed += 1
-            elif best is None or stable_key(run.objective, n_steps) < stable_key(
-                best.objective, n_steps
-            ):
-                best = replace(run, start=a)
+    starts = Starts(
+        data=data,
+        ranks=tie_ranks(data),
+        seed=seed,
+        n_regimes=n_regimes,
+        max_transitions=max_transitions,
+        switch_threshold=switch_threshold,
+        max_iter=max_iter,
+        tau_max=tau_max,
+        pcmci_args={
+            "pc_alpha": pc_alpha,
+            "alpha_level": alpha_level,
+            "fdr_method": fdr_method,
+            "indep_test": indep_test,
+        },
+    )
+    runs = pooled_starts(starts, n_starts)
+    with ExitStack() as limits:  # the regression costs then give the same bits on any host
+        if backend.config.backend == "cpu":  # PyTorch on one thread, as in a pooled worker
+            limits.enter_context(backend.one_torch_thread())
+        limits.enter_context(backend.one_blas_thread())
+        if runs is None:
+            runs = (run_start(starts, a) for a in range(n_starts))
+        best, n_failed = best_start(runs, data.shape[0])
     if best is None:
         raise RegimeFitError(
             f"rpcmci: every one of the {n_starts} starts left a regime with fewer than "

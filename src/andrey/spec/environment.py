@@ -27,6 +27,7 @@ from andrey.core.missing_groups import (
 )
 from andrey.lingam.pwling import MIN_PRUNE_WORK
 from andrey.search._parallel_ges import MIN_POOL_GES_WORK
+from andrey.temporal._parallel_rpcmci import MIN_POOL_RPCMCI_WORK
 
 from .models import EnvVarSpec
 
@@ -72,7 +73,7 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "`normal_scores` and of FCI-JCI with `fisherz` or `student_t`, the full-graph search "
             "of IAMB, Inter-IAMB, and MMPC (and the restrict phase of MMHC and RSMAX2 that reads "
             "their sets) and a list of their targets with `fisherz`, `student_t`, or "
-            "`normal_scores` on complete data, and worker threads for "
+            "`normal_scores` on complete data, the starts of `rpcmci`, and worker threads for "
             "the two directions of `pnl` and the searches of `skewd` and `skewd_mv`; `0` or `1` "
             "runs serially. "
             "Separate from `ANDREY_BACKEND`, which picks the numeric code."
@@ -157,6 +158,22 @@ ENV_VARS: tuple[EnvVarSpec, ...] = (
             "running Linux with 2, 4, and 8 workers. No effect unless the worker count (`n_jobs` / "
             "`ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns once on the "
             "default when it reaches a tenth of it; `andrey calibrate --method blanket` measures "
+            "a value for your machine."
+        ),
+        group="backend",
+    ),
+    EnvVarSpec(
+        name="ANDREY_RPCMCI_PARALLEL_MIN_WORK",
+        values="integer (starts times regimes times time steps per fit)",
+        default=str(MIN_POOL_RPCMCI_WORK),
+        effect=(
+            "Per-fit crossover gate for the parallel starts of `rpcmci`: the starts run on the "
+            "worker pool only when `n_starts * n_regimes * T` for a series of `T` time steps is "
+            "at least this, else in-process. `0` sends every fit with two or more starts to the "
+            "pool. The default was measured on an AMD EPYC 9534 server running Linux with 2, 4, "
+            "and 8 workers. No effect unless the worker count (`n_jobs` / "
+            "`ANDREY_N_JOBS`) is above 1. A fit with more than one worker warns once on the "
+            "default when it reaches a tenth of it; `andrey calibrate --method rpcmci` measures "
             "a value for your machine."
         ),
         group="backend",
