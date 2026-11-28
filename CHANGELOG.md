@@ -308,12 +308,27 @@ names its pull request.
   them only after a check at import that they return the bytes of `linprog` on small programs of the
   same form, and `linprog` solves the program with SciPy before 1.15 and wherever the check fails.
   ([#1383])
+- `rpcmci` runs its starts on the `andrey.config(n_jobs=...)` worker processes, so it runs faster
+  with more than one worker, with the same result bit for bit at any number of workers, whichever
+  worker finishes first. A fit uses the workers only when `n_starts * n_regimes * T` for a series
+  of `T` time steps reaches `ANDREY_RPCMCI_PARALLEL_MIN_WORK`; `andrey calibrate --method rpcmci`
+  measures the value for a machine, and a fit with more than one worker warns once when it nears
+  the default. ([#1384])
 - For contributors, the `check-test-changes` job also flags a `conftest.py` that sets
   `collect_ignore` or `collect_ignore_glob`, a `__test__ = False` added to a module or a function, a
   string `skipif` or `xfail` condition made `True`, a `pytest.raises` widened from `Exception` to
   `BaseException`, a `test_*` function that becomes a fixture, a `parametrize` with no case added,
   an `xfail` that gains `run=False`, a new `setup_module`, `setup_class`, `setup_method`, or
   `setup_function` that skips, and a function of `qa/` that is deleted or emptied. ([#1381])
+- `resit` and the exact search of `cpcm_graph` (3 or 4 variables) run their regressions on the
+  `andrey.config(n_jobs=...)` worker processes, so they run faster with more than one worker, with
+  the same graph, causal order, and scores bit for bit at any number of workers. A `resit` fit uses
+  the workers only when its causal order holds at least `ANDREY_RESIT_PARALLEL_MIN_WORK`
+  regressions times rows; the exact search sends the fits of the columns under the `"gaussian"`,
+  `"gamma"`, or `"gumbel"` family, the families whose fits cost more than starting the workers, and
+  only when those fits times rows reach `ANDREY_CPCM_PARALLEL_MIN_WORK`.
+  `andrey calibrate --method resit` and `--method cpcm` measure the values for a machine, and a fit
+  with more than one worker warns once when it nears a default. ([#1385])
 - `indep_test="kci"` runs faster, with the same output bit for bit: a query keeps the kernel of its
   first variable with the conditioning set for the queries that share it, as it kept the second
   variable's, and the skeleton searches of `pc`, `fci`, and the methods built on them evaluate a
@@ -3354,3 +3369,5 @@ First alpha release.
 [#1373]: https://github.com/Abel-ai-lab/Andrey/pull/1373
 [#1383]: https://github.com/Abel-ai-lab/Andrey/pull/1383
 [#1381]: https://github.com/Abel-ai-lab/Andrey/pull/1381
+[#1384]: https://github.com/Abel-ai-lab/Andrey/pull/1384
+[#1385]: https://github.com/Abel-ai-lab/Andrey/pull/1385

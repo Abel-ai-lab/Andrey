@@ -111,6 +111,11 @@ completely at random. A column order moves the removed values, so they are not r
 `--shuffle`. Record both manifests of a compare with one version of `qa/identity.py`: the older
 one has no rows for them, and the compare lists each as in one manifest only.
 
+Regime-PCMCI, which the gate does not run, has a fit of its own, `RPCMCI`, with 20 starts on two
+series of 600 steps that switch between two regimes in runs of 70 to 100 steps, one of them with
+variable ranks that differ from the positions. It is not refitted under `--shuffle`, and under
+`--workers` its starts run on the worker pool.
+
 Two options the gate's datasets cannot reach have fits of their own, named for the method and the
 option, on data where each changes the answer. `possibly_separable="ambiguous"` runs PC, FCI,
 CD-NOD, FCI-JCI, IAMB, Inter-IAMB, MMPC (with `structure="cpdag"`, the graph that reads it), and

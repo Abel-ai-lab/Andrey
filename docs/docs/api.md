@@ -574,8 +574,11 @@ fits the same kind of model with the noise of any distribution, with the paper's
 a causal order from the sink up, each sink the variable whose additive-model residual an HSIC test
 finds most independent of the remaining variables, then removes each parent whose removal leaves
 the residual independent of the variable's predecessors at `alpha=0.05`. It returns a DAG and a
-causal order. The [0.13.0](benchmarks/0.13.0.md#resit) release card measures it from 5 to 20
-variables against the authors' code and lingam; its accuracy claim holds up to 10 variables.
+causal order. With `andrey.config(n_jobs=...)` above 1, its regressions and tests run on that many
+worker processes once the fit holds `ANDREY_RESIT_PARALLEL_MIN_WORK` regressions of the causal
+order times rows, with the same result bit for bit. The [0.13.0](benchmarks/0.13.0.md#resit)
+release card measures it from 5 to 20 variables against the authors' code and lingam; its accuracy
+claim holds up to 10 variables.
 
 SCORE (Rolland et al. 2022), {py:func}`~andrey.score_matching`, fits the model of CAM, nonlinear
 effects with additive Gaussian noise, without a regression in its order search: under that model a
@@ -619,7 +622,10 @@ variable's values mapped through its fitted distribution function are independen
 in the causal direction. {py:func}`~andrey.cpcm` decides a pair by an HSIC test of that residual in
 each direction; {py:func}`~andrey.cpcm_graph` returns the DAG whose residuals a dHSIC test finds
 most jointly independent, with a penalty of 2 per edge, by exact search up to 4 variables and
-RESIT's order with greedy edge removal above. A column outside its family's support raises
+RESIT's order with greedy edge removal above. With `n_jobs` above 1 the exact search over 3 or 4
+variables fits the residuals of the columns under the Gaussian, gamma, or Gumbel family on worker
+processes once it holds `ANDREY_CPCM_PARALLEL_MIN_WORK` such fits times rows, with the same result
+bit for bit. A column outside its family's support raises
 `ValueError`: a non-integer under `"poisson"`, a value of 0 or less under `"exponential"`, or a
 value of 1 or less under `"pareto"`. The [0.19.0](benchmarks/0.19.0.md#cpcm) release card measures
 both against the authors' code on the paper's pairs and on graphs of 4 to 8 variables.
@@ -817,8 +823,10 @@ alternates PCMCI on each regime's time steps with a linear program that reassign
 regime whose linear model predicts them best, with at most `max_transitions` switches per regime;
 the lowest-objective start returns each step's regime and one lagged graph per regime in a
 {py:class}`~andrey.RegimeOutput`. SciPy's HiGHS solver solves the linear program exactly, so it
-needs no further package. It is experimental until its benchmark in the paper's setting is
-published.
+needs no further package. With `andrey.config(n_jobs=...)` above 1, the starts run on that many
+worker processes once `n_starts * n_regimes * T` for a series of `T` steps reaches
+`ANDREY_RPCMCI_PARALLEL_MIN_WORK`, with the same result at any number of workers. It is
+experimental until its benchmark in the paper's setting is published.
 
 A method becomes supported once it has:
 
@@ -1633,7 +1641,7 @@ and `rc_params` return plain data and need no import.
 | `andrey --help --json` | Every method contract and the shared CLI contract |
 | `andrey config` | Current settings, backend availability, the platform, and the optional extras |
 | `andrey config --help` | Environment variables, defaults, effects, and precedence |
-| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT, possible-d-separation, full-graph IAMB, Inter-IAMB, and MMPC) for this machine, as settings to export |
+| `andrey calibrate` | Measured worker-pool cutoffs (GES, skeleton, RCoT, possible-d-separation, full-graph IAMB, Inter-IAMB, and MMPC, Regime-PCMCI, RESIT, and the CPCM exact search) for this machine, as settings to export |
 | `andrey --skill` | The agent guide (`SKILL.md`): methods, settings, how to run and read results |
 
 In `--help --json`, each parameter carries its bounds as JSON Schema's `minimum` and `maximum`, or

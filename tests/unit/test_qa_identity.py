@@ -752,13 +752,21 @@ def test_counting_records_the_exact_search_scores(x: np.ndarray) -> None:
 
 
 def test_every_supported_method_is_fitted_on_its_datasets() -> None:
-    extra = set(identity.TARGET_LISTS) | set(identity.OPTIONS) | set(identity.EM_FITS)
+    extra = (
+        set(identity.TARGET_LISTS)
+        | set(identity.OPTIONS)
+        | set(identity.EXPERIMENTAL)
+        | set(identity.EM_FITS)
+    )
     assert set(identity.FITS) - extra == set(qg.SUPPORTED)
     assert set(identity.TARGET_LISTS.values()) <= set(qg.SUPPORTED)
     assert set(identity.TARGET_LISTS) <= set(identity.WORKER_METHODS)
     own = set(identity.OPTIONS) | set(identity.EM_FITS)
     fitted = [identity.TARGET_LISTS.get(m, m) for m in identity.FITS if m not in own]
-    assert all(m in identity.LARGER or m in identity.UNKNOWN_TARGETS for m in fitted)
+    assert all(
+        m in identity.LARGER or m in identity.UNKNOWN_TARGETS or m in identity.EXPERIMENTAL
+        for m in fitted
+    )
 
 
 def test_each_option_fit_names_a_supported_method_and_its_own_data() -> None:
@@ -1716,6 +1724,72 @@ def test_the_full_graph_searches_are_refitted_on_workers_through_the_pool(
     monkeypatch.setattr(
         tg, "ProcessPoolExecutor", lambda *a, **k: started.append(1) or real(*a, **k)
     )
+    rows, findings = identity.run([name], seeds=1, workers=2)
+    assert findings == []
+    assert {r["workers"] for r in rows} == {1, 2}
+    assert started
+
+
+def test_regime_pcmci_is_fitted_on_series_that_switch_between_regimes() -> None:
+    """The gate does not run it, so the corpus draws two series of its own: its fit has failed
+    starts and ties on both, and the second has variable ranks that differ from its positions."""
+    assert identity.datasets("RPCMCI") == ("regime_sign_d2_n600", "regime_wide_d3_n600")
+    [(_, _, _, x), (_, _, _, wide)] = [
+        c for c in identity.corpus(["RPCMCI"], seeds=1)
+    ]  # one draw of each series
+    assert x.shape == (600, 2) and wide.shape == (600, 3)
+    assert not identity.FITS["RPCMCI"].shuffled
+
+
+def test_the_parts_of_a_regime_output_name_its_weights_and_each_regime() -> None:
+    x = identity.draws("regime_sign_d2_n600")[0].data
+    out = identity.FITS["RPCMCI"].call(x)
+    names = identity.parts(out)
+    assert {"regimes", "0.graph", "1.graph", "metadata.objective"} <= set(names)
+    assert len(list(identity.graphs(out))) >= out.n_regimes
+    moved = andrey.RegimeOutput.new(
+        list(out.outputs), np.flipud(out.weights).copy(), metadata=dict(out.metadata)
+    )
+    changed = {k for k, v in identity.parts(moved).items() if names[k] != v}
+    assert changed == {"regimes"}
+    assert identity.digest(moved) != identity.digest(out)
+
+
+def test_regime_pcmci_is_refitted_on_workers_through_the_pool(monkeypatch) -> None:
+    """The refit sends every fit to the pool, so the check compares pooled runs, not serial ones."""
+    from andrey.temporal import _parallel_rpcmci as pr
+
+    assert "RPCMCI" in identity.WORKER_METHODS
+    started: list[int] = []
+    real = pr.ProcessPoolExecutor
+    monkeypatch.setattr(
+        pr, "ProcessPoolExecutor", lambda **k: started.append(k["max_workers"]) or real(**k)
+    )
+    rows, findings = identity.run(["RPCMCI"], seeds=1, workers=2)
+    assert findings == []
+    assert {r["workers"] for r in rows} == {1, 2}
+    assert started == [2, 2]  # one pool for each of the two series
+
+
+@pytest.mark.parametrize(
+    "name, dataset", [("RESIT", "anm_er_n1000_d5"), ("CPCMGraph", "anm_er_n300_d4")]
+)
+def test_the_fcm_regressions_are_refitted_on_workers_through_the_pool(
+    name, dataset, monkeypatch
+) -> None:
+    """The refit sends every regression to the pool, so the check compares pooled fits, not serial
+    ones. CPCM's is the exact search, up to 4 variables, which no gate dataset reaches."""
+    from andrey.fcm import _parallel as fcm_pool
+
+    assert name in identity.WORKER_METHODS
+    assert dataset in identity.datasets(name)
+    assert identity.draws(dataset)[0].data.shape[1] <= (4 if name == "CPCMGraph" else 5)
+    started: list[int] = []
+    real = fcm_pool.ProcessPoolExecutor
+    monkeypatch.setattr(
+        fcm_pool, "ProcessPoolExecutor", lambda *a, **k: started.append(1) or real(*a, **k)
+    )
+    monkeypatch.setattr(identity, "datasets", lambda method: (dataset,))
     rows, findings = identity.run([name], seeds=1, workers=2)
     assert findings == []
     assert {r["workers"] for r in rows} == {1, 2}
