@@ -11,6 +11,7 @@ import dataclasses
 import json
 import logging
 import multiprocessing as mp
+import sys
 import time
 import warnings
 
@@ -404,6 +405,8 @@ def test_a_worker_holds_one_blas_thread():
     facade does in the calling process, so a result is the one this process computes."""
     with par._pool(1, par._pin, ()) as pool:
         info = pool.submit(threadpool_info).result()
+    if sys.platform == "darwin" and not info:
+        pytest.skip("threadpoolctl lists no pool to limit")  # macOS Accelerate
     assert info and {library["num_threads"] for library in info} == {1}
 
 
