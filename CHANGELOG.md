@@ -249,13 +249,14 @@ names its pull request.
   as the in-place tensor operations of `torch.optim.Adam`, so the first fit in a process no
   longer builds an optimizer, which imports `torch._dynamo` and its dependencies. ([#1343])
 - `calm`, `anm`, `loci`, and `pnl`, and the separating sets, collider votes, and orientation rules
-  of `gfci`, `boss_fci`, and `grasp_fci`, run on one BLAS thread, and `calm` on one torch thread, so
-  each returns the result it gives on one thread whatever the machine's thread count, and `pnl`
-  returns the same bits with one worker and with several. KCI from 2,000 rows keeps every thread in
-  the GFCI family, as it does in `pc`. On a machine with several BLAS threads their results can
-  change in the last digits, and `calm` can return another graph, as with `missing="em"` or
-  `use_moral_graph=False`. They use less CPU time there, and `anm` and the GFCI family with KCI can
-  take longer in wall-clock time on a machine with free cores. ([#1369])
+  of `gfci`, `boss_fci`, and `grasp_fci`, run on one BLAS thread, and on one torch thread where
+  torch computes, in `calm` and under `backend="cpu"`, so each returns the result it gives on one
+  thread whatever the machine's thread count, and `pnl` returns the same bits with one worker and
+  with several. KCI from 2,000 rows keeps every thread in the GFCI family, as it does in `pc`. On a
+  machine with several BLAS threads their results can change in the last digits, and `calm` can
+  return another graph, as with `missing="em"` or `use_moral_graph=False`. They use less CPU time
+  there, and `anm` and the GFCI family with KCI can take longer in wall-clock time on a machine with
+  free cores. ([#1369])
 
 ### Fixed
 
