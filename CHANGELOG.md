@@ -271,6 +271,11 @@ names its pull request.
   log-likelihood for rows that observe one column, and in the expected mean and covariance for rows
   that miss one, because Accelerate sums a dot product by the memory alignment of its operand; such
   patterns are solved alone. ([#1341])
+- A saved graph (JSON or npz) with a column index below 0 or at least `n_nodes`, from a hand edit or
+  damage, raises a `ValueError` on `StructureOutput.load` that gives the allowed range and the
+  smallest and largest index found. A `dag`, `cpdag`, or `undirected` graph used to reach SciPy's
+  transpose, which can crash the process, and the other kinds loaded and failed at the first read
+  with an `IndexError`. ([#1364])
 
 ## [0.19.0] - 2026-11-24
 
@@ -3247,3 +3252,4 @@ First alpha release.
 [#1347]: https://github.com/Abel-ai-lab/Andrey/pull/1347
 [#1352]: https://github.com/Abel-ai-lab/Andrey/pull/1352
 [#1353]: https://github.com/Abel-ai-lab/Andrey/pull/1353
+[#1364]: https://github.com/Abel-ai-lab/Andrey/pull/1364
