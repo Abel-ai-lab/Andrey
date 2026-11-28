@@ -748,7 +748,17 @@ def finish(
     repaired, removed = threshold_dag(weights, canonical, threshold)
     back = canonical.back
     weighted = (weights * repaired)[np.ix_(back, back)]
-    dag = to_structure(endpoint_marks(repaired[np.ix_(back, back)]), kind="dag", labels=labels)
+    support = repaired[np.ix_(back, back)]
+    dag = to_structure(endpoint_marks(support), kind="dag", labels=labels)
+    if (take := _checkpoint.TAKE.get()) is not None:
+        take(
+            "continuous.result",
+            support=support,
+            weights=weighted,
+            h_final=h_final,
+            edges_removed=removed,
+            path_steps=path_steps,
+        )
     return ContinuousResult(weighted, dag, h_final, removed, path_steps)
 
 

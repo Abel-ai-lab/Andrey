@@ -72,17 +72,17 @@ A compare names the fit that differs, not where inside it the two builds parted.
 (with `-o`) records, for each draw's first fit, one worker and no column order, a digest of the
 algorithm's state at each of its stages, and the compare names the first stage and piece where the
 builds part. The stages are the skeleton search of PC, FCI, FCI-JCI, CD-NOD, GFCI, BOSS-FCI,
-GRaSP-FCI, and RSMAX2 by conditioning size, then its collider, Meek, possible-d-sep, and rule
-rounds; each applied move of GES, AGES, XGES, GIES, GnIES, HC, and Tabu, and of the greedy step of
-MMHC and RSMAX2; each target's grown and shrunk set of IAMB, Inter-IAMB, and MMPC; each round of
+GRaSP-FCI, and RSMAX2 by conditioning size, then its collider, Meek, conflict, possible-d-sep, and
+rule rounds; each applied move of GES, AGES, XGES, GIES, GnIES, HC, and Tabu, and of the greedy step
+of MMHC and RSMAX2; each target's grown and shrunk set of IAMB, Inter-IAMB, and MMPC; each round of
 structural EM; and each solve, dual step, path step, or outer round of NOTEARS, DYNOTEARS, DAGMA,
-and CALM. GES, XGES, GIES, structural EM, and CALM end with a stage that holds the total, the
-likelihoods, or the objective they return. The other methods keep the whole-output hash alone.
-Each stage passes the state to the private sink `andrey.core._checkpoint.TAKE`, which is unset
-outside the harness: a stage then costs one read of a context variable and builds nothing, so the
-manifest of a run without the mode has the same rows as before. The harness exits with an error when
-the imported Andrey has no such sink, so a run against an older build fails instead of recording
-nothing.
+and CALM. GES, XGES, GIES, structural EM, CALM, NOTEARS, DAGMA, and DYNOTEARS end with a stage that
+holds the total, the likelihoods, or the thresholded weights and objective they return. The other
+methods keep the whole-output hash alone. Each stage passes the state to the private sink
+`andrey.core._checkpoint.TAKE`, which is unset outside the harness: a stage then costs one read of a
+context variable and builds nothing, so the manifest of a run without the mode has the same rows as
+before. The harness exits with an error when the imported Andrey has no such sink, so a run against
+an older build fails instead of recording nothing.
 
 A row of a manifest with checkpoints has two more fields, `checkpoints`, the digest of the fit's
 stages in order, and `checkpoint_records`, their number. The pieces' bytes go to

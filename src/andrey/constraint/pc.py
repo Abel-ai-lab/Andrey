@@ -181,7 +181,10 @@ def pc(
         cpdag = meek(pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order)
         if (take := _checkpoint.TAKE.get()) is not None:
             take("pc.meek", cpdag=cpdag)
-        return to_structure(undirect_conflicts(cpdag), kind="cpdag")
+        cpdag = undirect_conflicts(cpdag)
+        if (take := _checkpoint.TAKE.get()) is not None:
+            take("pc.conflicts", cpdag=cpdag)
+        return to_structure(cpdag, kind="cpdag")
     firings: list[dict] = []
     cpdag = meek(
         pdag, rule4=rule4, ambiguous=ambiguous, in_column_order=in_column_order, _trace=firings

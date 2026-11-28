@@ -848,7 +848,10 @@ pc_module = importlib.import_module("andrey.constraint.pc")
 
 #: Each family's fit on a dataset where it makes every stage listed, as the harness fits it.
 FAMILY_STAGES: dict[str, tuple[str, set[str]]] = {
-    "PC": ("asia_gauss", {"skeleton.size", "skeleton.end", "pc.colliders", "pc.meek"}),
+    "PC": (
+        "asia_gauss",
+        {"skeleton.size", "skeleton.end", "pc.colliders", "pc.meek", "pc.conflicts"},
+    ),
     "FCI": (
         "asia_gauss",
         {"skeleton.size", "skeleton.end", "fci.colliders", "fci.possible_dsep", "fci.rules"},
@@ -864,8 +867,9 @@ FAMILY_STAGES: dict[str, tuple[str, set[str]]] = {
     "IAMB": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
     "InterIAMB": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
     "MMPC": ("asia_gauss", {"blanket.grow", "blanket.shrink", "blanket.structure"}),
-    "NOTEARS": ("notears_paper_raw_d10", {"notears.solve", "notears.dual"}),
-    "DAGMA": ("notears_paper_raw_d10", {"dagma.stage"}),
+    "NOTEARS": ("notears_paper_raw_d10", {"notears.solve", "notears.dual", "continuous.result"}),
+    "DAGMA": ("notears_paper_raw_d10", {"dagma.stage", "continuous.result"}),
+    "DYNOTEARS": ("dynotears_paper_d10_n500", {"notears.solve", "dynotears.result"}),
     "GES-em": ("linear_gauss_er_d10", {"em.round", "em.loglik", "ges.forward"}),
 }
 
@@ -1014,6 +1018,35 @@ def test_structural_em_ends_with_every_likelihood_it_reports() -> None:
     out, _, records = _fit_on("GES-em", dataset, checkpoints=True)
     assert [r.stage for r in records].count("em.loglik") == 1 and records[-1].stage == "em.loglik"
     assert records[-1].pieces[0].array.tolist() == out.metadata["em"]["log_likelihood"]
+
+
+def test_pc_records_the_graph_after_conflict_cleanup_and_not_the_one_before_it(
+    monkeypatch, x: np.ndarray
+) -> None:
+    monkeypatch.setattr(
+        pc_module, "undirect_conflicts", lambda cpdag, **kwargs: np.zeros_like(cpdag)
+    )
+    with identity.checkpointing(True) as recorder:
+        out = andrey.pc(x)
+    stages = [r.stage for r in recorder.records]
+    assert stages[-2:] == ["pc.meek", "pc.conflicts"]
+    before, after = recorder.records[-2].pieces[0], recorder.records[-1].pieces[0]
+    assert before.array.any() and not after.array.any()
+    assert not np.asarray(out.structure.to_numpy()).any()
+
+
+@pytest.mark.parametrize("name", ["NOTEARS", "DAGMA", "DYNOTEARS"])
+def test_a_continuous_search_ends_with_the_result_it_returns(name: str) -> None:
+    dataset, _ = FAMILY_STAGES[name]
+    out, _, records = _fit_on(name, dataset, checkpoints=True)
+    last = records[-1]
+    stage = "dynotears.result" if name == "DYNOTEARS" else "continuous.result"
+    assert last.stage == stage and [r.stage for r in records].count(stage) == 1
+    pieces = {p.name: p.array for p in last.pieces}
+    if out.weighted_adjacency is not None:
+        assert np.array_equal(pieces["weights"], np.asarray(out.weighted_adjacency).ravel())
+    assert float(pieces["h_final"][0]) == out.metadata["h_final"]
+    assert int(pieces["edges_removed"][0]) == out.metadata["edges_removed"]
 
 
 @pytest.mark.filterwarnings("ignore::andrey.SearchLimitWarning")
